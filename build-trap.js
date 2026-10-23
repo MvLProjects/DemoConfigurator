@@ -38,6 +38,35 @@ import { padDelen, profielDoos } from './pad.js';
 import { groepeerVormen } from './onderdelen.js';
 import { maakBoom } from './samenstelling.js';
 
+/** Een vector om de verticale as draaien; ruis rond nul wordt nul. */
+function draaiZ(v, hoek) {
+    const c = Math.cos(hoek), s = Math.sin(hoek);
+    return [v[0] * c - v[1] * s, v[0] * s + v[1] * c, v[2]]
+        .map(w => (Math.abs(w) < 1e-12 ? 0 : w));
+}
+
+/**
+ * De onderdelen vanaf index `vanaf` om de verticale as draaien en verschuiven.
+ *
+ * Zo wordt een vlucht van een kwartslag- of halfslagtrap gebouwd: eerst als
+ * rechte vlucht langs +X, precies zoals een rechte trap, en daarna als geheel
+ * op zijn plek gezet. De onderdelen zelf veranderen niet - een trede van vlucht
+ * 2 is hetzelfde stuk als een trede van vlucht 1 - alleen hun plaatsing.
+ *
+ * Een plaatboom is getekend als omtrek in het XZ-vlak; die krijgt de draaiing
+ * er los bij in `plaatsing`, en maakPlaat en het voorbeeld passen hem toe.
+ */
+function verplaatsDelen(delen, vanaf, hoek, verschuiving) {
+    for (let i = vanaf; i < delen.length; i++) {
+        const d = delen[i];
+        if (d.omtrek) { d.plaatsing = { hoek, verschuiving }; continue; }
+        d.oorsprong = draaiZ(d.oorsprong, hoek).map((c, k) => c + verschuiving[k]);
+        d.xAs = draaiZ(d.xAs, hoek);
+        d.yAs = draaiZ(d.yAs, hoek);
+        d.zAs = draaiZ(d.zAs, hoek);
+    }
+}
+
 /**
  * Alle onderdelen van een trap, als kale beschrijving in wereldcoordinaten.
  *
@@ -46,7 +75,28 @@ import { maakBoom } from './samenstelling.js';
  * van de benedenvloer.
  */
 export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
+    // DE SOORT TRAP. Een wenteltrap is zo anders opgebouwd - spil, taartpunten,
+    // een leuning die meedraait - dat hij een eigen functie heeft.
+    const soort = p.soort || 'recht';
+    if (soort === 'wentel') return wentelDelen(p, balustradeMaten, leuning);
+
+    // Een kwartslag- of halfslagtrap draait OP het bordes, dus hij heeft er
+    // altijd een. Niet ingevuld: halverwege. Het bordes is zo diep als de trap
+    // breed is - het veld bordeslengte geldt alleen voor een rechte trap.
+    const draaiend = soort === 'kwartslag' || soort === 'halfslag';
+    if (draaiend) {
+        p = { ...p, bordesLengte: p.breedte,
+              bordesNa: p.bordesNa > 0 ? p.bordesNa
+                  : Math.round(berekenTrap({ hoogte: p.hoogte }).optreden / 2) };
+    }
     const t = berekenTrap(p);
+    if (draaiend && !t.bordes) {
+        throw new Error(`Een ${soort}trap draait op een bordes, en daarvoor is deze `
+            + 'trap te laag: er moet aan beide kanten minstens één trede overblijven.');
+    }
+    // Draaiing: +1 is naar +Y, -1 naar -Y. In deze app is "links" de -Y-kant,
+    // net als bij de leuning (zie zijdenVan).
+    const draaiKant = p.draai === 'links' ? -1 : 1;
 
     const halveBreedte = p.breedte / 2;
 
@@ -91,7 +141,12 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
      * liggende onder de trede. De linker is de rechter, een halve slag om z
      * gedraaid - zo is het hetzelfde stuk staal en herkent de stuklijst dat.
      */
-    const hoeken = (xVan, xTot, zOnderTrede) => {
+    //
+    // `vlakken` zegt tegen welke boomvlakken: [y van het vlak, kant waar de
+    // boom zit]. Standaard de twee bomen van een vlucht; onder het bordes van
+    // een draaiende trap is het er soms maar één.
+    const hoeken = (xVan, xTot, zOnderTrede,
+                    vlakken = [[binnen, +1], [-binnen, -1]]) => {
         const { been: a, dikte: s, inspring } = O.tredehoek;
         const doorsnede = [[a - s, 0], [a, 0], [a, a], [0, a], [0, a - s], [a - s, a - s]];
         const gemeen = {
@@ -99,12 +154,13 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
             dx: xTot - xVan - 2 * inspring, dy: a, dz: a,
             lengteAs: 'x', omschrijving: `L ${a}×${a}×${s}`,
         };
-        delen.push({ ...gemeen,
-            oorsprong: [xVan + inspring, binnen - a, zOnderTrede - a],
-            xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1] });
-        delen.push({ ...gemeen,
-            oorsprong: [xTot - inspring, -binnen + a, zOnderTrede - a],
-            xAs: [-1, 0, 0], yAs: [0, -1, 0], zAs: [0, 0, 1] });
+        for (const [y, kant] of vlakken) {
+            delen.push(kant > 0
+                ? { ...gemeen, oorsprong: [xVan + inspring, y - a, zOnderTrede - a],
+                    xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1] }
+                : { ...gemeen, oorsprong: [xTot - inspring, y + a, zOnderTrede - a],
+                    xAs: [-1, 0, 0], yAs: [0, -1, 0], zAs: [0, 0, 1] });
+        }
     };
 
     /**
@@ -364,6 +420,72 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
         }
     };
 
+    // De ruimte tussen de twee vluchten van een halfslagtrap. Zie regels.json.
+    const oog = O.halfslag.oog;
+
+    /**
+     * Het bordes van een kwartslag- of halfslagtrap, en vlucht 2 erachter.
+     *
+     * Bovenaanzicht bij een draai naar +Y (s = +1); bij -Y spiegelt alles in y.
+     *
+     *   kwartslag                       halfslag
+     *              vlucht 2 ^                  <- vlucht 2
+     *               +-------+           +------------------+
+     *               |bordes |B          |      bordes      |B
+     *   --vlucht 1--+-------+           |                  |
+     *               A                   +------------------+
+     *                                   --vlucht 1-->      A   C aan de overkant
+     *
+     * De bordesbomen lopen langs de BUITENranden (A, B en bij een halfslag C)
+     * en sluiten stomp op elkaar aan. Waar een vlucht aankomt of vertrekt
+     * zitten geen bordesbomen: daar zijn het de trapbomen zelf.
+     */
+    const draaiBordes = (L1, bZ) => {
+        const s = draaiKant, hb = halveBreedte, B = p.breedte, tb = boomDikte;
+        const halfslag = soort === 'halfslag';
+        // De y van de verste buitenrand, aan de kant waar de trap heen draait.
+        const yVer = halfslag ? 3 * hb + oog : hb;
+        const yA = -s * (hb - tb);                       // binnenkant strook A
+        const yC = s * (halfslag ? yVer - tb : hb);      // overkant van de plank
+
+        delen.push({
+            soort: 'bordes',
+            oorsprong: [L1, Math.min(yA, yC), bZ - p.tredeDikte],
+            xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
+            dx: B - tb, dy: Math.abs(yC - yA), dz: p.tredeDikte,
+            materiaal: tredeMateriaal,
+            ...tredeBestel,
+        });
+        if (tredeSoort.opHoeken) {
+            hoeken(L1, L1 + B - tb, bZ - p.tredeDikte,
+                halfslag ? [[yA, -s], [yC, s]] : [[yA, -s]]);
+        }
+
+        /** Een liggende bordesboom langs een buitenrand, opening naar binnen. */
+        const liggend = (start, run, lengte, uit) => {
+            const zAs = [run[1] * uit[2] - run[2] * uit[1],
+                         run[2] * uit[0] - run[0] * uit[2],
+                         run[0] * uit[1] - run[1] * uit[0]];
+            delen.push({
+                soort: 'bordesboom',
+                // Wijst zAs omlaag, dan begint het doosje bovenaan.
+                oorsprong: [start[0], start[1], zAs[2] < 0 ? bZ : bZ - hBoom],
+                xAs: run, yAs: uit, zAs,
+                dx: lengte, dy: tb, dz: hBoom, lengteAs: 'x',
+                ...(boomDoos ? { profiel: p.boomProfiel } : {}),
+            });
+        };
+        liggend([L1, yA], [1, 0, 0], B, [0, -s, 0]);
+        liggend([L1 + B - tb, yA], [0, s, 0], Math.abs(yC - yA), [1, 0, 0]);
+        if (halfslag) liggend([L1, yC], [1, 0, 0], B, [0, s, 0]);
+
+        // Vlucht 2: als rechte vlucht gebouwd, dan op zijn plek gedraaid.
+        const begin = delen.length;
+        vlucht(0, bZ, t.vluchten[1].treden, 'onder');
+        if (halfslag) verplaatsDelen(delen, begin, Math.PI, [L1, s * (B + oog), 0]);
+        else verplaatsDelen(delen, begin, s * Math.PI / 2, [L1 + hb, s * hb, 0]);
+    };
+
     if (!t.bordes) {
         vlucht(0, 0, t.treden);
     } else {
@@ -375,55 +497,61 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
         const bordesX = eerste * t.aantrede;
         const bordesZ = t.bordes.hoogte;
 
-        delen.push({
-            soort: 'bordes',
-            oorsprong: [bordesX, -binnen, bordesZ - p.tredeDikte],
-            xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
-            dx: t.bordes.lengte, dy: 2 * binnen, dz: p.tredeDikte,
-            // Het bordes is net zo goed een plank als een trede, en je maakt
-            // hem van hetzelfde materiaal - anders staat er een stalen vlak
-            // midden in een houten trap.
-            materiaal: tredeMateriaal,
-            ...tredeBestel,
-        });
-        if (tredeSoort.opHoeken) {
-            hoeken(bordesX, bordesX + t.bordes.lengte, bordesZ - p.tredeDikte);
-        }
         // Het stootbord voor het bordes: van de bovenste trede van vlucht 1 tot
         // de bovenkant van het bordes. Het bordes steekt nergens over.
         if (p.stootborden) stootbord(bordesX, eerste * t.optrede, bordesZ);
 
-        // Zijplaten onder het bordes, die de twee vluchten met elkaar verbinden.
-        //
-        // Is de boom een PROFIEL, dan is de bordesboom datzelfde profiel,
-        // liggend, met de opening naar binnen en zijn bovenkant op bordespeil.
-        // Een plaat tussen twee U-profielen sloot nergens op aan en stak er
-        // dwars doorheen.
-        if (boomDoos) {
-            const [B, H] = boomDoos;
-            for (const zijde of [+1, -1]) {
-                const rechts = zijde > 0;
+        if (draaiend) {
+            draaiBordes(bordesX, bordesZ);
+        } else {
+            delen.push({
+                soort: 'bordes',
+                oorsprong: [bordesX, -binnen, bordesZ - p.tredeDikte],
+                xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
+                dx: t.bordes.lengte, dy: 2 * binnen, dz: p.tredeDikte,
+                // Het bordes is net zo goed een plank als een trede, en je
+                // maakt hem van hetzelfde materiaal - anders staat er een
+                // stalen vlak midden in een houten trap.
+                materiaal: tredeMateriaal,
+                ...tredeBestel,
+            });
+            if (tredeSoort.opHoeken) {
+                hoeken(bordesX, bordesX + t.bordes.lengte, bordesZ - p.tredeDikte);
+            }
+
+            // Zijplaten onder het bordes, die de twee vluchten met elkaar
+            // verbinden.
+            //
+            // Is de boom een PROFIEL, dan is de bordesboom datzelfde profiel,
+            // liggend, met de opening naar binnen en zijn bovenkant op
+            // bordespeil. Een plaat tussen twee U-profielen sloot nergens op
+            // aan en stak er dwars doorheen.
+            if (boomDoos) {
+                const [B, H] = boomDoos;
+                for (const zijde of [+1, -1]) {
+                    const rechts = zijde > 0;
+                    delen.push({
+                        soort: 'bordesboom',
+                        oorsprong: [bordesX, rechts ? halveBreedte - B : -halveBreedte + B,
+                                    rechts ? bordesZ - H : bordesZ],
+                        xAs: [1, 0, 0], yAs: [0, zijde, 0], zAs: [0, 0, zijde],
+                        dx: t.bordes.lengte, dy: B, dz: H,
+                        profiel: p.boomProfiel,
+                        lengteAs: 'x',
+                    });
+                }
+            }
+            for (const y of boomDoos ? [] : [-halveBreedte, halveBreedte - p.boomDikte]) {
                 delen.push({
                     soort: 'bordesboom',
-                    oorsprong: [bordesX, rechts ? halveBreedte - B : -halveBreedte + B,
-                                rechts ? bordesZ - H : bordesZ],
-                    xAs: [1, 0, 0], yAs: [0, zijde, 0], zAs: [0, 0, zijde],
-                    dx: t.bordes.lengte, dy: B, dz: H,
-                    profiel: p.boomProfiel,
-                    lengteAs: 'x',
+                    oorsprong: [bordesX, y, bordesZ - p.boomHoogte],
+                    xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
+                    dx: t.bordes.lengte, dy: p.boomDikte, dz: p.boomHoogte,
                 });
             }
-        }
-        for (const y of boomDoos ? [] : [-halveBreedte, halveBreedte - p.boomDikte]) {
-            delen.push({
-                soort: 'bordesboom',
-                oorsprong: [bordesX, y, bordesZ - p.boomHoogte],
-                xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
-                dx: t.bordes.lengte, dy: p.boomDikte, dz: p.boomHoogte,
-            });
-        }
 
-        vlucht(bordesX + t.bordes.lengte, bordesZ, t.vluchten[1].treden, 'onder');
+            vlucht(bordesX + t.bordes.lengte, bordesZ, t.vluchten[1].treden, 'onder');
+        }
     }
 
     // --- leuning(en) ---
@@ -466,20 +594,67 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
     const stBreedte = stDoos ? Math.max(stDoos[0], stDoos[1])
         : (leuningMaten && leuningMaten.staanderBreedte);
 
+    /**
+     * De leuningpaden van een kwartslag- of halfslagtrap aan kant `zijde`.
+     *
+     * BUITEN loopt de leuning in één stuk om het bordes heen: omhoog langs
+     * vlucht 1, vlak langs de buitenranden van het bordes, en weer omhoog
+     * langs vlucht 2. Hij begint pas te stijgen waar de neuzenlijn van vlucht 2
+     * het bordespeil snijdt, één aantrede voor de eerste trede - zie
+     * leuningPad.
+     *
+     * BINNEN verschilt het. Bij een kwartslag komen vlucht 1 en 2 samen in de
+     * binnenhoek op verschillende hoogtes; daar kan één pad niet doorlopen
+     * zonder een verticale sprong. Het zijn dus twee leuningen, waarvan de
+     * eindstaanders tegen elkaar in de hoek staan. Bij een halfslag maakt de
+     * leuning een korte bocht om het oog, over het bordes.
+     */
+    const draaiPaden = (zijde) => {
+        const s = draaiKant, hb = halveBreedte, off = stBreedte / 2;
+        const a = t.aantrede, opt = t.optrede, tan = opt / a;
+        const L1 = t.vluchten[0].treden * a, L2 = t.vluchten[1].treden * a;
+        const bZ = t.bordes.hoogte, H = p.hoogte, xo = L1 + p.breedte + off;
+        if (zijde !== s) {
+            const yo = -s * (hb + off);
+            if (soort === 'kwartslag') {
+                return [[[0, yo, opt], [L1, yo, bZ], [xo, yo, bZ],
+                         [xo, s * (hb - a), bZ], [xo, s * (hb + L2), H]]];
+            }
+            const yc = s * (3 * hb + oog + off);
+            return [[[0, yo, opt], [L1, yo, bZ], [xo, yo, bZ], [xo, yc, bZ],
+                     [L1 + a, yc, bZ], [L1 - L2, yc, H]]];
+        }
+        const yi = s * (hb + off);
+        if (soort === 'kwartslag') {
+            const xi = L1 - off;
+            return [
+                [[0, yi, opt], [xi, yi, bZ - off * tan]],
+                [[xi, s * (hb + off + stBreedte), bZ + opt + (off + stBreedte) * tan],
+                 [xi, s * (hb + L2), H]],
+            ];
+        }
+        const yi2 = s * (hb + oog - off);
+        return [[[0, yi, opt], [L1, yi, bZ], [L1 + a, yi, bZ], [L1 + a, yi2, bZ],
+                 [L1 - L2, yi2, H]]];
+    };
+
     const verbindingen = [];
     for (const zijde of zijdenVan(leuning)) {
         if (!leuningMaten) break;
-        const y = zijde * (halveBreedte + stBreedte / 2);
-        const leuningDeel = padDelen(leuningPad(t, p, y), false, leuningMaten);
-        const verschuiving = delen.length;
-        delen.push(...leuningDeel.delen);
-        for (const v of leuningDeel.verbindingen) {
-            verbindingen.push({ ...v, a: v.a + verschuiving, b: v.b + verschuiving });
+        const paden = draaiend ? draaiPaden(zijde)
+            : [leuningPad(t, p, zijde * (halveBreedte + stBreedte / 2))];
+        for (const pad of paden) {
+            const leuningDeel = padDelen(pad, false, leuningMaten);
+            const verschuiving = delen.length;
+            delen.push(...leuningDeel.delen);
+            for (const v of leuningDeel.verbindingen) {
+                verbindingen.push({ ...v, a: v.a + verschuiving, b: v.b + verschuiving });
+            }
         }
     }
 
     // --- wandleuning --------------------------------------------------------
-    const wandFout = wandleuningFout(p.wandleuning, leuning);
+    const wandFout = wandleuningFout(p.wandleuning, leuning, soort);
     if (wandFout) throw new Error(wandFout);
     const wandZijde = { links: -1, rechts: 1 }[p.wandleuning];
     if (wandZijde) {
@@ -496,6 +671,228 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
     return { delen, verbindingen, trap: t, opmerkingen: beoordeelTrap(t) };
 }
 
+// --- wenteltrap ------------------------------------------------------------
+
+/**
+ * De meetkunde van een wenteltrap, zonder onderdelen: hoe ver elke trede
+ * draait en hoeveel hoofdruimte er na een volle slag overblijft.
+ *
+ * De AANTREDE wordt gemeten op de looplijn, halverwege tussen spil en
+ * buitenrand - daar loop je. Daar moet hij dezelfde loopregel halen als bij een
+ * rechte trap, dus de draaihoek per trede volgt eruit: aantrede / straal.
+ * Vlak bij de spil is een trede smaller, aan de buitenkant breder; dat is wat
+ * een wenteltrap is.
+ *
+ * DOORLOOPHOOGTE: na een volle slag zit je onder de trede die je net
+ * gepasseerd bent. Hoeveel ruimte daar is volgt uit hoeveel treden er in een
+ * slag passen - een kleinere diameter is een krappere slag en dus minder
+ * hoofdruimte. Zie regels.json, trap.onderdelen.wentel.
+ */
+export function wentelMaten(p) {
+    const W = ONDERDELEN.wentel;
+    const t = berekenTrap({ hoogte: p.hoogte });
+    const Ro = p.diameter / 2, Rs = W.spilDiameter / 2;
+    const rLoop = (Rs + Ro) / 2;
+    const hoek = t.aantrede / rLoop;                       // radialen per trede
+    const perSlag = 2 * Math.PI / hoek;
+    const doorloop = perSlag * t.optrede - (p.tredeDikte || 0);
+    return { t, Ro, Rs, rLoop, hoek, perSlag, doorloop,
+             draaiing: hoek * t.treden * 180 / Math.PI };
+}
+
+/** Fouten in een wenteltrap, als lijst meldingen; leeg is goed. */
+export function controleerWentel(p) {
+    if (p.soort !== 'wentel') return [];
+    const W = ONDERDELEN.wentel;
+    const m = wentelMaten(p);
+    if (m.doorloop < W.minDoorloop) {
+        return [`Doorloophoogte ${Math.round(m.doorloop)} mm, minder dan ${W.minDoorloop}: `
+            + 'na een volle slag stoot je je hoofd. Maak de diameter groter.'];
+    }
+    return [];
+}
+
+/**
+ * De onderdelen van een wenteltrap: spil, taartpunttreden en een leuning
+ * langs de buitenrand.
+ *
+ * Trede k draait van (k-1) x hoek tot k x hoek en ligt met zijn bovenkant op
+ * k x optrede, net als bij een rechte trap. De bovenste stap is de vloer.
+ *
+ * ALLE TREDEN ZIJN HETZELFDE STUK. De doorsnede wordt in een vaste stand
+ * getekend (van 0 tot één tredehoek) en elke trede wordt daarna gedraaid
+ * geplaatst. Zo herkent de stuklijst er één onderdeel in, maal het aantal.
+ */
+function wentelDelen(p, balustradeMaten, leuning) {
+    const W = ONDERDELEN.wentel;
+    const m = wentelMaten(p);
+    const { t, Ro, Rs, hoek } = m;
+    const s = p.draai === 'links' ? -1 : 1;          // +1 linksom (naar +Y)
+    const delen = [];
+    const opmerkingen = [...beoordeelTrap(t)];
+
+    // De spil: een holle buis van vloer tot vloer.
+    delen.push({
+        soort: 'spil', buis: { wand: W.spilWand }, rond: true,
+        oorsprong: [-Rs, -Rs, 0], xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
+        dx: 2 * Rs, dy: 2 * Rs, dz: p.hoogte, lengteAs: 'z',
+        omschrijving: `Ø ${W.spilDiameter}×${W.spilWand}`,
+    });
+
+    // De taartpunt in vaste stand, in het grondvlak. De binnenrand staat een
+    // haar van de spil af: een koorde van een cirkel ligt BINNEN die cirkel, en
+    // zonder deze marge stak elke trede een paar tiende mm in de spil.
+    const N = 8;
+    const rBinnen = Rs / Math.cos(hoek / 8) + 1;
+    const punt = (r, a) => [r * Math.cos(a), r * Math.sin(a)];
+    const vorm = [
+        ...Array.from({ length: 5 }, (_, i) => punt(rBinnen, s * hoek * i / 4)),
+        ...Array.from({ length: N + 1 }, (_, i) => punt(Ro, s * hoek * (N - i) / N)),
+    ];
+    const xMin = Math.min(...vorm.map(q => q[0])), yMin = Math.min(...vorm.map(q => q[1]));
+    const doorsnede = vorm.map(([x, y]) => [x - xMin, y - yMin]);
+    const breed = Math.max(...doorsnede.map(q => q[0]));
+    const diep = Math.max(...doorsnede.map(q => q[1]));
+
+    const tredeMateriaal = p.tredeMateriaal || 'staal';
+    const tredeSoort = tredeSoortVan(tredeMateriaal);
+    const tredeBestel = tredeSoort.besteld ? {
+        besteld: true,
+        bestelSoort: 'trede:' + (isHout(tredeMateriaal) ? 'hout' : tredeMateriaal),
+    } : {};
+
+    for (let k = 1; k <= t.treden; k++) {
+        const a0 = s * hoek * (k - 1);
+        const hoekpunt = draaiZ([xMin, yMin, 0], a0);
+        delen.push({
+            soort: 'trede', doorsnede,
+            // Lokaal: x omhoog (de dikte), y en z liggen in het grondvlak.
+            oorsprong: [hoekpunt[0], hoekpunt[1], k * t.optrede - p.tredeDikte],
+            xAs: [0, 0, 1], yAs: draaiZ([1, 0, 0], a0), zAs: draaiZ([0, 1, 0], a0),
+            dx: p.tredeDikte, dy: breed, dz: diep, lengteAs: 'y',
+            omschrijving: `taartpunt R${Math.round(Ro)}, ${(hoek * 180 / Math.PI).toFixed(1)}°`,
+            materiaal: tredeMateriaal,
+            ...tredeBestel,
+        });
+    }
+
+    // Wat een wenteltrap (nog) niet heeft, zeggen in plaats van stil weglaten.
+    const nietHier = [p.stootborden && 'stootborden', p.platen && 'voet- en kopplaten',
+                      tredeSoort.opHoeken && 'steunhoeken'].filter(Boolean);
+    if (nietHier.length) {
+        opmerkingen.push(`Bij een wenteltrap zijn ${nietHier.join(', ')} nog niet `
+            + 'beschikbaar; de treden zitten aan de spil.');
+    }
+
+    // --- de leuning langs de buitenrand -------------------------------------
+    //
+    // Spijlen op elke trede, zoveel dat de vrije ruimte ertussen onder de
+    // maximale doorgang blijft, en een ronde handregel die in korte rechte
+    // stukken met verstek meedraait. Aan welke kant je "links" of "rechts"
+    // kiest maakt hier niet uit: de binnenkant is de spil.
+    if (leuning !== 'geen' && balustradeMaten) {
+        const L = metProfielMaten({ ...balustradeMaten, voetplaatDikte: 0 });
+        const spijl = L.spijlBreedte, regelD = L.handregelHoogte;
+        const Rr = Ro - spijl / 2 - W.leuningInspring;
+        const boog = hoek * Rr;
+        const perTrede = Math.max(1, Math.ceil(boog / (L.maxDoorgang + spijl)));
+        // Hoe schuin de regel ligt, op de straal van de leuning.
+        const cosRegel = boog / Math.hypot(boog, t.optrede);
+        // Het hart van de regel boven tredevoortgang u (0 = eerste neus).
+        const hart = (u) => t.optrede * (1 + u) + L.hoogte - regelD / 2;
+
+        const punten = [];
+        for (let i = 0; i <= 2 * t.treden; i++) {
+            const u = i / 2;
+            const [x, y] = punt(Rr, s * hoek * u);
+            punten.push([x, y, hart(u)]);
+        }
+        rondeRegel(delen, punten, regelD, 'handregel');
+
+        for (let k = 1; k <= t.treden; k++) {
+            for (let j = 0; j < perTrede; j++) {
+                const u = k - 1 + (j + 0.5) / perTrede;
+                const [x, y] = punt(Rr, s * hoek * u);
+                // Tot de onderkant van de regel, aan de lage kant van de spijl:
+                // de regel loopt erboven schuin op.
+                // Een halve millimeter speling: de regel bestaat uit rechte
+                // stukken, en een koorde ligt net iets anders dan de boog.
+                const du = (spijl / 2) / boog;
+                const top = hart(u - du) - (regelD / 2) / cosRegel - 0.5;
+                const voet = k * t.optrede;
+                delen.push({
+                    soort: 'spijl', rond: true,
+                    oorsprong: [x - spijl / 2, y - spijl / 2, voet],
+                    xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
+                    dx: spijl, dy: spijl, dz: top - voet, lengteAs: 'z',
+                });
+            }
+        }
+    }
+
+    if (p.afwerking) for (const d of delen) d.afwerking = p.afwerking;
+    return {
+        delen, verbindingen: [], opmerkingen,
+        trap: { ...t, aanzet: 2 * Ro, wentel: m },
+    };
+}
+
+const min3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const een3 = (v) => { const l = Math.hypot(...v); return v.map(c => c / l); };
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const kruis3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+                          a[0] * b[1] - a[1] * b[0]];
+
+/**
+ * Een ronde regel langs een reeks punten (het hart van de regel), in rechte
+ * stukken met een verstek op de deellijn in elke knik.
+ *
+ * Elk stuk loopt in een knik een diameter door; het verstek haalt dat weer
+ * weg. Zonder verstek zaten twee cilinders in elke knik in elkaar - staal op
+ * twee plekken. De richting mag alle kanten op: een wandleuning ligt in een
+ * verticaal vlak, de handregel van een wenteltrap draait mee.
+ *
+ * @returns de richting van elk stuk, voor wie er iets onder wil hangen
+ */
+function rondeRegel(delen, punten, diameter, soort) {
+    const R = diameter / 2;
+    const richtingen = punten.slice(1).map((q, i) => een3(min3(q, punten[i])));
+
+    for (let i = 0; i < richtingen.length; i++) {
+        const d = richtingen[i];
+        const vorige = richtingen[i - 1], volgende = richtingen[i + 1];
+        const voor = vorige ? diameter : 0;
+        const na = volgende ? diameter : 0;
+        const lengte = Math.hypot(...min3(punten[i + 1], punten[i]));
+        const begin = punten[i].map((c, k) => c - d[k] * voor);
+
+        // Rechtsdraaiend stelsel met de lengte langs zAs: xAs horizontaal
+        // haaks op de regel, yAs = zAs x xAs ligt dan in het verticale vlak.
+        const xAs = een3([-d[1], d[0], 0]);
+        const yAs = kruis3(d, xAs);
+        const oorsprong = begin.map((c, k) => c - xAs[k] * R - yAs[k] * R);
+        const assen = [xAs, yAs, d];
+        const snede = (P, n) => {
+            const q = min3(P, oorsprong);
+            return { punt: assen.map(a => dot3(q, a)), richting: assen.map(a => dot3(n, a)) };
+        };
+        const verstek = [];
+        if (vorige) verstek.push(snede(punten[i], een3(vorige.map((c, k) => -(c + d[k])))));
+        if (volgende) verstek.push(snede(punten[i + 1], een3(d.map((c, k) => c + volgende[k]))));
+
+        delen.push({
+            soort, oorsprong, xAs, yAs, zAs: d,
+            dx: diameter, dy: diameter, dz: lengte + voor + na,
+            lengteAs: 'z', rond: true, verstek,
+            // Wat er gezaagd wordt is het stuk tussen de knikken, niet de
+            // verlenging die het verstek eraf haalt.
+            zaaglengte: lengte,
+            omschrijving: `Ø ${diameter}`,
+        });
+    }
+    return richtingen;
+}
+
 /**
  * Kan de wandleuning aan die kant? Geeft een melding of null.
  *
@@ -503,9 +900,13 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
  * muurhouders in de lucht naast de balustrade. Apart zodat het paneel het al
  * kan zeggen terwijl je kiest, en niet pas bij het bouwen.
  */
-export function wandleuningFout(wand, leuning) {
+export function wandleuningFout(wand, leuning, soort = 'recht') {
     const zijde = { links: -1, rechts: 1 }[wand];
     if (!zijde) return null;
+    if (soort !== 'recht') {
+        return 'Een wandleuning kan nu alleen bij een rechte trap. Zet hem op '
+            + '"geen", of kies een leuning.';
+    }
     if (zijdenVan(leuning).includes(zijde)) {
         return `Aan de ${wand}kant staat al een leuning. Een wandleuning hoort `
             + 'aan de kant van de muur; kies de andere kant of haal de leuning daar weg.';
@@ -534,43 +935,7 @@ function wandleuningDelen(delen, t, p, muurY, zijde) {
     // bovenkant, dus het hart ligt een straal lager.
     const punten = leuningPad(t, p, regelY).map(([x, y, z]) => [x, y, z + W.hoogte - R]);
 
-    const min = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-    const een = (v) => { const l = Math.hypot(...v); return v.map(c => c / l); };
-    const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-    const richtingen = punten.slice(1).map((q, i) => een(min(q, punten[i])));
-
-    for (let i = 0; i < richtingen.length; i++) {
-        const d = richtingen[i];
-        const vorige = richtingen[i - 1], volgende = richtingen[i + 1];
-        // In een knik een stuk doorlopen; het verstek haalt het teveel eraf.
-        const voor = vorige ? W.diameter : 0;
-        const na = volgende ? W.diameter : 0;
-        const lengte = Math.hypot(...min(punten[i + 1], punten[i]));
-        const begin = punten[i].map((c, k) => c - d[k] * voor);
-
-        // Rechtsdraaiend stelsel met de lengte langs zAs.
-        const xAs = [0, 1, 0];
-        const yAs = [-d[2], 0, d[0]];
-        const oorsprong = begin.map((c, k) => c - xAs[k] * R - yAs[k] * R);
-        const assen = [xAs, yAs, d];
-        const snede = (P, n) => {
-            const q = min(P, oorsprong);
-            return { punt: assen.map(a => dot(q, a)), richting: assen.map(a => dot(n, a)) };
-        };
-        const verstek = [];
-        if (vorige) verstek.push(snede(punten[i], een(vorige.map((c, k) => -(c + d[k])))));
-        if (volgende) verstek.push(snede(punten[i + 1], een(d.map((c, k) => c + volgende[k]))));
-
-        delen.push({
-            soort: 'wandleuning', oorsprong, xAs, yAs, zAs: d,
-            dx: W.diameter, dy: W.diameter, dz: lengte + voor + na,
-            lengteAs: 'z', rond: true, verstek,
-            // Wat er gezaagd wordt is het stuk tussen de knikken, niet de
-            // verlenging die het verstek eraf haalt.
-            zaaglengte: lengte,
-            omschrijving: `Ø ${W.diameter}`,
-        });
-    }
+    const richtingen = rondeRegel(delen, punten, W.diameter, 'wandleuning');
 
     // De hoogte van het hart van de regel boven x, en hoe schuin hij daar ligt.
     const regelOp = (x) => {
@@ -720,15 +1085,51 @@ function maakPlaat(oc, d, opruimen) {
     const prisma = new oc.BRepPrimAPI_MakePrism_1(vlak.Shape(), richting, false, true);
     const lokaal = eigenVorm(oc, prisma.Shape());
 
-    // Een plaat wordt alleen verschoven, niet gedraaid: de omtrek ligt al in het
-    // goede vlak.
+    // Een plaat ligt al in het goede vlak en wordt alleen verschoven - tenzij
+    // hij bij een vlucht hoort die gedraaid op zijn plek staat, zie
+    // verplaatsDelen. Dan komt die draaiing om de verticale as er nog overheen.
+    const { hoek = 0, verschuiving = [0, 0, 0] } = d.plaatsing || {};
+    const [ex, ey] = [draaiZ([1, 0, 0], hoek), draaiZ([0, 1, 0], hoek)];
+    const t0 = draaiZ([x0, d.y, z0], hoek).map((c, k) => c + verschuiving[k]);
     const tr = new oc.gp_Trsf_1();
-    tr.SetValues(1, 0, 0, x0,
-                 0, 1, 0, d.y,
-                 0, 0, 1, z0);
+    tr.SetValues(ex[0], ey[0], 0, t0[0],
+                 ex[1], ey[1], 0, t0[1],
+                 0,     0,     1, t0[2]);
     const verplaatser = new oc.BRepBuilderAPI_Transform_2(prisma.Shape(), tr, true);
 
     opruimen.push(lijn, vlak, richting, prisma, tr, verplaatser);
+    return { geplaatst: verplaatser.Shape(), lokaal };
+}
+
+/**
+ * Een buis: een cilinder met een gat erin, zoals de spil van een wenteltrap.
+ *
+ * Opgebouwd vanuit de hoek van zijn doosje, net als rondDeel, zodat hij met
+ * dezelfde assen op zijn plek gaat. Massief zou het gewicht in de raming
+ * vertienvoudigen.
+ */
+function maakBuis(oc, d, opruimen) {
+    const R = d.dx / 2;
+    const voet = new oc.gp_Pnt_3(R, R, 0);
+    const voet2 = new oc.gp_Pnt_3(R, R, -1);
+    const omhoog = new oc.gp_Dir_4(0, 0, 1);
+    const as = new oc.gp_Ax2_3(voet, omhoog);
+    const as2 = new oc.gp_Ax2_3(voet2, omhoog);
+    const buiten = new oc.BRepPrimAPI_MakeCylinder_3(as, R, d.dz);
+    const binnen = new oc.BRepPrimAPI_MakeCylinder_3(as2, R - d.buis.wand, d.dz + 2);
+    const snede = new oc.BRepAlgoAPI_Cut_3(buiten.Shape(), binnen.Shape(),
+        new oc.Message_ProgressRange_1());
+    snede.Build(new oc.Message_ProgressRange_1());
+    const vorm = snede.Shape();
+    const lokaal = eigenVorm(oc, vorm);
+
+    const tr = new oc.gp_Trsf_1();
+    tr.SetValues(
+        d.xAs[0], d.yAs[0], d.zAs[0], d.oorsprong[0],
+        d.xAs[1], d.yAs[1], d.zAs[1], d.oorsprong[1],
+        d.xAs[2], d.yAs[2], d.zAs[2], d.oorsprong[2]);
+    const verplaatser = new oc.BRepBuilderAPI_Transform_2(vorm, tr, true);
+    opruimen.push(voet, voet2, omhoog, as, as2, buiten, binnen, tr, verplaatser);
     return { geplaatst: verplaatser.Shape(), lokaal };
 }
 
@@ -771,7 +1172,7 @@ function maakPrisma(oc, d, opruimen) {
  */
 export async function bouwTrap(p, balustradeMaten = null, leuning = 'geen',
                                bestaandeShape = null) {
-    const fouten = [...valideer(p), ...controleerBordes(p)];
+    const fouten = [...valideer(p), ...controleerBordes(p), ...controleerWentel(p)];
     if (fouten.length) throw new Error('Ongeldige maten:\n- ' + fouten.join('\n- '));
 
     // DE LEUNING WORDT NET ZO STRENG GEKEURD ALS EEN LOSSE BALUSTRADE. Dat
@@ -805,6 +1206,7 @@ export async function bouwTrap(p, balustradeMaten = null, leuning = 'geen',
             // leuningprofiel op de trap dezelfde echte doorsnede.
             const gemaakt = d.omtrek ? maakPlaat(oc, d, opruimen)
                 : d.doorsnede ? maakPrisma(oc, d, opruimen)
+                : d.buis ? maakBuis(oc, d, opruimen)
                 : await maakDeel(oc, d, opruimen);
             builder.Add(bundel, gemaakt.geplaatst);
             lokaal.push({ deel: d, vorm: gemaakt.lokaal });

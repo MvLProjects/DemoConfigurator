@@ -16,7 +16,7 @@ import { bouwBalustrade, bouwBlok, bouwBalustradeOpRanden, beoordeelRanden,
     voorspelBalustrade } from './build-balustrade.js';
 import { STANDAARD, valideer, VULLING, GLAS, vullingSoort } from './balustrade-rules.js';
 import { parseer, noemtProfiel } from './command-parser.js';
-import { bouwTrap, trapDelen, wandleuningFout } from './build-trap.js';
+import { bouwTrap, trapDelen, wandleuningFout, controleerWentel } from './build-trap.js';
 import { maakVoorbeeld, ruimVoorbeeldOp } from './preview.js';
 import { TREDESOORTEN, tredeSoortVan } from './treden.js';
 import { STANDAARD as TRAP_STANDAARD, berekenTrap, beoordeelTrap,
@@ -1473,7 +1473,8 @@ document.getElementById('t_leuning').addEventListener('change', trapGewijzigd);
 const wandleuningEl = document.getElementById('t_wandleuning');
 const stootbordenEl = document.getElementById('t_stootborden');
 const platenEl = document.getElementById('t_platen');
-for (const el of [wandleuningEl, stootbordenEl, platenEl]) {
+for (const el of [wandleuningEl, stootbordenEl, platenEl,
+                  document.getElementById('t_soort'), document.getElementById('t_draai')]) {
     el.addEventListener('change', trapGewijzigd);
 }
 
@@ -1492,6 +1493,8 @@ function huidigeTrapMaten() {
         // de knop.
         boomProfiel: profielen.boom,
         afwerking: afwerkingEl.value || null,
+        soort: document.getElementById('t_soort').value,
+        draai: document.getElementById('t_draai').value,
         // De losse trapdelen; zie regels.json onder trap.onderdelen.
         wandleuning: wandleuningEl.value,
         stootborden: stootbordenEl.checked,
@@ -1503,9 +1506,10 @@ function werkTrapBij() {
     const maten = huidigeTrapMaten();
     // Of een bordes kan hangt af van het AANTAL optreden, en dat volgt pas uit
     // de hoogte. Die controle staat daarom los van de gewone grenzen.
-    const fouten = [...valideerTrap(maten), ...controleerBordes(maten)];
+    const fouten = [...valideerTrap(maten), ...controleerBordes(maten),
+                    ...controleerWentel(maten)];
     const wandFout = wandleuningFout(maten.wandleuning,
-        document.getElementById('t_leuning').value);
+        document.getElementById('t_leuning').value, maten.soort);
     if (wandFout) fouten.push(wandFout);
 
     if (fouten.length) {
@@ -2458,6 +2462,8 @@ document.getElementById('instelBestand').addEventListener('change', async (event
         // De losse trapdelen. Een ouder bestand kent ze niet; dan staan ze uit,
         // zoals de trap toen ook was.
         if (inhoud.trap) {
+            document.getElementById('t_soort').value = inhoud.trap.soort || 'recht';
+            document.getElementById('t_draai').value = inhoud.trap.draai || 'rechts';
             wandleuningEl.value = inhoud.trap.wandleuning || 'geen';
             stootbordenEl.checked = Boolean(inhoud.trap.stootborden);
             platenEl.checked = Boolean(inhoud.trap.platen);
@@ -2670,6 +2676,8 @@ async function voerOpdrachtKern(tekst) {
             if (p.stootborden !== undefined) stootbordenEl.checked = p.stootborden;
             if (p.platen !== undefined) platenEl.checked = p.platen;
             if (p.wandleuning !== undefined) wandleuningEl.value = p.wandleuning;
+            if (p.soort !== undefined) document.getElementById('t_soort').value = p.soort;
+            if (p.draai !== undefined) document.getElementById('t_draai').value = p.draai;
             // Wat er over de LEUNING gezegd is - overstek, balustervorm,
             // dekband, spijlbreedte - komt in het balustradepaneel: daar haalt
             // de trapleuning zijn maten vandaan.

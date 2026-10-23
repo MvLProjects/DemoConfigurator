@@ -47,11 +47,26 @@ export function maakVoorbeeld(delen) {
         const uit = uiterlijkVanDeel(d);
 
         if (d.omtrek) {
-            // Een trapboom als plaat: zijn omtrek staat al in wereldcoördinaten
-            // in het XZ-vlak. Dat is een eigen vorm, geen doosje.
+            // Een trapboom als plaat: een eigen vorm, geen doosje.
             const mesh = new THREE.Mesh(plaatGeometrie(d), stofVoor(uit));
             mesh.userData.deel = d;
             groep.add(mesh);
+            continue;
+        }
+
+        if (d.doorsnede) {
+            // Een steunhoek of een taartpunttrede: een eigen doorsnede. Een
+            // taartpunt als doosje tekenen zou een wenteltrap van balken
+            // opleveren. Gelijke doorsneden worden samen getekend, net als de
+            // doosjes - alleen de plaatsing verschilt.
+            const vorm = 'prisma:' + JSON.stringify(d.doorsnede) + '|' + d.dx;
+            const sleutel = vorm + '|' + uit.sleutel;
+            if (!bakken.has(sleutel)) {
+                bakken.set(sleutel, { vorm, uit, matrices: [], geo: prismaGeometrie(d) });
+            }
+            bakken.get(sleutel).matrices.push(new THREE.Matrix4().makeBasis(
+                new THREE.Vector3(...d.xAs), new THREE.Vector3(...d.yAs),
+                new THREE.Vector3(...d.zAs)).setPosition(...d.oorsprong));
             continue;
         }
 
@@ -61,8 +76,8 @@ export function maakVoorbeeld(delen) {
         bakken.get(sleutel).matrices.push(matrixVan(d));
     }
 
-    for (const { vorm, uit, matrices } of bakken.values()) {
-        const mesh = new THREE.InstancedMesh(eenheidsvorm(vorm), stofVoor(uit),
+    for (const { vorm, uit, matrices, geo } of bakken.values()) {
+        const mesh = new THREE.InstancedMesh(geo || eenheidsvorm(vorm), stofVoor(uit),
             matrices.length);
         matrices.forEach((m, i) => mesh.setMatrixAt(i, m));
         mesh.instanceMatrix.needsUpdate = true;
@@ -144,6 +159,32 @@ function plaatGeometrie(d) {
     g.applyMatrix4(new THREE.Matrix4().set(
         1, 0, 0, 0,
         0, 0, -1, d.y + d.dikte,
+        0, 1, 0, 0,
+        0, 0, 0, 1));
+    // Hoort hij bij een vlucht die gedraaid op zijn plek staat (kwartslag,
+    // halfslag), dan komt die draaiing er nog overheen. Zie verplaatsDelen.
+    if (d.plaatsing) {
+        const { hoek = 0, verschuiving = [0, 0, 0] } = d.plaatsing;
+        g.applyMatrix4(new THREE.Matrix4().makeRotationZ(hoek));
+        g.translate(...verschuiving);
+    }
+    return g;
+}
+
+/**
+ * Een eigen doorsnede op lengte, zoals maakPrisma in build-trap.js hem bouwt:
+ * de doorsnede in het lokale yz-vlak, dx lang langs de lokale x. Nog niet
+ * geplaatst: dat doet de matrix van elk exemplaar.
+ *
+ * three.js extrudeert een vorm in zijn XY-vlak langs +Z. Vorm-x wordt dus
+ * lokaal y, vorm-y lokaal z en de extrusie lokaal x - rechtsdraaiend.
+ */
+function prismaGeometrie(d) {
+    const vorm = new THREE.Shape(d.doorsnede.map(([v, w]) => new THREE.Vector2(v, w)));
+    const g = new THREE.ExtrudeGeometry(vorm, { depth: d.dx, bevelEnabled: false });
+    g.applyMatrix4(new THREE.Matrix4().set(
+        0, 0, 1, 0,
+        1, 0, 0, 0,
         0, 1, 0, 0,
         0, 0, 0, 1));
     return g;

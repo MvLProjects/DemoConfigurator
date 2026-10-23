@@ -1074,8 +1074,25 @@
 
             <div class="veld"><label for="t_hoogte">hoogte</label>
                 <input type="number" id="t_hoogte" step="50"></div>
+            <div class="veld"><label for="t_soort">soort trap</label>
+                <select id="t_soort">
+                    <option value="recht">recht</option>
+                    <option value="kwartslag">kwartslag (L)</option>
+                    <option value="halfslag">halfslag (U)</option>
+                    <option value="wentel">wenteltrap</option>
+                </select></div>
+            <div class="veld"><label for="t_draai">draait naar</label>
+                <select id="t_draai">
+                    <option value="rechts">rechts</option>
+                    <option value="links">links</option>
+                </select></div>
+            <p class="hint">Een kwartslag- of halfslagtrap draait op een bordes
+               (standaard halverwege; zie "bordes na stap"). Een wenteltrap draait
+               om een spil; dan telt de diameter hieronder en niet de breedte.</p>
             <div class="veld"><label for="t_breedte">breedte</label>
                 <input type="number" id="t_breedte" step="50"></div>
+            <div class="veld"><label for="t_diameter">diameter (wenteltrap)</label>
+                <input type="number" id="t_diameter" step="100"></div>
             <div class="veld"><label for="t_tredeMateriaal">trede-materiaal</label>
                 <select id="t_tredeMateriaal"></select></div>
             <p class="hint">Geldt voor de treden en het bordes. Kies je een

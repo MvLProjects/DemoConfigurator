@@ -133,7 +133,10 @@ function herhalendeMaten(delen) {
     }
 
     // Optrede en aantrede van een trap: gemeten aan de eerste twee treden.
-    const treden = delen.filter(d => d.soort === 'trede')
+    // Alleen bij treden die recht langs X lopen: bij een wenteltrap draait elke
+    // trede een stuk verder, en dan is het verschil in x geen aantrede.
+    const treden = delen.filter(d => d.soort === 'trede'
+            && d.xAs && d.xAs[0] === 1 && d.xAs[1] === 0)
         .sort((p, q) => p.oorsprong[2] - q.oorsprong[2]);
     if (treden.length >= 2) {
         const t1 = treden[0], t2 = treden[1];

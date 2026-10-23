@@ -10670,6 +10670,75 @@ try {
         wandleuning: 'links', afwerking: '7016' },
         { ...bbBal, staanderProfiel: chsP, handregelProfiel: chsP, spijlProfiel: fl205 }, 'rechts'));
 
+    // ============ DEEL BC: kwartslag, halfslag en wenteltrap ================
+    log('\n\n======== DEEL BC: kwartslag, halfslag en wenteltrap ========\n');
+
+    // Vlucht 2 wordt als rechte vlucht gebouwd en daarna gedraaid neergezet;
+    // de leuning loopt buiten om het bordes heen. Elke soort met een leuning
+    // aan beide kanten, beide draairichtingen, zonder staal op twee plekken.
+    for (const [naam, extra, bal] of [
+        ['kwartslag rechts', { soort: 'kwartslag', draai: 'rechts' }, {}],
+        ['kwartslag links, UNP, eiken, platen', { soort: 'kwartslag', draai: 'links',
+            boomProfiel: unpRef, tredeMateriaal: 'eiken', tredeDikte: 40,
+            stootborden: true, platen: true }, {}],
+        ['halfslag rechts', { soort: 'halfslag', draai: 'rechts' }, {}],
+        // Met glas: bij een oog van 250 kwamen de klemmen in de bocht in elkaar.
+        ['halfslag links, glas', { soort: 'halfslag', draai: 'links',
+            tredeMateriaal: 'glas', tredeDikte: 32 },
+            { staanderProfiel: chsP, handregelProfiel: chsP, vulling: 'glas' }],
+    ]) {
+        adMeet(naam, await trapBouw.bouwTrap({ ...bbTrap, ...extra }, { ...bbBal, ...bal }, 'beide'));
+    }
+    adMeet('wenteltrap rechts', await trapBouw.bouwTrap(
+        { ...bbTrap, soort: 'wentel', draai: 'rechts' }, bbBal, 'rechts'));
+    adMeet('wenteltrap links, eiken, 2200', await trapBouw.bouwTrap(
+        { ...bbTrap, soort: 'wentel', draai: 'links', diameter: 2200,
+          tredeMateriaal: 'eiken', tredeDikte: 40 }, bbBal, 'rechts'));
+
+    {
+        // Vlucht 2 van een kwartslag rechts loopt langs +Y, en de bovenste
+        // trede ligt één optrede onder de vloer.
+        const { delen, trap } = trapBouw.trapDelen({ ...bbTrap, soort: 'kwartslag', draai: 'rechts' });
+        const treden = delen.filter(d => d.soort === 'trede');
+        const boven = treden.reduce((a, b) => (b.oorsprong[2] > a.oorsprong[2] ? b : a));
+        check('kwartslag: vlucht 2 loopt haaks weg, langs +Y',
+            Math.abs(boven.xAs[1] - 1) < 1e-9 && boven.oorsprong[1] > bbTrap.breedte / 2,
+            `xAs ${boven.xAs}, y ${boven.oorsprong[1].toFixed(0)}`);
+        check('en de bovenste trede ligt één optrede onder de vloer',
+            Math.abs(boven.oorsprong[2] + boven.dz - (bbTrap.hoogte - trap.optrede)) < 1e-6);
+
+        // Elke taartpunt is hetzelfde onderdeel: de stuklijst telt er één.
+        const w = await trapBouw.bouwTrap({ ...bbTrap, soort: 'wentel' });
+        const tr = w.onderdelen.filter(o => o.deel.soort === 'trede');
+        check('wenteltrap: alle treden zijn één onderdeel', tr.length === 1
+            && tr[0].aantal === w.trap.treden, `${tr.length} soorten, ${tr[0] && tr[0].aantal} stuks`);
+        const m = trapBouw.wentelMaten({ ...bbTrap, diameter: 1800 });
+        check('bij 1800 mm is er na een volle slag genoeg hoofdruimte',
+            m.doorloop >= 2100, `${Math.round(m.doorloop)} mm`);
+        let krap = '';
+        try { await trapBouw.bouwTrap({ ...bbTrap, soort: 'wentel', diameter: 1400 }); }
+        catch (e) { krap = e.message; }
+        check('bij 1400 mm wordt hij geweigerd: je stoot je hoofd', /Doorloophoogte/.test(krap),
+            krap.split('\n')[1] || 'bouwde gewoon');
+        check('een wandleuning kan alleen bij een rechte trap',
+            /alleen bij een rechte trap/.test(
+                trapBouw.wandleuningFout('links', 'geen', 'kwartslag') || ''));
+
+        const zin = await win.eval("import('/command-parser.js')");
+        const bcCat = { profielen: cat.alleProfielen(catBoom) };
+        const g1 = zin.parseer('kwartslagtrap van 3 meter hoog die naar links draait, '
+            + 'met een tussenbordes na stap 8 en leuning aan beide kanten', null, bcCat);
+        check('"kwartslagtrap ... naar links ... tussenbordes na stap 8"',
+            g1.params && g1.params.soort === 'kwartslag' && g1.params.draai === 'links'
+            && g1.params.bordesNa === 8 && g1.leuning === 'beide', g1.fout || g1.uitleg);
+        const g2 = zin.parseer('wenteltrap van 3 meter hoog met een diameter van 2 meter, '
+            + 'rechtsom, eiken treden en leuning', null, bcCat);
+        check('"wenteltrap ... diameter van 2 meter, rechtsom"',
+            g2.params && g2.params.soort === 'wentel' && g2.params.diameter === 2000
+            && g2.params.draai === 'rechts' && g2.params.hoogte === 3000
+            && g2.params.tredeMateriaal === 'eiken', g2.fout || g2.uitleg);
+    }
+
     log('\n' + (failures === 0
         ? '*** ALLE CONTROLES GESLAAGD ***'
         : `*** ${failures} CONTROLE(S) MISLUKT ***`));

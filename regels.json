@@ -48,7 +48,8 @@
       "boomHoogte": 250,
       "boomDikte": 10,
       "bordesNa": 0,
-      "bordesLengte": 1000
+      "bordesLengte": 1000,
+      "diameter": 1800
     },
     "grenzen": {
       "hoogte": [300, 6000],
@@ -58,7 +59,8 @@
       "boomHoogte": [100, 500],
       "boomDikte": [4, 30],
       "bordesNa": [0, 40],
-      "bordesLengte": [600, 3000]
+      "bordesLengte": [600, 3000],
+      "diameter": [1200, 3000]
     },
     "_onderdelen": [
       "De losse onderdelen van een trap die geen trede of boom zijn. Alle maten",
@@ -79,7 +81,15 @@
       "             flap aan de buitenkant. Niet naar binnen: daar ligt de bovenste trede.",
       "wandleuning  ronde regel op muurhouders aan de kant zonder leuning.",
       "             hoogte = verticaal boven de lijn door de tredeneuzen, tot de",
-      "             bovenkant van de regel; afstand = vrije ruimte tot de muur."
+      "             bovenkant van de regel; afstand = vrije ruimte tot de muur.",
+      "halfslag     oog = de open ruimte tussen de twee vluchten. Daar loopt de",
+      "             binnenleuning in een korte bocht omheen. Niet krapper dan",
+      "             300: bij 250 kwamen de glasklemmen van de twee korte velden",
+      "             in de bocht in elkaar (gemeten 22 037 mm3 bij CHS 48,3).",
+      "wentel       spil = holle buis in het midden. minDoorloop = de vrije",
+      "             hoogte onder de trede een volle slag hoger; is die kleiner,",
+      "             dan moet de diameter groter. leuningInspring = hoever de",
+      "             spijlen binnen de buitenrand van de trede staan."
     ],
     "onderdelen": {
       "tredehoek":   { "been": 50, "dikte": 5, "inspring": 10 },
@@ -87,7 +97,10 @@
       "voetplaat":   { "dikte": 10, "rand": 50, "gat": 14 },
       "kopplaat":    { "dikte": 10, "flap": 70, "gat": 14 },
       "wandleuning": { "diameter": 42.4, "hoogte": 900, "afstand": 50,
-                       "houderAfstand": 1000, "rozet": 70, "rozetDikte": 6, "arm": 12 }
+                       "houderAfstand": 1000, "rozet": 70, "rozetDikte": 6, "arm": 12 },
+      "halfslag":    { "oog": 350 },
+      "wentel":      { "spilDiameter": 168.3, "spilWand": 5, "minDoorloop": 2100,
+                       "leuningInspring": 15 }
     },
     "optrede": [150, 188],
     "aantrede": [220, 350],

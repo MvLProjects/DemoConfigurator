@@ -58,7 +58,9 @@ const GETAL = /(\d+(?:[.,]\d+)?)(?!\d)\s*(?:(millimeter|centimeter|meter|mm|cm|m
 // De volgorde telt: 'trap' moet vóór 'balustrade' staan. Anders pakt
 // "trap van 3 meter met leuning" het woord 'leuning' en bouw je een balustrade.
 const VORMEN = [
-    { actie: 'trap', woorden: ['trap', 'steektrap', 'stairs'] },
+    { actie: 'trap', woorden: ['trap', 'steektrap', 'stairs', 'wenteltrap', 'spiltrap',
+                               'spiraaltrap', 'kwartslagtrap', 'halfslagtrap', 'bordestrap',
+                               'hoektrap'] },
     { actie: 'kubus', woorden: ['kubus', 'cube', 'dobbelsteen'] },
     { actie: 'blok', woorden: ['blok', 'balk', 'doos', 'plaat', 'box'] },
     { actie: 'balustrade', woorden: ['balustrade', 'leuning', 'hekwerk', 'reling', 'railing'] },
@@ -646,6 +648,18 @@ const BORDES_LENGTE = new RegExp(`\\bbordes(?:\\s?lengte)?\\s+(?:van\\s+)?${NUM}
     + `(?:\\s+(?:lang|diep))?`, 'gi');
 const BORDES_NA = /\bbordes\s+(?:na|bij|op)\s+(?:de\s+)?(?:stap|trede|optrede)?\s*(\d+)(?:e|de|ste)?(?:\s+(?:stap|stappen|trede|treden|optreden))?\b/gi;
 
+// De soort trap, de draairichting en de diameter van een wenteltrap.
+const SOORTZINNEN = [
+    [/\b(?:wentel|spil|spiraal)trap(?:pen)?\b/gi, 'wentel'],
+    [/\b(?:kwartslag\w*|hoektrap|l-trap|l-vormige?)\b/gi, 'kwartslag'],
+    [/\b(?:halfslag\w*|u-trap|u-vormige?)\b/gi, 'halfslag'],
+];
+const DRAAIZIN = /\b(linksom|rechtsom|linksdraaiend|rechtsdraaiend)\b|\bdraai\w*\s+(?:naar\s+)?(links|rechts)\b|\b(?:naar\s+)?(links|rechts)\s+draai\w*\b/gi;
+const DIAMETERZINNEN = [
+    new RegExp(`(?:\\bdiameter|\\bdoorsnede|Ø)\\s*(?:van\\s+)?${NUM}`, 'gi'),
+    new RegExp(`${NUM}\\s*(?:diameter|doorsnede)\\b`, 'gi'),
+];
+
 const STOOTBORDEN = /\b(?:zonder\s+stootborden?|met\s+stootborden?|stootborden?|gesloten\s+trap|dichte\s+trap|open\s+trap)\b/gi;
 const PLATEN = /\b(?:voet-?\s*en\s*kop\s?platen|voet\s?platen|voet\s?plaat|kop\s?platen|kop\s?plaat|anker\s?platen)\b/gi;
 const WANDLEUNING = /\b(?:(links|rechts)\s+(?:een\s+)?(?:wand|muur)\s?leuning|(?:wand|muur)\s?leuning(?:\s+(?:aan\s+de\s+|op\s+de\s+)?(links|rechts)(?:kant)?)?)\b/gi;
@@ -659,9 +673,34 @@ const WANDLEUNING = /\b(?:(links|rechts)\s+(?:een\s+)?(?:wand|muur)\s?leuning|(?
  *   wandKant 'links', 'rechts', '?' (wel genoemd, kant onbekend) of undefined
  */
 function leesTrapExtras(tekst) {
-    let rest = tekst;
+    // Een tussenbordes is een bordes; zelfde lengte, zodat alle posities kloppen.
+    let rest = tekst.replace(/tussen(bordes)/gi, '      $1');
     const maten = {}, keuzes = {}, gevonden = [], genegeerd = [];
     let wandKant;
+
+    // De soort trap en de draairichting.
+    for (const [re, soort] of SOORTZINNEN) {
+        for (const m of [...rest.matchAll(re)]) {
+            keuzes.soort = soort;
+            rest = poets(rest, m.index, m.index + m[0].length);
+        }
+    }
+    for (const m of [...rest.matchAll(DRAAIZIN)]) {
+        keuzes.draai = /links/i.test(m[0]) ? 'links' : 'rechts';
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+    for (const re of DIAMETERZINNEN) {
+        for (const m of [...rest.matchAll(re)]) {
+            maten.diameter = naarMillimeter(m[1], m[2]);
+            rest = poets(rest, m.index, m.index + m[0].length);
+        }
+    }
+    if (keuzes.soort) {
+        gevonden.push({ wentel: 'wenteltrap', kwartslag: 'kwartslag (L)',
+                        halfslag: 'halfslag (U)' }[keuzes.soort]
+            + (keuzes.draai ? `, draait naar ${keuzes.draai}` : ''));
+    }
+    if (maten.diameter !== undefined) gevonden.push(`diameter ${maten.diameter} mm`);
 
     // De treden.
     let materiaalWoord, dikte;
@@ -987,6 +1026,8 @@ export function parseer(invoer, vorige = null, opties = {}) {
                 actie: 'trap',
                 params: {
                     ...TRAP_STANDAARD, hoogte, breedte, ...trapMaten,
+                    soort: keuzes.soort || 'recht',
+                    draai: keuzes.draai || 'rechts',
                     tredeMateriaal: keuzes.tredeMateriaal || 'staal',
                     stootborden: Boolean(keuzes.stootborden),
                     platen: Boolean(keuzes.platen),
