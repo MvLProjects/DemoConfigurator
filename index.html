@@ -340,6 +340,24 @@
     .start_keuze button.primair { border-color: #0b63ce; }
     .start_titel { font-size: 14px; font-weight: 600; }
     .start_uitleg { font-size: 11px; color: #7a838c; line-height: 1.45; }
+    /* Het tabblad Voorbeelden: kaarten met een plaatje, onder elkaar. */
+    #voorbeeldKaarten .vb_groep { margin: 14px 0 6px; font-size: 10.5px; font-weight: 600;
+                                  color: #7a838c; text-transform: uppercase;
+                                  letter-spacing: .04em; }
+    #voorbeeldKaarten .vb_groep:first-child { margin-top: 0; }
+    #panel #voorbeeldKaarten button { display: flex; flex-direction: column; gap: 3px;
+                                      width: 100%; margin: 0 0 8px; padding: 0 0 8px;
+                                      overflow: hidden; text-align: left; font: inherit;
+                                      color: inherit; white-space: normal;
+                                      border: 1px solid #dde1e5; border-radius: 5px;
+                                      background: #fff; cursor: pointer; }
+    #panel #voorbeeldKaarten button:hover { border-color: #0b63ce;
+                                            box-shadow: 0 2px 8px #0b63ce22; }
+    #voorbeeldKaarten img { display: block; width: 100%; aspect-ratio: 3 / 2;
+                            object-fit: cover; background: #f2f4f6;
+                            border-bottom: 1px solid #eef1f4; margin-bottom: 4px; }
+    #voorbeeldKaarten .start_titel { font-size: 12.5px; padding: 0 9px; }
+    #voorbeeldKaarten .start_uitleg { font-size: 11px; padding: 0 9px; }
     #panel .hint { color: #7a838c; font-size: 11px; margin: 0 0 12px; line-height: 1.4; }
     #panel .veld { display: flex; align-items: center; justify-content: space-between;
                    gap: 8px; margin-bottom: 7px; }
@@ -673,6 +691,13 @@
             <path d="M5.5 11.5V14l3.2-2.5"/>
         </symbol>
         <!-- een bestand dat naar binnen gaat: pijl omhoog uit een bak -->
+        <!-- vier vlakjes: een keuze uit kant-en-klare ontwerpen -->
+        <symbol id="ic-voorbeeld" viewBox="0 0 16 16">
+            <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/>
+            <rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/>
+            <rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/>
+            <rect x="9" y="9" width="4.5" height="4.5" rx="1"/>
+        </symbol>
         <symbol id="ic-open" viewBox="0 0 16 16">
             <path d="M8 10.5V2.5M5 5.5 8 2.5l3 3M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10"/>
         </symbol>
@@ -1376,6 +1401,18 @@
             </div>
         </div>
     </details>
+
+    <!-- Kant-en-klare ontwerpen, met een plaatje erbij: zien wat je krijgt
+         voordat je klikt. Gevuld vanuit voorbeelden.js. De plaatjes staan in
+         voorbeelden/ en zijn opnames van de app zelf. -->
+    <details class="groep" data-icoon="voorbeeld">
+        <summary>Voorbeelden</summary>
+        <div>
+            <p class="hint">Klik op een voorbeeld: de maten komen in het paneel
+               en het model wordt gebouwd. Daarna kun je alles aanpassen.</p>
+            <div id="voorbeeldKaarten"></div>
+        </div>
+    </details>
     </div>
 
     <div id="viewport">
@@ -1450,8 +1487,8 @@
         <div class="start_keuze">
             <button id="startTrap" type="button">
                 <span class="start_titel">Trap ontwerpen</span>
-                <span class="start_uitleg">Rechte steektrap, eventueel met een
-                    bordes en een leuning</span>
+                <span class="start_uitleg">Recht, kwartslag, halfslag of
+                    wenteltrap, met bordes en leuning</span>
             </button>
             <button id="startBalustrade" type="button" class="primair">
                 <span class="start_titel">Balustrade ontwerpen</span>

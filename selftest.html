@@ -10824,6 +10824,38 @@ try {
         doc.getElementById('p_vulling').value = 'spijlen';
         doc.getElementById('t_soort').value = 'recht';
 
+        // DE VOORBEELDEN: elk bouwt in de echte app, via zijn knop, zonder
+        // fout. Een voorbeeld dat niet werkt is de slechtst denkbare eerste
+        // indruk - en het eerste wat een nieuwe gebruiker aanklikt.
+        const vbMod = await win.eval("import('/voorbeelden.js')");
+        // Elke kaart heeft een plaatje dat er ook echt is: een gebroken
+        // plaatje op het tabblad zie je meteen.
+        const vbPlaatjes = await Promise.all(vbMod.VOORBEELDEN.map(v => new Promise((klaar) => {
+            const img = doc.querySelector(`#voorbeeldKaarten [data-voorbeeld="${v.id}"] img`);
+            if (!img) return klaar(`${v.id}: geen plaatje`);
+            const p = new Image();
+            p.onload = () => klaar(p.naturalWidth > 0 ? '' : `${v.id}: leeg`);
+            p.onerror = () => klaar(`${v.id}: laadt niet`);
+            p.src = img.src;
+        })));
+        check('elk voorbeeld staat op het tabblad Voorbeelden, met een plaatje',
+            vbPlaatjes.every(f => !f), vbPlaatjes.filter(Boolean).join(', '));
+        for (const v of vbMod.VOORBEELDEN) {
+            const voor = errors.length;
+            bcStatus.textContent = '';
+            // Via het tabblad Voorbeelden, zoals een gebruiker het doet.
+            doc.querySelector(`#voorbeeldKaarten [data-voorbeeld="${v.id}"]`).click();
+            for (let i = 0; i < 40000
+                 && !/mm hoog|Balustrade \d|mislukt/.test(bcStatus.textContent); i++) {
+                await sleep(25);
+            }
+            check(`voorbeeld "${v.naam}" bouwt zonder fout`,
+                !/mislukt/.test(bcStatus.textContent) && bcStatus.textContent !== ''
+                && errors.length === voor,
+                bcStatus.textContent.slice(0, 60) + ' ' + errors.slice(voor).join(' | '));
+        }
+        doc.getElementById('t_soort').value = 'recht';
+
         // GEEN ONDERDEEL ONDER HET TITELBLOK. Gelijk verdelen op aantal zette
         // drie hoge stroken op één blad; het derde liep over de rand.
         const td = await win.eval("import('/tekening2d.js')");

@@ -20,6 +20,7 @@ import { bouwTrap, trapDelen, wandleuningFout, controleerWentel } from './build-
 import { maakVoorbeeld, ruimVoorbeeldOp } from './preview.js';
 import { TREDESOORTEN, tredeSoortVan } from './treden.js';
 import { maakOfferte } from './offerte.js';
+import { VOORBEELDEN } from './voorbeelden.js';
 import { STANDAARD as TRAP_STANDAARD, berekenTrap, beoordeelTrap,
     valideer as valideerTrap, controleerBordes } from './trap-regels.js';
 import { laadCatalogus } from './profielen.js';
@@ -2767,6 +2768,60 @@ document.getElementById('instelLink').addEventListener('click', async () => {
         statusEl.textContent = 'Link maken mislukt: ' + err.message;
     }
 });
+
+// --- voorbeeldontwerpen ------------------------------------------------------
+//
+// Een voorbeeld is een ontwerp in de vorm van een link; zie voorbeelden.js. Het
+// begint vanaf de standaardmaten en zonder profielen of sierpunten, zodat er
+// van wat er stond niets achterblijft.
+
+export async function openVoorbeeld(id) {
+    const v = VOORBEELDEN.find(x => x.id === id);
+    if (!v) return;
+    if (startDialoog.open) startDialoog.close();
+    for (const o of ['staander', 'handregel', 'spijl', 'boom']) {
+        profielen[o] = null;
+        toonProfiel(o);
+    }
+    sierpuntKeuze = SIERPUNT_GEEN;
+    spijlPuntKeuze = SIERPUNT_GEEN;
+    toonSierpunt();
+    toonSpijlPunt();
+    const balustrade = { ...STANDAARD, afwerking: '', ...(v.b || {}) };
+    const trap = { ...TRAP_STANDAARD, soort: 'recht', draai: 'rechts', tredeMateriaal: 'staal',
+                   wandleuning: 'geen', stootborden: false, platen: false, ...(v.t || {}) };
+    openGroep(v.wat === 'trap' ? 'Trap' : 'Balustrade');
+    await pasInstellingenToe({ versie: INSTEL_VERSIE, balustrade, trap, leuning: v.l || 'geen' });
+    statusEl.textContent = `Voorbeeld "${v.naam}" — het model wordt opgebouwd…`;
+    (v.wat === 'trap' ? trapKnop : genereerKnop).click();
+}
+
+/** Eén kaart voor een voorbeeld: plaatje, naam en uitleg. */
+function voorbeeldKnop(v) {
+    const knop = document.createElement('button');
+    knop.type = 'button';
+    knop.dataset.voorbeeld = v.id;
+    knop.innerHTML = `<img alt="" loading="lazy"><span class="start_titel"></span><span class="start_uitleg"></span>`;
+    knop.querySelector('img').src = `voorbeelden/${v.id}.jpg`;
+    knop.querySelector('.start_titel').textContent = v.naam;
+    knop.querySelector('.start_uitleg').textContent = v.uitleg;
+    return knop;
+}
+
+// Het tabblad Voorbeelden: de kaarten in twee groepen. Alleen hier, niet op het
+// startscherm - dat blijft bij de ene vraag wat je gaat maken.
+const voorbeeldKaarten = document.getElementById('voorbeeldKaarten');
+for (const [wat, kop] of [['trap', 'Trappen'], ['balustrade', 'Balustrades']]) {
+    const groep = document.createElement('div');
+    groep.className = 'vb_groep';
+    groep.textContent = kop;
+    voorbeeldKaarten.appendChild(groep);
+    for (const v of VOORBEELDEN.filter(x => x.wat === wat)) {
+        const knop = voorbeeldKnop(v);
+        knop.addEventListener('click', () => openVoorbeeld(v.id));
+        voorbeeldKaarten.appendChild(knop);
+    }
+}
 
 /** Opent de app met een link erin, dan dat ontwerp: paneel vullen en bouwen. */
 async function openOntwerpUitLink() {
