@@ -1003,6 +1003,21 @@ function werkTabsBij() {
 
 werkTabsBij();
 
+// GEEN MATEN VERANDEREN MET HET MUISWIEL. Staat de cursor in een getalveld en
+// scrol je met de muis erboven, dan telt de browser de waarde stilletjes op of
+// af. Bij het scrollen door het paneel veranderde zo de traphoogte zonder dat
+// iemand het merkte - en verscheen er een trap op een werkplek die leeg hoorde
+// te zijn. Het veld verliest daarom zijn focus zodra het wiel erover draait:
+// de waarde blijft staan en het paneel scrolt gewoon door. Typen en de
+// pijltjes werken zoals altijd.
+document.addEventListener('wheel', (e) => {
+    const veld = e.target;
+    if (veld instanceof HTMLInputElement && veld.type === 'number'
+            && veld === document.activeElement) {
+        veld.blur();
+    }
+}, { passive: true });
+
 // Het verborgen bestandsveld achter een gewone knop. Het veld zelf blijft
 // staan; alleen de knop die de browser er zelf omheen tekent is weg.
 document.getElementById('openModel')
