@@ -2533,15 +2533,23 @@ opRandKnop.addEventListener('click', async () => {
 // cache.
 const INSTEL_VERSIE = 1;
 
-document.getElementById('instelOpslaan').addEventListener('click', () => {
-    const instellingen = {
+/**
+ * Alles wat een ontwerp is, als één object. Dezelfde inhoud voor het bestand
+ * en voor de link: twee manieren om te bewaren die uit elkaar lopen, en een
+ * collega opent iets anders dan je hem stuurde.
+ */
+function huidigeInstellingen() {
+    return {
         versie: INSTEL_VERSIE,
         opgeslagen: new Date().toISOString(),
         balustrade: huidigeMaten(),
         trap: huidigeTrapMaten(),
         leuning: document.getElementById('t_leuning').value,
     };
-    downloadBestand(JSON.stringify(instellingen, null, 2), 'instellingen.json');
+}
+
+document.getElementById('instelOpslaan').addEventListener('click', () => {
+    downloadBestand(JSON.stringify(huidigeInstellingen(), null, 2), 'instellingen.json');
     statusEl.textContent = 'Instellingen opgeslagen als instellingen.json.';
 });
 
@@ -2566,40 +2574,7 @@ document.getElementById('instelBestand').addEventListener('change', async (event
                 + `versie ${INSTEL_VERSIE}. Onbekende instellingen zijn overgeslagen.`;
         }
 
-        const gezet = vulVelden(velden, inhoud.balustrade)
-                    + vulVelden(trapVelden, inhoud.trap);
-        if (inhoud.leuning) document.getElementById('t_leuning').value = inhoud.leuning;
-        if (inhoud.trap && inhoud.trap.tredeMateriaal) {
-            tredeMateriaalEl.value = inhoud.trap.tredeMateriaal;
-        }
-        // De losse trapdelen. Een ouder bestand kent ze niet; dan staan ze uit,
-        // zoals de trap toen ook was.
-        if (inhoud.trap) {
-            document.getElementById('t_soort').value = inhoud.trap.soort || 'recht';
-            document.getElementById('t_draai').value = inhoud.trap.draai || 'rechts';
-            wandleuningEl.value = inhoud.trap.wandleuning || 'geen';
-            stootbordenEl.checked = Boolean(inhoud.trap.stootborden);
-            platenEl.checked = Boolean(inhoud.trap.platen);
-        }
-        // De afwerking staat in allebei de maatsets, want het is één keuze voor
-        // het hele werk. De balustrade is de bron; leeg betekent blank.
-        if (inhoud.balustrade && 'afwerking' in inhoud.balustrade) {
-            afwerkingEl.value = inhoud.balustrade.afwerking || '';
-        }
-
-        // En de PROFIELKEUZES. Die gingen al mee het bestand in - ze zitten in
-        // huidigeMaten() - maar werden bij het laden nooit teruggezet. Je laadde
-        // dus een ontwerp en kreeg stilletjes massieve blokken terug, terwijl de
-        // maten wel klopten. Dat viel niet op omdat het model er nog steeds
-        // uitzag als een leuning.
-        //
-        // De url wordt opnieuw opgebouwd met het exportmoment van de catalogus
-        // die er NU ligt; het pad binnen de catalogus is de echte sleutel.
-        await herstelProfielen(inhoud.balustrade, inhoud.trap);
-
-        werkAfgeleideBij();
-        werkTrapBij();
-
+        const gezet = await pasInstellingenToe(inhoud);
         if (inhoud.versie <= INSTEL_VERSIE) {
             statusEl.textContent = `${gezet} instellingen geladen uit ${bestand.name}.`;
         }
@@ -2608,6 +2583,57 @@ document.getElementById('instelBestand').addEventListener('change', async (event
         statusEl.textContent = 'Kon dit bestand niet lezen: ' + err.message;
     }
 });
+
+/**
+ * Een ontwerp in het paneel zetten: uit een instellingenbestand of uit een
+ * link. Geeft terug hoeveel invulvelden er gezet zijn.
+ */
+async function pasInstellingenToe(inhoud) {
+    const gezet = vulVelden(velden, inhoud.balustrade)
+                + vulVelden(trapVelden, inhoud.trap);
+    if (inhoud.leuning) document.getElementById('t_leuning').value = inhoud.leuning;
+    if (inhoud.trap && inhoud.trap.tredeMateriaal) {
+        tredeMateriaalEl.value = inhoud.trap.tredeMateriaal;
+    }
+    // De losse trapdelen. Een ouder bestand kent ze niet; dan staan ze uit,
+    // zoals de trap toen ook was.
+    if (inhoud.trap) {
+        document.getElementById('t_soort').value = inhoud.trap.soort || 'recht';
+        document.getElementById('t_draai').value = inhoud.trap.draai || 'rechts';
+        wandleuningEl.value = inhoud.trap.wandleuning || 'geen';
+        stootbordenEl.checked = Boolean(inhoud.trap.stootborden);
+        platenEl.checked = Boolean(inhoud.trap.platen);
+    }
+    // De afwerking staat in allebei de maatsets, want het is één keuze voor
+    // het hele werk. De balustrade is de bron; leeg betekent blank.
+    if (inhoud.balustrade && 'afwerking' in inhoud.balustrade) {
+        afwerkingEl.value = inhoud.balustrade.afwerking || '';
+    }
+    // De SIERPUNTEN. Die gingen ook al mee het bestand in en werden bij het
+    // laden nooit teruggezet - zelfde gat als bij de profielen hieronder.
+    if (inhoud.balustrade && inhoud.balustrade.sierpunt) {
+        sierpuntKeuze = inhoud.balustrade.sierpunt;
+        toonSierpunt();
+    }
+    if (inhoud.balustrade && inhoud.balustrade.spijlSierpunt) {
+        spijlPuntKeuze = inhoud.balustrade.spijlSierpunt;
+        toonSpijlPunt();
+    }
+
+    // En de PROFIELKEUZES. Die gingen al mee het bestand in - ze zitten in
+    // huidigeMaten() - maar werden bij het laden nooit teruggezet. Je laadde
+    // dus een ontwerp en kreeg stilletjes massieve blokken terug, terwijl de
+    // maten wel klopten. Dat viel niet op omdat het model er nog steeds
+    // uitzag als een leuning.
+    //
+    // De url wordt opnieuw opgebouwd met het exportmoment van de catalogus
+    // die er NU ligt; het pad binnen de catalogus is de echte sleutel.
+    await herstelProfielen(inhoud.balustrade, inhoud.trap);
+
+    werkAfgeleideBij();
+    werkTrapBij();
+    return gezet;
+}
 
 /**
  * De drie profielkeuzes uit een instellingenbestand terugzetten.
@@ -2630,11 +2656,19 @@ async function herstelProfielen(maten, trapMaten) {
     if (!Object.values(bron).some(Boolean)) return;
 
     try {
-        const { basis, versie } = await catalogusKlaar();
+        const { basis, versie, info, boom } = await catalogusKlaar();
+        // Uit een LINK komt alleen het pad binnen de catalogus, om de link kort
+        // te houden. Dat is de echte sleutel; de rest staat in de catalogus.
+        const uitCatalogus = (bestand) => {
+            const rauw = alleProfielen(boom).find(p => p.bestand === bestand);
+            return rauw ? { ...maakVerwijzing(rauw, info, basis, versie), label: rauw.label }
+                        : null;
+        };
         for (const onderdeel of ['staander', 'handregel', 'spijl', 'boom']) {
-            profielen[onderdeel] = bron[onderdeel]
-                ? cfg.naarProfiel(cfg.uitProfiel(bron[onderdeel]), basis, versie)
-                : null;
+            const ref = bron[onderdeel];
+            profielen[onderdeel] = !ref ? null
+                : typeof ref === 'string' ? uitCatalogus(ref)
+                : cfg.naarProfiel(cfg.uitProfiel(ref), basis, versie);
             toonProfiel(onderdeel);
         }
         werkAfgeleideBij();
@@ -2656,10 +2690,102 @@ function vulVelden(doelVelden, waarden) {
             if (isVinkje(veld)) veld.checked = waarde !== 0;
             else veld.value = waarde;
             aantal++;
+        } else if (typeof waarde === 'string' && !isVinkje(veld)) {
+            // OOK DE KEUZES DIE GEEN GETAL ZIJN: de vulling, de hoeken, het
+            // balustermodel. Die gingen mee het bestand in en werden hier
+            // overgeslagen - een glazen balustrade kwam terug met spijlen.
+            veld.value = waarde;
+            aantal++;
         }
     }
     return aantal;
 }
+
+// --- delen via een link -----------------------------------------------------
+//
+// Het hele ontwerp in het webadres, achter een #. Dat deel stuurt de browser
+// niet naar de server, dus het werkt ook op een statische site. Wie de link
+// opent krijgt het startscherm niet, maar meteen dit model.
+//
+// KORT GEHOUDEN: van een profiel gaat alleen het pad binnen de catalogus mee
+// (de rest staat in de catalogus), en de JSON wordt ingepakt voor hij in
+// base64 gaat. Een balustrade met drie profielen past zo in een paar honderd
+// tekens.
+
+/** Een ontwerp als korte tekst voor in een link. */
+async function ontwerpAlsCode() {
+    const inst = huidigeInstellingen();
+    const kaal = (m) => Object.fromEntries(Object.entries(m).map(([k, v]) =>
+        [k, /Profiel$/.test(k) && v && typeof v === 'object' ? v.bestand : v]));
+    const inhoud = { v: INSTEL_VERSIE, wat: watStaatErIn(),
+                     b: kaal(inst.balustrade), t: kaal(inst.trap), l: inst.leuning };
+    const stroom = new Blob([JSON.stringify(inhoud)]).stream()
+        .pipeThrough(new CompressionStream('deflate-raw'));
+    const bytes = new Uint8Array(await new Response(stroom).arrayBuffer());
+    let s = '';
+    for (const b of bytes) s += String.fromCharCode(b);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** Het omgekeerde van ontwerpAlsCode. Geëxporteerd voor de zelftest. */
+export async function codeAlsOntwerp(code) {
+    const b64 = code.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
+    const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+    const stroom = new Blob([bytes]).stream()
+        .pipeThrough(new DecompressionStream('deflate-raw'));
+    return JSON.parse(await new Response(stroom).text());
+}
+
+/** Gaat het ontwerp over een trap of een balustrade? */
+function watStaatErIn() {
+    if (laatsteNaam) return laatsteNaam;
+    const open = document.querySelector('#panel details.groep[open] summary');
+    return open && open.textContent.trim() === 'Trap' ? 'trap' : 'balustrade';
+}
+
+export async function linkNaarOntwerp() {
+    return location.origin + location.pathname + '#ontwerp=' + await ontwerpAlsCode();
+}
+
+document.getElementById('instelLink').addEventListener('click', async () => {
+    try {
+        const link = await linkNaarOntwerp();
+        const veld = document.getElementById('instelLinkTekst');
+        veld.value = link;
+        veld.style.display = '';
+        veld.select();
+        // Het klembord kan geweigerd worden; dan staat hij er nog om te kopiëren.
+        try {
+            await navigator.clipboard.writeText(link);
+            statusEl.textContent = 'Link naar dit ontwerp gekopieerd.';
+        } catch {
+            statusEl.textContent = 'Kopieer de link uit het veld onder de knop.';
+        }
+    } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Link maken mislukt: ' + err.message;
+    }
+});
+
+/** Opent de app met een link erin, dan dat ontwerp: paneel vullen en bouwen. */
+async function openOntwerpUitLink() {
+    const m = location.hash.match(/^#ontwerp=([\w-]+)$/);
+    if (!m) return;
+    try {
+        const o = await codeAlsOntwerp(m[1]);
+        if (startDialoog.open) startDialoog.close();
+        const isTrap = o.wat === 'trap';
+        openGroep(isTrap ? 'Trap' : 'Balustrade');
+        await pasInstellingenToe({ versie: o.v, balustrade: o.b, trap: o.t, leuning: o.l });
+        statusEl.textContent = 'Ontwerp geopend uit een link; het model wordt opgebouwd…';
+        (isTrap ? trapKnop : genereerKnop).click();
+    } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Deze link kon niet geopend worden: ' + err.message;
+    }
+}
+// Aangeroepen helemaal onderaan dit bestand, als alles hierin bestaat.
 
 // --- opdracht in woorden ---------------------------------------------------
 // De zin wordt omgezet naar parameters, en die gaan door dezelfde validatie en
@@ -4053,3 +4179,10 @@ function buildHighlight(points, radius) {
     }
     return group;
 }
+
+// --- als laatste: een gedeelde link openen ------------------------------------
+// Hier onderaan, zodat alles waar hij naar grijpt al bestaat. Een module die
+// eerst op regels.json wacht kan ná het load-event klaar zijn; dan meteen.
+// Zie openOntwerpUitLink.
+if (document.readyState === 'complete') openOntwerpUitLink();
+else window.addEventListener('load', openOntwerpUitLink);

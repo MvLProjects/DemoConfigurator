@@ -10809,6 +10809,19 @@ try {
             ofT.includes('Betreft: Wenteltrap') && ofT.includes('(Uw ontwerp)')
             && ofT.includes('(Prijsindicatie)') && /indicatie/i.test(ofT));
         check('met het beeld van het model erin', /\/Subtype \/Image/.test(ofT));
+        // DELEN VIA EEN LINK: het ontwerp gaat heen en terug zonder verlies,
+        // en een profiel reist als pad binnen de catalogus, niet als heel
+        // object - anders wordt de link onbruikbaar lang.
+        doc.getElementById('p_vulling').value = 'glas';
+        const link = await mainMod.linkNaarOntwerp();
+        check('de link naar het ontwerp is kort genoeg om te versturen',
+            link.includes('#ontwerp=') && link.length < 2000, `${link.length} tekens`);
+        const terug = await mainMod.codeAlsOntwerp(link.split('#ontwerp=')[1]);
+        check('en geeft het ontwerp precies terug',
+            terug.wat === 'trap' && terug.t.soort === 'wentel'
+            && terug.b.vulling === 'glas' && terug.l === 'rechts',
+            JSON.stringify({ wat: terug.wat, soort: terug.t.soort, vulling: terug.b.vulling }));
+        doc.getElementById('p_vulling').value = 'spijlen';
         doc.getElementById('t_soort').value = 'recht';
 
         // GEEN ONDERDEEL ONDER HET TITELBLOK. Gelijk verdelen op aantal zette
