@@ -8333,7 +8333,8 @@ try {
         aoIndex.filter(r => r.soort === 'veld').length === aoVelden.length,
         `${aoIndex.filter(r => r.soort === 'veld').length} van ${aoVelden.length}`);
     const aoKnoppen = [...doc.querySelectorAll('#panel button')]
-        .filter(b => b.textContent.trim().length >= 3);
+        // De voorbeeldkaarten niet: dat zijn ontwerpen, geen instellingen.
+        .filter(b => b.textContent.trim().length >= 3 && !b.dataset.voorbeeld);
     check(`en alle ${aoKnoppen.length} knoppen met een naam`,
         aoIndex.filter(r => r.soort === 'knop').length === aoKnoppen.length,
         aoIndex.filter(r => r.soort === 'knop').length);
