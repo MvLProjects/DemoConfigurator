@@ -2659,6 +2659,21 @@ async function voerOpdrachtKern(tekst) {
                 if (gelezen.params[naam] !== undefined) veld.value = gelezen.params[naam];
             }
             document.getElementById('t_leuning').value = gelezen.leuning;
+            // De keuzes die geen getalveld zijn: tredesoort, stootborden,
+            // platen, wandleuning. Een zin beschrijft de hele trap, dus wat
+            // niet genoemd is gaat terug naar de standaard - net als de maten.
+            const p = gelezen.params;
+            if (p.tredeMateriaal !== undefined) tredeMateriaalEl.value = p.tredeMateriaal;
+            if (p.stootborden !== undefined) stootbordenEl.checked = p.stootborden;
+            if (p.platen !== undefined) platenEl.checked = p.platen;
+            if (p.wandleuning !== undefined) wandleuningEl.value = p.wandleuning;
+            // Wat er over de LEUNING gezegd is - overstek, balustervorm,
+            // dekband, spijlbreedte - komt in het balustradepaneel: daar haalt
+            // de trapleuning zijn maten vandaan.
+            for (const [naam, veld] of Object.entries(velden)) {
+                const w = (gelezen.leuningMaten || {})[naam];
+                if (w !== undefined) veld.value = w;
+            }
             const maten = werkTrapBij();
             if (!maten) {
                 schrijfChat('nee', 'Die maten komen niet door de controle. '

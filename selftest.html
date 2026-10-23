@@ -10606,6 +10606,44 @@ try {
         check('op muurhouders met een rozet', telSoort(dWl, 'muurhouder') >= 2
             && telSoort(dWl, 'muurhouder') === telSoort(dWl, 'rozet'));
     }
+    log('\n--- 5. de trap in woorden ---');
+    {
+        const bbZin = await win.eval("import('/command-parser.js')");
+        const bbCat = { profielen: cat.alleProfielen(catBoom) };
+        const g = bbZin.parseer('trap van 3,2 meter hoog en 1200 breed met trapbomen UPN 220, '
+            + 'een bordes van 1200 na stap 8, glazen treden, stootborden, voet- en kopplaten, '
+            + 'leuning rechts en een wandleuning links', null, bbCat);
+        const p = g.params || {};
+        check('een lange trapzin wordt helemaal begrepen',
+            g.actie === 'trap' && p.hoogte === 3200 && p.breedte === 1200
+            && p.bordesNa === 8 && p.bordesLengte === 1200
+            && p.tredeMateriaal === 'glas' && p.tredeDikte === 32
+            && p.stootborden && p.platen && p.wandleuning === 'links' && g.leuning === 'rechts'
+            && g.profielen.boom && g.profielen.boom.label === 'UPN 220',
+            g.fout || g.uitleg);
+        // "maak hem 200 hoger" werd een H-balk HEM 200 als staander.
+        const h = bbZin.parseer('maak hem 200 hoger', g, bbCat);
+        check('"maak hem 200 hoger" is geen profiel HEM 200',
+            h.params && h.params.hoogte === 3400 && !(h.profielen && h.profielen.staander),
+            h.fout || h.uitleg);
+        const hem = bbZin.parseer('balustrade van 2 meter met staanders HEM 200', null, bbCat);
+        check('maar "staanders HEM 200" is het nog wel',
+            hem.profielen && hem.profielen.staander && hem.profielen.staander.label === 'HEM 200',
+            hem.uitleg);
+        const hout = bbZin.parseer('trap van 3 meter hoog met houten treden', null, bbCat);
+        check('"houten treden" vraagt welk hout in plaats van te raden',
+            hout.params.tredeMateriaal === 'staal' && /Welk hout/.test(hout.genegeerd.join(' ')));
+        const vrij = bbZin.parseer('trap van 3 meter hoog met leuning rechts en wandleuning', null, bbCat);
+        check('een wandleuning zonder kant komt aan de kant zonder leuning',
+            vrij.params.wandleuning === 'links', vrij.uitleg);
+        const midden = bbZin.parseer('trap van 3 meter hoog met een bordes', null, bbCat);
+        check('"met een bordes" zonder stap komt halverwege',
+            midden.params.bordesNa === 8, midden.uitleg);
+        const ov = bbZin.parseer('trap van 3 meter hoog met leuning links en 80 mm spijloverstek', null, bbCat);
+        check('wat over de leuning gezegd wordt gaat mee naar de balustradematen',
+            ov.leuningMaten && ov.leuningMaten.spijlOverstek === 80, JSON.stringify(ov.leuningMaten));
+    }
+
     // En alles tegelijk, met een leuning, een UNP-boom en een bordes: de
     // zwaarste combinatie die het paneel kan maken.
     adMeet('trap met ALLES', await trapBouw.bouwTrap({ ...bbBordes, boomProfiel: unpRef,

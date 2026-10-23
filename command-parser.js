@@ -21,7 +21,8 @@
 // door OCCT, op basis van getallen, niet door wat er uit een model rolt.
 
 import { STANDAARD } from './balustrade-rules.js';
-import { STANDAARD as TRAP_STANDAARD } from './trap-regels.js';
+import { STANDAARD as TRAP_STANDAARD, berekenTrap } from './trap-regels.js';
+import { tredeSoortVan } from './treden.js';
 // De sierpuntmodellen, om hun namen uit een zin te kunnen halen. Er komt GEEN
 // tweede lijst met namen: de termen worden uit MODELLEN zelf afgeleid, zodat
 // een nieuw model meteen te noemen is zonder dat iemand dit bestand kent.
@@ -102,7 +103,7 @@ const ONDERDEELWOORDEN = [
     [/\b(staander|staanders|paal|palen|post|posten|stijl|stijlen)\b/i, 'staander'],
     [/\b(handregel|handregels|bovenregel|leuningregel)\b/i, 'handregel'],
     [/\b(spijl|spijlen|spijltje|spijltjes|staaf|staven|baluster|balusters)\b/i, 'spijl'],
-    [/\b(trapboom|boom|bomen)\b/i, 'boom'],
+    [/\b(trapbomen|trapboom|boom|bomen)\b/i, 'boom'],
 ];
 
 /**
@@ -373,6 +374,11 @@ function leesExtras(tekst, voorraad) {
     // wanddiktes; daar kiezen we er niet zomaar een van.
     for (const m of [...rest.matchAll(PROFIELNAAM)]) {
         if (GEEN_CODE.test(m[1])) continue;        // "van 300" is geen profiel
+        // "maak HEM 200 hoger" is geen HEM 200. Dat werd het wel: na een trap
+        // kreeg de leuning er stilletjes een H-balk als staander bij. Het
+        // kleine woordje "hem" met een getal en dan een bijstelwoord is een
+        // voornaamwoord; "HEM 200" als profielnaam blijft gewoon werken.
+        if (m[1] === 'hem' && BIJSTELWOORD.test(rest.slice(m.index + m[0].length))) continue;
         const termen = [...new Set([
             (m[1] + m[2]).replace(/\s+/g, ''),
             (m[1] + m[2]).replace(/\s+/g, '').replace(/,/g, '.'),
@@ -545,6 +551,136 @@ function leesExtras(tekst, voorraad) {
     return { ...uit, rest, gevonden, genegeerd };
 }
 
+// --- de trap: bordes, treden, stootborden, platen, wandleuning ---------------
+//
+// Zelfde aanpak als leesExtras: eerst herkennen en wegpoetsen, dan pas maten
+// lezen. "Een bordes van 1200 na stap 8" bevat twee getallen die anders de
+// breedte van de trap en nog iets worden.
+
+const NUM = '(\\d+(?:[.,]\\d+)?)\\s*(millimeter|centimeter|meter|mm|cm|m)?\\b';
+
+// Wat er voor de treden genoemd kan worden, en welke tredesoort dat is. "Hout"
+// zonder houtsoort staat erbij om het te kunnen VRAGEN in plaats van te raden.
+const TREDEWOORDEN = [
+    [/^traanplaat/, 'traanplaat'],
+    [/^(rooster|grating)/, 'rooster'],
+    [/^gla[sz]/, 'glas'],                  // glas, glazen
+    [/^(natuursteen|natuurstenen|steen|stenen|marmer|graniet)/, 'steen'],
+    [/^beton/, 'beton'],
+    [/^eiken/, 'eiken'], [/^beuken/, 'beuken'], [/^vuren/, 'vuren'], [/^merbau/, 'merbau'],
+    [/^(staalplaat|stalen|staal)/, 'staal'],
+    [/^hout/, null],
+];
+const MATERIAAL = '(traanplaat|roosters?|grating|glazen|glas|natuurstenen|natuursteen|'
+    + 'stenen|steen|marmer|graniet|betonnen|beton|eikenhouten|eikenhout|eiken|'
+    + 'beukenhouten|beukenhout|beuken|vurenhouten|vurenhout|vuren|merbau|'
+    + 'staalplaat|stalen|staal|houten|hout)';
+// "eiken treden", "roostertreden", "glazen treden van 32 mm dik".
+const TREDE_VOOR = new RegExp(`\\b${MATERIAAL}\\s?-?\\s?(?:trede|treden)\\b`
+    + `(?:\\s+(?:van\\s+)?${NUM}\\s*dik\\w*)?`, 'gi');
+// "treden van eiken", "treden uit beton".
+const TREDE_NA = new RegExp(`\\b(?:trede|treden)\\s+(?:van|in|uit)\\s+(?:een\\s+|het\\s+)?`
+    + `${MATERIAAL}\\b`, 'gi');
+const TREDEDIKTE = [
+    new RegExp(`\\btrede\\s?dikte\\s*(?:van|=|:)?\\s*${NUM}`, 'gi'),
+    new RegExp(`\\btreden\\s+(?:van\\s+)?${NUM}\\s*dik\\w*`, 'gi'),
+    new RegExp(`${NUM}\\s*dikke\\s+treden\\b`, 'gi'),
+];
+
+const BORDES_LENGTE = new RegExp(`\\bbordes(?:\\s?lengte)?\\s+(?:van\\s+)?${NUM}`
+    + `(?:\\s+(?:lang|diep))?`, 'gi');
+const BORDES_NA = /\bbordes\s+(?:na|bij|op)\s+(?:de\s+)?(?:stap|trede|optrede)?\s*(\d+)(?:e|de|ste)?(?:\s+(?:stap|stappen|trede|treden|optreden))?\b/gi;
+
+const STOOTBORDEN = /\b(?:zonder\s+stootborden?|met\s+stootborden?|stootborden?|gesloten\s+trap|dichte\s+trap|open\s+trap)\b/gi;
+const PLATEN = /\b(?:voet-?\s*en\s*kop\s?platen|voet\s?platen|voet\s?plaat|kop\s?platen|kop\s?plaat|anker\s?platen)\b/gi;
+const WANDLEUNING = /\b(?:(links|rechts)\s+(?:een\s+)?(?:wand|muur)\s?leuning|(?:wand|muur)\s?leuning(?:\s+(?:aan\s+de\s+|op\s+de\s+)?(links|rechts)(?:kant)?)?)\b/gi;
+
+/**
+ * Leest wat een trap méér kan dan hoogte, breedte en leuning.
+ *
+ * @returns { rest, maten, keuzes, wandKant, gevonden, genegeerd }
+ *   maten   velden van het trappaneel (tredeDikte, bordesNa, bordesLengte)
+ *   keuzes  tredeMateriaal, stootborden, platen
+ *   wandKant 'links', 'rechts', '?' (wel genoemd, kant onbekend) of undefined
+ */
+function leesTrapExtras(tekst) {
+    let rest = tekst;
+    const maten = {}, keuzes = {}, gevonden = [], genegeerd = [];
+    let wandKant;
+
+    // De treden.
+    let materiaalWoord, dikte;
+    for (const re of [TREDE_VOOR, TREDE_NA]) {
+        for (const m of [...rest.matchAll(re)]) {
+            materiaalWoord = m[1].toLowerCase();
+            if (m[2] !== undefined && re === TREDE_VOOR) dikte = naarMillimeter(m[2], m[3]);
+            rest = poets(rest, m.index, m.index + m[0].length);
+        }
+    }
+    for (const re of TREDEDIKTE) {
+        for (const m of [...rest.matchAll(re)]) {
+            dikte = naarMillimeter(m[1], m[2]);
+            rest = poets(rest, m.index, m.index + m[0].length);
+        }
+    }
+    if (materiaalWoord !== undefined) {
+        const [, soort] = TREDEWOORDEN.find(([re]) => re.test(materiaalWoord)) || [];
+        if (soort === null || soort === undefined) {
+            genegeerd.push('Welk hout voor de treden? Kies eiken, beuken, vuren of merbau.');
+        } else {
+            keuzes.tredeMateriaal = soort;
+            gevonden.push(`treden: ${tredeSoortVan(soort).naam}`);
+            // Een soort brengt zijn eigen dikte mee, net als in het paneel.
+            if (dikte === undefined) maten.tredeDikte = tredeSoortVan(soort).dikte;
+        }
+    }
+    if (dikte !== undefined) {
+        maten.tredeDikte = dikte;
+        gevonden.push(`trededikte ${dikte} mm`);
+    }
+
+    // Het bordes. EERST de lengte, en daarbij blijft het woord "bordes" staan:
+    // "een bordes van 1200 na stap 8" heeft het nog nodig voor de stap.
+    for (const m of [...rest.matchAll(BORDES_LENGTE)]) {
+        maten.bordesLengte = naarMillimeter(m[1], m[2]);
+        gevonden.push(`bordes ${maten.bordesLengte} mm lang`);
+        rest = rest.slice(0, m.index) + 'bordes'.padEnd(m[0].length)
+            + rest.slice(m.index + m[0].length);
+    }
+    for (const m of [...rest.matchAll(BORDES_NA)]) {
+        maten.bordesNa = parseInt(m[1], 10);
+        gevonden.push(`bordes na stap ${maten.bordesNa}`);
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+    if (/\bbordes\b/i.test(rest) && maten.bordesNa === undefined) {
+        maten.bordesNa = 'midden';          // wordt hieronder uitgerekend
+    }
+    rest = rest.replace(/\bbordes\b/gi, (w) => ' '.repeat(w.length));
+
+    // Stootborden.
+    for (const m of [...rest.matchAll(STOOTBORDEN)]) {
+        keuzes.stootborden = !/zonder|open/i.test(m[0]);
+        gevonden.push(keuzes.stootborden ? 'met stootborden' : 'zonder stootborden');
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+
+    // Voet- en kopplaten. Altijd allebei: zo staat het ook in het paneel.
+    for (const m of [...rest.matchAll(PLATEN)]) {
+        keuzes.platen = true;
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+    if (keuzes.platen) gevonden.push('voet- en kopplaten');
+
+    // De wandleuning, VÓÓR de gewone leuning gezocht wordt: "leuning rechts en
+    // een wandleuning links" mag de rechterkant niet aan de muur hangen.
+    for (const m of [...rest.matchAll(WANDLEUNING)]) {
+        wandKant = (m[1] || m[2] || '?').toLowerCase();
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+
+    return { rest, maten, keuzes, wandKant, gevonden, genegeerd };
+}
+
 /** Zet "2,5 m" om naar 2500 (millimeter). */
 function naarMillimeter(getal, eenheid) {
     const waarde = parseFloat(getal.replace(',', '.'));
@@ -633,6 +769,11 @@ const BIJSTEL_DOEL = {
 
 const STANDAARD_STAP = 100; // als er geen maat bij staat
 
+// Staat er direct een bijstelwoord achter? Zie "maak hem 200 hoger" bij de
+// profielen.
+const BIJSTELWOORD = new RegExp(`^\\s*(?:mm|cm|m|millimeter|centimeter|meter)?\\s*`
+    + `(?:${Object.keys(BIJSTELLEN).join('|')})\\b`, 'i');
+
 /**
  * Ontleedt een zin.
  *
@@ -648,7 +789,7 @@ export function parseer(invoer, vorige = null, opties = {}) {
     // EERST de extra's eruit halen en wegpoetsen; zie leesExtras hierboven.
     // Wat overblijft gaat naar de maatherkenning die er altijd al was.
     const extra = leesExtras(ruw, opties.profielen || []);
-    const tekst = extra.rest;
+    let tekst = extra.rest;
 
     /** Wat er in de maten van een balustrade terechtkomt. */
     const extraMaten = {};
@@ -709,6 +850,11 @@ export function parseer(invoer, vorige = null, opties = {}) {
         };
     }
 
+    // Bij een trap eerst wat een trap méér kan, zodat die getallen er al uit
+    // zijn voor de maatlezer begint. Zie leesTrapExtras.
+    const trapExtra = vorm === 'trap' ? leesTrapExtras(tekst) : null;
+    if (trapExtra) tekst = trapExtra.rest;
+
     const getallen = vindGetallen(tekst);
     // Geen maat meer over, maar wel iets anders begrepen? Dan is de zin niet
     // onbegrepen. Een balustrade valt terug op de standaardmaten uit
@@ -744,13 +890,57 @@ export function parseer(invoer, vorige = null, opties = {}) {
             else leuning = 'beide';
         }
 
-        return metExtras({
-            actie: 'trap',
-            params: { ...TRAP_STANDAARD, hoogte, breedte },
-            leuning,
-            uitleg: `trap ${fmt(hoogte)} hoog, ${fmt(breedte)} breed`
-                + (leuning === 'geen' ? '' : `, leuning ${leuning}`),
-        });
+        const { maten: trapMaten, keuzes, gevonden, genegeerd } = trapExtra;
+
+        // "met een bordes" zonder stap: halverwege. Dat is een keuze, dus hij
+        // staat er in de uitleg bij.
+        if (trapMaten.bordesNa === 'midden') {
+            trapMaten.bordesNa = Math.round(berekenTrap({ hoogte }).optreden / 2);
+            gevonden.push(`bordes halverwege, na stap ${trapMaten.bordesNa}`);
+        }
+        if (trapMaten.bordesNa && trapMaten.bordesLengte === undefined) {
+            trapMaten.bordesLengte = TRAP_STANDAARD.bordesLengte;
+        }
+
+        // De wandleuning hoort aan de kant ZONDER leuning. Wordt de kant niet
+        // genoemd, dan volgt hij uit de leuning - maar alleen als dat eenduidig
+        // is. Anders vragen, niet raden.
+        let wandleuning = 'geen';
+        const vrijeKant = { links: 'rechts', rechts: 'links' }[leuning];
+        if (trapExtra.wandKant === '?') {
+            if (vrijeKant) {
+                wandleuning = vrijeKant;
+            } else {
+                genegeerd.push(leuning === 'beide'
+                    ? 'Er staat aan beide kanten al een leuning; voor een wandleuning is geen plek.'
+                    : 'Aan welke kant hangt de wandleuning? Zeg "wandleuning links" of "rechts".');
+            }
+        } else if (trapExtra.wandKant) {
+            wandleuning = trapExtra.wandKant;
+        }
+        if (wandleuning !== 'geen') gevonden.push(`wandleuning ${wandleuning}`);
+
+        // WAT ER VOOR DE LEUNING GEZEGD IS gaat mee naar het balustradepaneel:
+        // die leuning wordt met de balustradematen gebouwd. Zonder dit verdween
+        // "80 mm spijloverstek" in een trapzin zonder dat iemand het zag.
+        return {
+            ...metExtras({
+                actie: 'trap',
+                params: {
+                    ...TRAP_STANDAARD, hoogte, breedte, ...trapMaten,
+                    tredeMateriaal: keuzes.tredeMateriaal || 'staal',
+                    stootborden: Boolean(keuzes.stootborden),
+                    platen: Boolean(keuzes.platen),
+                    wandleuning,
+                },
+                leuning,
+                uitleg: `trap ${fmt(hoogte)} hoog, ${fmt(breedte)} breed`
+                    + (leuning === 'geen' ? '' : `, leuning ${leuning}`)
+                    + (gevonden.length ? `; ${gevonden.join('; ')}` : ''),
+            }),
+            leuningMaten: extraMaten,
+            genegeerd: [...extra.genegeerd, ...genegeerd],
+        };
     }
 
     if (vorm === 'kubus') {
