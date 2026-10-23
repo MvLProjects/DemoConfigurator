@@ -34,6 +34,7 @@ import { MODELLEN as DEKBANDEN } from './dekbanden.js';
 // Dezelfde vergelijking die de profielkiezer gebruikt als je in het zoekveld
 // typt. Zo vindt "chs48,3" hier precies wat het daar ook zou vinden.
 import { pastBijZoekterm, normLabel } from './profielen.js';
+import { RAL } from './materialen.js';
 
 // Hoe een eenheid zich verhoudt tot millimeter. Zonder eenheid gaan we uit van
 // millimeter, want dat is wat CAD en de werkplaats gebruiken.
@@ -204,6 +205,25 @@ function veldPatronen(naam, direct, onderdeel, bijvoeglijk) {
     return uit;
 }
 
+// DE COATKLEUR. "RAL 7016", "in antraciet", "zwart gecoat", of "blank" voor
+// geen coating. Het RAL-nummer moet er vroeg uit: anders wordt 7016 een maat.
+// Alleen kleuren die het paneel ook kent; een onbekend nummer wordt gemeld.
+const RALZIN = /\bRAL\s*-?\s*(\d{4})\b/gi;
+const KLEURWOORDEN = [
+    ...Object.entries(RAL).map(([nr, r]) => [r.naam.toLowerCase(), nr]),
+    ['antraciet', '7016'], ['zwart', '9005'], ['wit', '9010'],
+].sort((a, b) => b[0].length - a[0].length);
+const ONGECOAT = /\b(?:blank|ongecoat|niet\s+gecoat|zonder\s+coating)\b/gi;
+
+// DE VULLING van de leuning. Bewust alleen hele uitdrukkingen: "glazen treden"
+// gaat over de treden en mag hier NIET als glazen vulling gelezen worden.
+const VULLINGZINNEN = [
+    [/\b(?:glazen\s+(?:vulling|panelen|ruiten|balustrade)|(?:vulling|panelen|ruiten)\s+(?:van|in|uit)\s+glas|met\s+glas(?:\s+als\s+vulling)?)\b/gi, 'glas'],
+    [/\b(?:liggende|horizontale)\s+(?:regels|spijlen|vulling|staven)\b/gi, 'horizontaal'],
+    [/\b(?:verticale|staande)\s+(?:spijlen|staven|vulling)\b/gi, 'spijlen'],
+    [/\bzonder\s+vulling\b/gi, 'geen'],
+];
+
 // "80 mm spijloverstek", "spijloverstek 80", "overstek van 100 mm".
 const OVERSTEKZIN = /(?:(\d+(?:[.,]\d+)?)\s*(millimeter|centimeter|meter|mm|cm|m)?\s+)?(spijl\s?overstek|handregel\s?overstek|overstek)(?:\s*(?:van|=|:)?\s*(\d+(?:[.,]\d+)?)\s*(millimeter|centimeter|meter|mm|cm|m)?)?/gi;
 
@@ -300,6 +320,41 @@ function leesExtras(tekst, voorraad) {
         handregelOverstek: undefined, profielen: {},
         sierpunt: undefined, spijlSierpunt: undefined,
     };
+
+    // --- 0. coatkleur en vulling -------------------------------------------
+    for (const m of [...rest.matchAll(RALZIN)]) {
+        if (RAL[m[1]]) {
+            uit.afwerking = m[1];
+            gevonden.push(`gecoat in RAL ${m[1]}`);
+        } else {
+            genegeerd.push(`RAL ${m[1]} staat niet in de kleurenlijst van de app. `
+                + `Kies uit: ${Object.keys(RAL).join(', ')}.`);
+        }
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+    if (uit.afwerking === undefined) {
+        const klein = rest.toLowerCase();
+        for (const [woord, nr] of KLEURWOORDEN) {
+            const i = klein.search(new RegExp(`\\b${esc(woord)}\\b`));
+            if (i < 0) continue;
+            uit.afwerking = nr;
+            gevonden.push(`gecoat in RAL ${nr} (${RAL[nr].naam.toLowerCase()})`);
+            rest = poets(rest, i, i + woord.length);
+            break;
+        }
+    }
+    for (const m of [...rest.matchAll(ONGECOAT)]) {
+        uit.afwerking = '';
+        gevonden.push('blank, niet gecoat');
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+    for (const [re, soort] of VULLINGZINNEN) {
+        for (const m of [...rest.matchAll(re)]) {
+            uit.vulling = soort;
+            rest = poets(rest, m.index, m.index + m[0].length);
+        }
+    }
+    if (uit.vulling) gevonden.push(`vulling: ${uit.vulling}`);
 
     // --- 1. hoeken ---------------------------------------------------------
     const paren = [];
@@ -799,6 +854,7 @@ export function parseer(invoer, vorige = null, opties = {}) {
         extraMaten.handregelOverstek = extra.handregelOverstek;
     }
     if (extra.spijlModel !== undefined) extraMaten.spijlModel = extra.spijlModel;
+    if (extra.vulling !== undefined) extraMaten.vulling = extra.vulling;
     if (extra.handregelModel !== undefined) {
         extraMaten.handregelModel = extra.handregelModel;
     }
@@ -810,6 +866,9 @@ export function parseer(invoer, vorige = null, opties = {}) {
     const metExtras = (r) => ({
         ...r,
         profielen: extra.profielen,
+        // De coatkleur geldt voor het hele werk, net als in het paneel:
+        // undefined = niet genoemd, '' = blank, anders een RAL-nummer.
+        afwerking: extra.afwerking,
         sierpunt: extra.sierpunt,
         spijlSierpunt: extra.spijlSierpunt,
         genegeerd: extra.genegeerd,

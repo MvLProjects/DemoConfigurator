@@ -2638,6 +2638,9 @@ async function voerOpdrachtKern(tekst) {
         || Object.values(gelezen.profielen || {}).some(Boolean)) {
         werkConfiguratiesBij();
     }
+    // De coatkleur geldt voor het hele werk, dus net als in het paneel één
+    // keuze. Niet genoemd = laten staan wat er stond; '' = blank.
+    if (gelezen.afwerking !== undefined) afwerkingEl.value = gelezen.afwerking;
 
     // Laten zien wat eruit kwam. Dat is niet alleen aardig voor de gebruiker:
     // het maakt zichtbaar dat er parameters tussen de zin en het model zitten.

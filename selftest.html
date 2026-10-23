@@ -10642,6 +10642,25 @@ try {
         const ov = bbZin.parseer('trap van 3 meter hoog met leuning links en 80 mm spijloverstek', null, bbCat);
         check('wat over de leuning gezegd wordt gaat mee naar de balustradematen',
             ov.leuningMaten && ov.leuningMaten.spijlOverstek === 80, JSON.stringify(ov.leuningMaten));
+
+        // Materialen in woorden: coatkleur en vulling.
+        const mat1 = bbZin.parseer('trap van 3 meter hoog met eiken treden, leuning rechts '
+            + 'met glazen panelen, alles gecoat in RAL 7016', null, bbCat);
+        check('RAL 7016 en glazen panelen worden begrepen, en de 7016 is geen maat',
+            mat1.afwerking === '7016' && mat1.leuningMaten.vulling === 'glas'
+            && mat1.params.hoogte === 3000 && mat1.params.breedte === 1000
+            && mat1.params.tredeMateriaal === 'eiken', mat1.uitleg);
+        const mat2 = bbZin.parseer('trap van 3 meter hoog met glazen treden', null, bbCat);
+        check('"glazen treden" gaat over de treden, niet over de vulling',
+            mat2.params.tredeMateriaal === 'glas' && mat2.leuningMaten.vulling === undefined,
+            mat2.uitleg);
+        const mat3 = bbZin.parseer('balustrade van 2 meter in antraciet met liggende regels', null, bbCat);
+        check('"in antraciet" is RAL 7016, "liggende regels" is horizontale vulling',
+            mat3.afwerking === '7016' && mat3.params.vulling === 'horizontaal', mat3.uitleg);
+        const mat4 = bbZin.parseer('balustrade van 2 meter in RAL 1234', null, bbCat);
+        check('een RAL-nummer dat de app niet kent wordt gemeld',
+            mat4.afwerking === undefined && /RAL 1234/.test(mat4.genegeerd.join(' '))
+            && mat4.params.lengte === 2000, mat4.genegeerd.join(' '));
     }
 
     // En alles tegelijk, met een leuning, een UNP-boom en een bordes: de
