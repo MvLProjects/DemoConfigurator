@@ -1022,10 +1022,9 @@ function kiesStart(naam) {
     const eerste = document.querySelector(
         `#panel details.groep[open] input[type=number]`);
     if (eerste) eerste.focus();
-    // Bij een trap staat er meteen een voorbeeld, zodat je ziet wat je
-    // invult. De statusregel hierboven wordt daarbij overschreven door die
-    // van het voorbeeld, en die zegt hetzelfde.
-    if (naam === 'Trap') trapGewijzigd();
+    // GEEN voorbeeld bij het kiezen. Hier verscheen meteen een complete trap,
+    // en de opdrachtgever wil een lege werkplek om mee te beginnen. Het
+    // voorbeeld komt pas als je zelf iets aan de trap verandert.
 }
 
 document.getElementById('startTrap')
