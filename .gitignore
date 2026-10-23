@@ -1,0 +1,24 @@
+# Geheimen en lokale omgevingen: nooit publiceren.
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# De Onshape-koppeling hoort niet bij de webapp.
+onshape-ai/
+
+# Instellingen van de assistent op deze pc.
+.claude/
+
+# Correspondentie en verslagen voor Marthijn: niet openbaar.
+mail-aan-marthijn.md
+correctie-aan-marthijn.md
+RAPPORT-MARTHIJN.md
+
+# Ontwerp- en plannotities: blijven lokaal.
+PLAN-*.md
+TECHNIEK.md
+FUNCTIES.md
+VERBETERPUNTEN.md
+VANDAAG.md
+*-LEREN.md

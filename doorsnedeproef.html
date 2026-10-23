@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<!--
+  Elke doorsnede uit de catalogus nameten en vergelijken met de
+  controlewaarden die bij de export geleverd zijn.
+
+  LANGZAAM. Deze pagina leest ALLE 2337 STEP-bestanden in. Dat duurt minuten en
+  hoort daarom niet in selftest.html, die je tientallen keren per dag draait.
+  Draai hem na een nieuwe export van de catalogus, en als je aan
+  profiel-geometrie.js hebt gezeten.
+
+  De controlewaarden staan in expected-sections.csv, berekend met OCCT uit
+  precies deze bestanden, met dezelfde keuzeregel voor het doorsnedevlak. Het is
+  dus geen tweede implementatie van dezelfde formule maar een vaste lat.
+
+  Openen: http://localhost:8000/doorsnedeproef.html
+-->
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Doorsnedes nameten</title>
+<style>
+    body { font: 13px/1.5 Consolas, monospace; margin: 24px; max-width: 1200px; }
+    h1 { font-size: 17px; }
+    pre { background: #f6f6f6; padding: 14px; border: 1px solid #ddd;
+          white-space: pre-wrap; }
+    #bezig { color: #06c; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Doorsnedes nameten</h1>
+<p>Vergelijkt elke doorsnede uit <code>C:\Configurator\Profiles</code> met
+<code>expected-sections.csv</code>. Dit leest elk STEP-bestand in en duurt een
+paar minuten.</p>
+<div id="bezig">bezig...</div>
+<pre id="out"></pre>
+
+<script type="module">
+const out = document.getElementById('out');
+const bezigEl = document.getElementById('bezig');
+const log = (s = '') => { out.textContent += s + '\n'; };
+
+let fouten = 0;
+const check = (naam, goed, detail) => {
+    if (!goed) fouten++;
+    log((goed ? '  OK   ' : '  FAIL ') + naam
+        + (detail !== undefined ? '  -> ' + detail : ''));
+};
+
+// Het scherm bijwerken tijdens een lange lus. Zonder dit staat het beeld
+// minutenlang stil en denk je dat hij vastloopt.
+async function voortgang(tekst) {
+    bezigEl.textContent = tekst;
+    await new Promise((klaar) => setTimeout(klaar, 0));
+}
+
+// De grenzen uit de opdracht.
+const OPPERVLAK_PROCENT = 0.1;     // %
+const DOOS_MM = 0.01;
+const ZWAARTEPUNT_MM = 0.01;
+
+// De controletabel bewaart het oppervlak op TWEE DECIMALEN. Bij een grote
+// doorsnede valt dat weg, maar bij de kleinste niet: rond staal van 1 mm heeft
+// een oppervlak van 0,785398 mm², en afgerond staat er 0,79. Dat is op zichzelf
+// al 0,58 % - zes keer de tolerantie die de opdracht vraagt.
+//
+// Die 0,58 % zegt dus niets over de geometrie, alleen over de tabel. Daarom is
+// de grens de grootste van twee: 0,1 % van de waarde, of een halve eenheid van
+// het laatste cijfer. Zo blijft de controle scherp waar hij scherp kan zijn.
+const AFRONDING_MM2 = 0.005;
+
+function doorsnedeVlakken(oc, shape) {
+    const platVlak = oc.GeomAbs_SurfaceType.GeomAbs_Plane;
+    const nummer = (e) => (e && typeof e === 'object' && 'value' in e) ? e.value : e;
+    const gevonden = [];
+
+    for (const exp = new oc.TopExp_Explorer_2(shape,
+             oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+         exp.More(); exp.Next()) {
+        const face = oc.TopoDS.Face_1(exp.Current());
+
+        const opp = new oc.BRepAdaptor_Surface_2(face, true);
+        const isPlat = nummer(opp.GetType()) === nummer(platVlak);
+        opp.delete();
+        if (!isPlat) continue;
+
+        // Op POSITIE zoeken en niet op grootte: alle hoekpunten op z = 0.
+        let opNul = true, hoekpunten = 0;
+        for (const ve = new oc.TopExp_Explorer_2(face,
+                 oc.TopAbs_ShapeEnum.TopAbs_VERTEX, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+             ve.More(); ve.Next()) {
+            const p = oc.BRep_Tool.Pnt(oc.TopoDS.Vertex_1(ve.Current()));
+            if (Math.abs(p.Z()) > 1e-4) { opNul = false; break; }
+            hoekpunten++;
+        }
+        if (opNul && hoekpunten > 0) gevonden.push(face);
+    }
+    return gevonden;
+}
+
+function metenAanVlak(oc, face) {
+    const eig = new oc.GProp_GProps_1();
+    const doos = new oc.Bnd_Box_1();
+    try {
+        // Een gat in het vlak gaat automatisch van het oppervlak af, en het
+        // zwaartepunt houdt er ook rekening mee. Nagerekend op een buis van
+        // 21,3 x 1,4: pi/4 * (21,3^2 - 18,5^2) = 87,52, en dat is precies wat
+        // er in de controletabel staat.
+        oc.BRepGProp.SurfaceProperties_1(face, eig, false, false);
+        oc.BRepBndLib.Add(face, doos, false);
+        const zw = eig.CentreOfMass();
+        const a = doos.CornerMin(), b = doos.CornerMax();
+
+        let wires = 0;
+        for (const we = new oc.TopExp_Explorer_2(face,
+                 oc.TopAbs_ShapeEnum.TopAbs_WIRE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+             we.More(); we.Next()) wires++;
+
+        return {
+            oppervlak: eig.Mass(),
+            doosX: b.X() - a.X(), doosY: b.Y() - a.Y(),
+            zwX: zw.X(), zwY: zw.Y(),
+            wires,
+        };
+    } finally {
+        eig.delete();
+        doos.delete();
+    }
+}
+
+/** Een CSV met kopregel inlezen. Geen komma's in de waarden, dus splitsen mag. */
+function leesCsv(tekst) {
+    const regels = tekst.trim().split(/\r?\n/);
+    const kop = regels[0].split(',');
+    return regels.slice(1).map((r) => {
+        const v = r.split(',');
+        return Object.fromEntries(kop.map((k, i) => [k, v[i]]));
+    });
+}
+
+try {
+    await voortgang('controletabel en manifest laden...');
+    const verwachtRijen = leesCsv(
+        await (await fetch('./expected-sections.csv')).text());
+    const verwacht = new Map(verwachtRijen.map((r) => [r.file, r]));
+    const manifest = await (await fetch('./profielen/manifest.json')).json();
+
+    log('======== 1. de twee lijsten naast elkaar ========\n');
+    log(`manifest        : ${manifest.profiles.length} regels, `
+        + `export van ${manifest.exportedAt}`);
+    log(`controletabel   : ${verwachtRijen.length} regels`);
+
+    check('evenveel regels in het manifest als in de controletabel',
+        manifest.profiles.length === verwachtRijen.length,
+        `${manifest.profiles.length} tegenover ${verwachtRijen.length}`);
+
+    const zonderRij = manifest.profiles.filter((p) => !verwacht.has(p.file));
+    check('elk profiel uit het manifest staat in de controletabel',
+        zonderRij.length === 0,
+        zonderRij.slice(0, 3).map((p) => p.file).join(', '));
+
+    const tabellen = new Set(manifest.profiles.map((p) => p.table));
+    log(`tabellen        : ${tabellen.size}`);
+    check('24 tabellen', tabellen.size === 24, tabellen.size);
+
+    // Het aantal draden is een harde eigenschap: hol = 2, massief of open = 1.
+    const perDraad = {};
+    for (const r of verwachtRijen) perDraad[r.wires] = (perDraad[r.wires] || 0) + 1;
+    log(`draden          : ${JSON.stringify(perDraad)}`);
+
+    await voortgang('OCCT laden (50 MB) — dit duurt een halve minuut...');
+    const { initOcct, leesVorm } = await import('./brep-edges.js');
+    const oc = await initOcct();
+
+    log('\n\n======== 2. elk bestand nameten ========\n');
+
+    const begin = Date.now();
+    let gemeten = 0, geenVlak = 0, meerVlakken = 0, gelezenFout = 0, grofAfgerond = 0;
+    const mis = { oppervlak: [], doos: [], zwaartepunt: [], wires: [] };
+    let ergsteOppervlak = 0, ergsteDoos = 0, ergsteZwaartepunt = 0;
+
+    for (const p of manifest.profiles) {
+        const v = verwacht.get(p.file);
+        if (!v) continue;
+
+        let shape;
+        try {
+            const bytes = new Uint8Array(
+                await (await fetch('./profielen/' + p.file)).arrayBuffer());
+            shape = await leesVorm(bytes);
+        } catch (e) {
+            gelezenFout++;
+            mis.oppervlak.push(`${p.file}: niet te lezen (${e.message})`);
+            continue;
+        }
+
+        const vlakken = doorsnedeVlakken(oc, shape);
+        if (vlakken.length === 0) { geenVlak++; continue; }
+        if (vlakken.length > 1) { meerVlakken++; continue; }
+
+        const m = metenAanVlak(oc, vlakken[0]);
+        gemeten++;
+
+        const oppVerwacht = Number(v.area_mm2);
+        const afwOppMm2 = Math.abs(m.oppervlak - oppVerwacht);
+        const mag = Math.max(oppVerwacht * OPPERVLAK_PROCENT / 100, AFRONDING_MM2);
+        // Voor de rapportage nog steeds in procenten: dat leest prettiger.
+        const afwOpp = afwOppMm2 / oppVerwacht * 100;
+        const afwDoos = Math.max(Math.abs(m.doosX - Number(v.bbox_x)),
+                                 Math.abs(m.doosY - Number(v.bbox_y)));
+        const afwZw = Math.max(Math.abs(m.zwX - Number(v.centroid_x)),
+                               Math.abs(m.zwY - Number(v.centroid_y)));
+
+        ergsteDoos = Math.max(ergsteDoos, afwDoos);
+        ergsteZwaartepunt = Math.max(ergsteZwaartepunt, afwZw);
+        // De ergste afwijking alleen bijhouden waar de tabel fijn genoeg is om
+        // hem te kunnen zien; anders meet je de afronding en niet de vorm.
+        if (oppVerwacht * OPPERVLAK_PROCENT / 100 > AFRONDING_MM2) {
+            ergsteOppervlak = Math.max(ergsteOppervlak, afwOpp);
+        } else {
+            grofAfgerond++;
+        }
+
+        if (afwOppMm2 > mag) {
+            mis.oppervlak.push(`${p.file}: ${m.oppervlak.toFixed(4)} tegenover `
+                + `${oppVerwacht} (${afwOpp.toFixed(3)} %, mag ${mag.toFixed(4)} mm2)`);
+        }
+        if (afwDoos > DOOS_MM) {
+            mis.doos.push(`${p.file}: ${m.doosX.toFixed(3)} x ${m.doosY.toFixed(3)} `
+                + `tegenover ${v.bbox_x} x ${v.bbox_y}`);
+        }
+        if (afwZw > ZWAARTEPUNT_MM) {
+            mis.zwaartepunt.push(`${p.file}: ${m.zwX.toFixed(3)}, ${m.zwY.toFixed(3)} `
+                + `tegenover ${v.centroid_x}, ${v.centroid_y}`);
+        }
+        if (m.wires !== Number(v.wires)) {
+            mis.wires.push(`${p.file}: ${m.wires} tegenover ${v.wires}`);
+        }
+
+        if (gemeten % 50 === 0) {
+            const per = (Date.now() - begin) / gemeten;
+            await voortgang(`${gemeten} van ${manifest.profiles.length} gemeten`
+                + ` — nog ongeveer `
+                + `${Math.round((manifest.profiles.length - gemeten) * per / 1000)} s`);
+        }
+    }
+
+    const duur = (Date.now() - begin) / 1000;
+    log(`${gemeten} doorsnedes gemeten in ${duur.toFixed(0)} s `
+        + `(${(duur / gemeten * 1000).toFixed(0)} ms per stuk)\n`);
+
+    check('elk bestand was te lezen', gelezenFout === 0, gelezenFout);
+    check('elk bestand heeft precies één doorsnedevlak op z = 0',
+        geenVlak === 0 && meerVlakken === 0,
+        `${geenVlak} zonder vlak, ${meerVlakken} met meer dan één`);
+    check('alle profielen uit het manifest zijn gemeten',
+        gemeten === manifest.profiles.length,
+        `${gemeten} van ${manifest.profiles.length}`);
+
+    log('');
+    log(`grootste afwijking oppervlak   : ${ergsteOppervlak.toFixed(5)} % `
+        + `(mag ${OPPERVLAK_PROCENT} %)`);
+    log(`  daarbuiten gelaten           : ${grofAfgerond} profiel(en) waar de `
+        + `twee decimalen van de tabel grover zijn dan ${OPPERVLAK_PROCENT} %`);
+    log(`grootste afwijking doosje      : ${ergsteDoos.toFixed(5)} mm `
+        + `(mag ${DOOS_MM} mm)`);
+    log(`grootste afwijking zwaartepunt : ${ergsteZwaartepunt.toFixed(5)} mm `
+        + `(mag ${ZWAARTEPUNT_MM} mm)`);
+    log('');
+
+    const toon = (naam, lijst) => {
+        check(naam, lijst.length === 0, lijst.length + ' afwijkend');
+        for (const r of lijst.slice(0, 15)) log(`      ${r}`);
+        if (lijst.length > 15) log(`      ... en nog ${lijst.length - 15}`);
+    };
+    toon(`oppervlak binnen ${OPPERVLAK_PROCENT} %`, mis.oppervlak);
+    toon(`omhullend doosje binnen ${DOOS_MM} mm`, mis.doos);
+    toon(`zwaartepunt binnen ${ZWAARTEPUNT_MM} mm`, mis.zwaartepunt);
+    toon('hetzelfde aantal draden', mis.wires);
+
+    log('\n\n======== 3. het nulpunt is NIET het zwaartepunt ========\n');
+    // Dit is de correctie uit de tweede opdracht. Bij een symmetrisch profiel
+    // vallen de twee samen; bij hoekstaal, U-profiel en T-staal niet. Wie het
+    // zwaartepunt voor het hart aanziet, zet zo'n profiel scheef neer.
+    const scheef = verwachtRijen.filter(
+        (r) => Math.hypot(Number(r.centroid_x), Number(r.centroid_y)) > 0.01);
+    const perTabelScheef = {};
+    for (const r of scheef) perTabelScheef[r.table] = (perTabelScheef[r.table] || 0) + 1;
+    log(`${scheef.length} van de ${verwachtRijen.length} profielen hebben hun `
+        + `zwaartepunt NIET in de oorsprong:`);
+    for (const [t, n] of Object.entries(perTabelScheef).sort()) {
+        log(`  ${t.padEnd(22)} ${String(n).padStart(4)}`);
+    }
+
+    const l50 = verwacht.get('DIN_EN_10056-1_LG/L_EN_10056-1-50x50x5.stp');
+    if (l50) {
+        log(`\nL 50x50x5: zwaartepunt (${l50.centroid_x}, ${l50.centroid_y}), `
+            + `doosje ${l50.bbox_x} x ${l50.bbox_y}`);
+        check('L 50x50x5 heeft zijn zwaartepunt op (10,964; -10,964) — '
+            + 'het getal uit de opdracht',
+            Math.abs(Number(l50.centroid_x) - 10.964) < 0.001
+            && Math.abs(Number(l50.centroid_y) + 10.964) < 0.001,
+            `${l50.centroid_x}, ${l50.centroid_y}`);
+    }
+
+    log('\n' + (fouten === 0
+        ? '*** ALLE CONTROLES GESLAAGD ***'
+        : `*** ${fouten} CONTROLE(S) MISLUKT ***`));
+} catch (e) {
+    fouten++;
+    log('FOUT: ' + (e && e.message ? e.message : String(e)));
+    log(e && e.stack ? e.stack : '');
+}
+bezigEl.textContent = fouten === 0 ? 'klaar' : `klaar, ${fouten} mislukt`;
+log('\n=== EINDE ===');
+</script>
+</body>
+</html>

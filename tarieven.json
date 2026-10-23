@@ -1,0 +1,124 @@
+{
+  "_kop": [
+    "RICHTPRIJZEN. DIT IS GEEN OFFERTE.",
+    "",
+    "Elk bedrag hieronder is een BEREIK dat op internet gevonden is, met de",
+    "bron en de datum erbij. Het zijn ordes van grootte om mee te rekenen,",
+    "geen inkoopprijzen van deze werkplaats. Wie hier een prijs uit haalt en",
+    "die aan een klant geeft, geeft een getal door dat niemand gecontroleerd",
+    "heeft.",
+    "",
+    "ZO HOORT DIT BESTAND GEBRUIKT TE WORDEN: vul de kolom 'eigen' met wat",
+    "JULLIE betalen. Staat daar een getal, dan rekent de app daarmee en",
+    "verdwijnt het bereik. Staat er niets, dan rekent hij met het gevonden",
+    "bereik en zegt erbij dat het een richtprijs is.",
+    "",
+    "WAT ER NIET IN ZIT: arbeid, transport, montage, steiger, keuring,",
+    "tekenwerk en winst. Het tarief voor arbeid staat op nul omdat er geen",
+    "getal voor gevonden is - niet omdat het niets kost. Een totaal zonder",
+    "arbeid is geen kostprijs maar een materiaalbegroting.",
+    "",
+    "PRIJZEN BEWEGEN. De staalprijs verandert per maand. Een bedrag van",
+    "vandaag is over een half jaar niet meer waar; daarom staat de datum",
+    "waarop het gezien is erbij, en niet alleen het getal."
+  ],
+
+  "versie": 1,
+  "gezien": "2026-10-21",
+
+  "_dichtheid": [
+    "Het soortelijk gewicht van staal. Dit is GEEN richtprijs maar een",
+    "natuurkundige constante die overal hetzelfde is: 7850 kg per kubieke",
+    "meter. De app rekent het gewicht uit het ECHTE volume van elk onderdeel,",
+    "dus uit de geometrie en niet uit een schatting per meter.",
+    "",
+    "Glas en steen staan er bewust niet bij. Glas wordt per vierkante meter",
+    "besteld en steen per stuk; een gewicht zou daar niets toevoegen behalve",
+    "een getal dat niemand nodig heeft."
+  ],
+  "dichtheid": { "staal": 7850 },
+
+  "posten": {
+    "staal": {
+      "naam": "Staal, grondstof",
+      "eenheid": "kg",
+      "laag": 0.75,
+      "hoog": 1.00,
+      "eigen": null,
+      "bron": "ferna.nl/blog/staalprijs",
+      "toelichting": "Materiaalprijs, uitdrukkelijk exclusief bewerkingen en behandelingen."
+    },
+    "coating": {
+      "naam": "Poedercoaten",
+      "eenheid": "m2",
+      "laag": 30,
+      "hoog": 75,
+      "eigen": null,
+      "bron": "smederijpapendrecht.nl (35-75), betuwe-poedercoating.nl (40 voor 1 laag, 70 voor 2), werkspot.nl (30-60)",
+      "toelichting": "Het bereik dekt een en twee lagen. Of voorbehandeling, transport en btw erin zitten verschilt per coaterij - vraag dat bij een offerte altijd na."
+    },
+    "stralen": {
+      "naam": "Zandstralen (voorbehandeling)",
+      "eenheid": "m2",
+      "laag": 30,
+      "hoog": 40,
+      "eigen": null,
+      "bron": "werkspot.nl",
+      "toelichting": "Alleen als het los berekend wordt. Sommige coaterijen hebben het in hun prijs zitten; dan telt dit dubbel."
+    },
+    "arbeid": {
+      "naam": "Arbeid werkplaats",
+      "eenheid": "uur",
+      "laag": 0,
+      "hoog": 0,
+      "eigen": null,
+      "bron": "",
+      "toelichting": "GEEN GETAL GEVONDEN. Staat op nul omdat het onbekend is, niet omdat het gratis is. Vul het in of lees het totaal als materiaalbegroting."
+    }
+  },
+
+  "_besteld": [
+    "Onderdelen die je koopt in plaats van maakt: glas, glasklemmen,",
+    "sierpunten en gedraaide balusters. Ze staan allemaal op nul.",
+    "",
+    "DAAR IS EEN REDEN VOOR. Voor staal en coaten is een marktprijs te",
+    "vinden; voor deze dingen niet, want ze verschillen per leverancier, per",
+    "model en per aantal. Een sierpunt van Geran kost iets anders dan een van",
+    "Consepto, en een gietstenen baluster hangt af van de mal. Een verzonnen",
+    "bedrag zou hier het meest misleidend zijn, want het ziet er net zo hard",
+    "uit als de staalprijs ernaast."
+  ],
+  "besteld": {
+    "ruit":      { "naam": "Gelaagd glas",      "eenheid": "m2",   "eigen": null },
+    "glasklem":  { "naam": "Glasklem",          "eenheid": "stuk", "eigen": null },
+    "sierpunt":  { "naam": "Sierpunt/paalkop",  "eenheid": "stuk", "eigen": null },
+    "spijl":     { "naam": "Gedraaide baluster","eenheid": "stuk", "eigen": null },
+    "trede:rooster": { "naam": "Roostertrede",           "eenheid": "stuk", "eigen": null },
+    "trede:hout":    { "naam": "Houten trede",           "eenheid": "stuk", "eigen": null },
+    "trede:glas":    { "naam": "Glazen trede",           "eenheid": "m2",   "eigen": null },
+    "trede:steen":   { "naam": "Natuurstenen trede",     "eenheid": "stuk", "eigen": null },
+    "trede:beton":   { "naam": "Betonnen trede (prefab)","eenheid": "stuk", "eigen": null },
+    "stootbord:hout":{ "naam": "Houten stootbord",       "eenheid": "stuk", "eigen": null }
+  },
+
+  "_controle": [
+    "Een tweede, onafhankelijke schatting om de eerste tegen af te zetten:",
+    "de prijs per kilo van een AFGEWERKTE constructie, inclusief maken maar",
+    "exclusief montage. Een leuning is eenvoudig werk en zit aan de onderkant",
+    "van het bereik.",
+    "",
+    "Deze twee horen NIET precies gelijk uit te komen. De opgebouwde",
+    "berekening telt materiaal en coating op en laat arbeid weg; dit getal",
+    "heeft arbeid er juist in zitten. Lopen ze ver uiteen, dan zegt dat iets",
+    "over wat er in de aanname mist - en dat is precies waarvoor het er staat."
+  ],
+  "controle": {
+    "naam": "Afgewerkte staalconstructie",
+    "eenheid": "kg",
+    "laag": 2.50,
+    "hoog": 4.00,
+    "eigen": null,
+    "bron": "novicon.nl/wat-kost-een-staalconstructie-per-kg",
+    "toelichting": "Bandbreedte voor de hele constructie is 2,50 tot 8,00 per kg; eenvoudig werk ligt op 2,50 tot 4,00."
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "_kop": [
+    "EEN BEGINLIJST, GEEN ADVIES.",
+    "",
+    "Deze bedrijven zijn op 21 oktober 2026 met een zoekopdracht gevonden en",
+    "overgeschreven van hun eigen website. Wat hier staat is wat ZIJ over",
+    "zichzelf zeggen. Er is NIETS van gecontroleerd: niet of ze nog bestaan,",
+    "niet of ze leveren wat je nodig hebt, niet of ze goed of betaalbaar zijn,",
+    "en niet of ze aan jullie eisen voldoen.",
+    "",
+    "ZO HOORT DIT GEBRUIKT TE WORDEN: als vertrekpunt om te bellen, niet als",
+    "keuze. Bel, vraag een offerte, en zet erbij wat je gehoord hebt. Een",
+    "bedrijf dat jullie kennen en vertrouwen hoort hier bovenaan te staan, en",
+    "niet een naam die een zoekmachine toevallig als eerste gaf.",
+    "",
+    "GEEN AFSTANDEN, GEEN 'BIJ JOU IN DE BUURT'. Dat zou vragen om jouw",
+    "locatie en om een adressendienst van buiten; geen van beide is hier. Waar",
+    "een plaats bekend is staat hij erbij, en verder niets - een lijst die doet",
+    "alsof hij weet wie er dichtbij zit terwijl hij dat niet weet, is erger dan",
+    "een lijst zonder afstanden.",
+    "",
+    "WAT 'onzeker' BETEKENT: bij dat bedrijf stond niet duidelijk op de site",
+    "dat ze dit ook echt leveren, of de pagina was oud. Bel dat eerst na."
+  ],
+
+  "versie": 1,
+  "gevonden": "2026-10-21",
+
+  "_soorten": [
+    "De soorten sluiten aan op de onderdelen die deze app maakt, zodat het",
+    "scherm kan laten zien welke leveranciers bij DIT model horen."
+  ],
+  "soorten": {
+    "staal":     "Stalen profielen, buizen en kokers",
+    "glasklem":  "Glasbeslag en glasklemmen",
+    "ruit":      "Gelaagd glas voor balustrades",
+    "spijl":     "Gedraaide balusters in steen of beton",
+    "sierpunt":  "Sierpunten en paalkoppen",
+    "coating":   "Poedercoaten",
+    "smeedwerk": "Maatwerk smeedwerk: leuningen en balustrades"
+  },
+
+  "bedrijven": [
+    { "naam": "Motorenco", "plaats": "", "soorten": ["staal"],
+      "url": "https://www.motorenco.nl/staalhandel/",
+      "zegt": "Staalhandel met 14 lintzagen; zaagt op maat, ook kleine aantallen, vaak dezelfde dag geleverd." },
+
+    { "naam": "Solines", "plaats": "Moerdijk", "soorten": ["staal"],
+      "url": "https://www.solines.nl/koker-profielen/",
+      "zegt": "Kokerprofielen van 20x20 tot 400x400 mm; bandzaag tot 800 mm. Grote voorraad in Moerdijk en Dortmund.",
+      "onzeker": "De pagina was bij het zoeken ruim een jaar oud; voorraad en prijzen kunnen veranderd zijn." },
+
+    { "naam": "Van Delft Staal", "plaats": "", "soorten": ["staal"],
+      "url": "https://www.vandelftstaal.nl/staal/",
+      "zegt": "Stalen profielen; zaagt kokers op verzoek en bezorgt door heel Nederland." },
+
+    { "naam": "STAALvakman", "plaats": "", "soorten": ["staal"],
+      "url": "https://www.staalvakman.nl/",
+      "zegt": "Webshop met eigen zagerij: koker, buis, hoekprofiel, strip, plat- en rondstaal, tot 400 cm op maat." },
+
+    { "naam": "IJzershop", "plaats": "", "soorten": ["staal"],
+      "url": "https://ijzershop.nl/306-staal",
+      "zegt": "Kokers, buizen en profielen in lengtes van 1 of 2 meter. Zaagnauwkeurigheid 2 mm, zaagverlies 4 mm, verstek tot 35 graden." },
+
+    { "naam": "Seine Metaal", "plaats": "", "soorten": ["staal"],
+      "url": "https://www.seinemetaal.nl/metaalbewerkingen/metaal-zagen",
+      "zegt": "Zaagt staal, RVS en aluminium; aparte lintzagen voor staal en voor RVS/aluminium." },
+
+    { "naam": "RVS24", "plaats": "", "soorten": ["glasklem"],
+      "url": "https://rvs24.nl/balustrades/glasvulling/glasklemmen/",
+      "zegt": "Groot assortiment glasklemmen in RVS 304 en RVS 316; levering zonder account." },
+
+    { "naam": "RVSBeurs", "plaats": "", "soorten": ["glasklem"],
+      "url": "https://www.rvsbeurs.nl/product-categorie/rvs-balustrade-onderdelen/rvs-glasklem/rvs-glasklemmen/",
+      "zegt": "Glasklemmen per stuk inclusief glasrubbers, in RVS 304 (binnen) en RVS 316 (buiten)." },
+
+    { "naam": "SB-Railing", "plaats": "Zwijndrecht", "soorten": ["glasklem"],
+      "url": "https://www.sb-railing.nl/nl/glasklemmenvan-sb-railing/",
+      "zegt": "Glasklemmen in RVS 304, RVS 316 en Zamak, met montagesets op voorraad." },
+
+    { "naam": "RVS Land (dealer Q-railing)", "plaats": "", "soorten": ["glasklem"],
+      "url": "https://rvsland.nl/q-railing",
+      "zegt": "Officieel dealer van Q-railing voor Nederland en België; levert de hele catalogus." },
+
+    { "naam": "Glasdiscount", "plaats": "", "soorten": ["glasklem", "ruit"],
+      "url": "https://www.glasdiscount.nl/balustrade-glasklem-12-76-mm-63-x-45-mm-vierkante-buis",
+      "zegt": "Glasklemmen voor gelaagd glas (66.2, 12,76 mm) in geborsteld RVS 316." },
+
+    { "naam": "Timmers B.V.", "plaats": "", "soorten": ["glasklem", "ruit"],
+      "url": "https://www.timmers-bv.nl/glasbeslag-groothandel/balustrade-systemen/glasklemmen-voor-balustrade-binnen/",
+      "zegt": "Glasbeslag-groothandel met balustradesystemen voor binnen en buiten.",
+      "onzeker": "Of er zakelijke prijzen of een minimale afname gelden stond er niet bij." },
+
+    { "naam": "Tuinbeeldencenter", "plaats": "", "soorten": ["spijl"],
+      "url": "https://www.tuinbeeldencenter.nl/tuinbeelden-divers/balustrades",
+      "zegt": "Massieve balustrades van wit gietsteen. Model Linea 82: 82 cm hoog, 100 cm lang, 133 kg, €349,00. Minimale afname 3 meter; maatwerk voor schuine of gebogen uitvoering mogelijk." },
+
+    { "naam": "Roma Tuinbeelden", "plaats": "Stadskanaal", "soorten": ["spijl"],
+      "url": "https://www.roma-tuinbeelden.nl/winkel/sokkels-voor-in-de-tuin/tuinbeeld-balustrade-beton/",
+      "zegt": "Betonnen balustrade 100 cm lang, 75 cm hoog, €159,95. Eigen beeldengieterij in Stadskanaal." },
+
+    { "naam": "Betondingen", "plaats": "Zaltbommel", "soorten": ["spijl"],
+      "url": "https://www.betondingen.nl/",
+      "zegt": "Prefab beton met eigen fabriek; levert in Nederland en België.",
+      "onzeker": "Balustrades stonden niet in het gevonden assortiment (wel poeren, L-elementen, muurafdekkers). Eerst navragen." },
+
+    { "naam": "Geran", "plaats": "", "soorten": ["sierpunt"],
+      "url": "https://www.geran.nl/",
+      "zegt": "Paalkoppen, rond Ø28 tot Ø100 en vierkant 25x25 tot 100x100. Uit het sierpuntenonderzoek; zie regels.json." },
+
+    { "naam": "Consepto", "plaats": "", "soorten": ["sierpunt"],
+      "url": "https://www.consepto.nl/",
+      "zegt": "Sierpunten: dennenappel, bol, speerpunt op klosvoet, gelepelde punt, kogel op spil, Franse lelie. Uit het sierpuntenonderzoek; zie regels.json.",
+      "onzeker": "Consepto schrijft er zelf bij dat de getoonde producten illustratief zijn." },
+
+    { "naam": "Betuwe Poedercoating", "plaats": "", "soorten": ["coating"],
+      "url": "https://www.betuwe-poedercoating.nl/prijzen",
+      "zegt": "Vaste tarieven: €40 per m² voor één laag, €70 voor twee lagen in standaard RAL (excl. btw); metallic duurder." },
+
+    { "naam": "Smederij Papendrecht", "plaats": "Papendrecht", "soorten": ["coating", "smeedwerk"],
+      "url": "https://smederijpapendrecht.nl/blog/staal-poedercoaten-kosten",
+      "zegt": "Noemt €35 tot €75 per m² voor poedercoaten op staal, exclusief voorbehandeling en transport." },
+
+    { "naam": "Smederij Tupker", "plaats": "", "soorten": ["smeedwerk"],
+      "url": "https://www.tupker.nl/",
+      "zegt": "Maatwerk hekwerken, trapleuningen en balustrades in staal, brons en messing; met de hand gesmeed." },
+
+    { "naam": "Smederij van Baars", "plaats": "Asten", "soorten": ["smeedwerk"],
+      "url": "https://smederijvanbaars.nl/ambacht/smeedijzeren-trapleuningen-balustrades-balkonhekken/",
+      "zegt": "Trapleuningen, traphekken en balustrades van smeedijzer, volledig op maat.",
+      "onzeker": "De gevonden pagina was ruim vier jaar oud." },
+
+    { "naam": "OX Iron Art", "plaats": "", "soorten": ["smeedwerk"],
+      "url": "https://ox-ironart.com/category/smeedijzeren-traphekken-en-balustrades/",
+      "zegt": "Smeedijzeren traphekken en balustrades in de Benelux; maatwerk, warm verzinkt." },
+
+    { "naam": "Ambachtelijke Smid", "plaats": "", "soorten": ["smeedwerk"],
+      "url": "https://www.ambachtelijke-smid.nl/smeedwerk/wonen-interieur/leuningen-en-balustrades/",
+      "zegt": "Leuningen en balustrades op maat, vaak met gesmede muurbevestigingen." }
+  ]
+}

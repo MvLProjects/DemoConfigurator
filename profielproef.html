@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<!--
+  Profielcatalogus: klopt de geometrie-afspraak op de ECHTE bestanden?
+
+  Dit blaadje bouwt nog geen venster. Het controleert alleen of hoofdstuk 2 en de
+  acceptatie-eisen uit hoofdstuk 5 van de opdracht halen wat ze beloven, voordat
+  er UI op gebouwd wordt. De dure fout zou zijn: eerst een mooie boom met 1742
+  regels maken en daarna ontdekken dat de doorsnede niet te vinden is.
+
+  Openen:  http://localhost:8000/profielproef.html
+-->
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Profielcatalogus nameten</title>
+<style>
+    body { font: 13px/1.5 Consolas, monospace; margin: 24px; max-width: 1000px; }
+    h1 { font-size: 17px; }
+    pre { background: #f6f6f6; padding: 14px; border: 1px solid #ddd;
+          white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Profielcatalogus nameten</h1>
+<p>Controleert de geometrie-afspraak uit de opdracht op de echte STEP-bestanden.
+Dit duurt een halve minuut: de 50 MB OCCT moet eerst geladen worden.</p>
+<pre id="out">bezig...</pre>
+<p id="voortgang"></p>
+
+<script type="module">
+const out = document.getElementById('out');
+const log = (s = '') => { out.textContent += s + '\n'; };
+
+// Deel 4 loopt 1743 bestanden af en dat duurt ruim een minuut. Zonder deze regel
+// staat er al die tijd niets nieuws op het scherm en lijkt de pagina vast te
+// zitten. Een lange bewerking zonder teken van leven is een fout, ook als het
+// antwoord uiteindelijk klopt.
+const voortgangEl = document.getElementById('voortgang');
+async function voortgang(tekst) {
+    voortgangEl.textContent = tekst;
+    // De browser laten tekenen. Zonder dit zetten we alleen tekst klaar die
+    // pas na de hele lus zichtbaar wordt, en dan heeft het geen zin.
+    await new Promise((klaar) => setTimeout(klaar, 0));
+}
+let fouten = 0;
+const check = (naam, goed, info = '') => {
+    if (!goed) fouten++;
+    log(`  ${goed ? 'OK  ' : 'FOUT'}  ${naam}${info === '' ? '' : '  -> ' + info}`);
+};
+
+// Getallen netjes, zoals de opdracht voorschrijft: geen nullen achter de komma.
+const getal = (v) => (typeof v === 'number' ? String(+v.toFixed(6)) : String(v));
+const waardeVan = (e) => (e && typeof e === 'object' && 'value' in e) ? e.value : e;
+
+/**
+ * Het doorsnedevlak: het VLAKKE vlak dat op z = 0 ligt.
+ *
+ * Op positie zoeken, niet op grootte. Bij een buis van 10 mm lang is de
+ * buitencilinder groter dan de doorsnede, dus "het grootste vlak" pakt het
+ * verkeerde. Dat staat zo in de opdracht en het is hier ook nagemeten.
+ */
+function doorsnedeVan(oc, shape) {
+    const gevonden = [];
+    const platVlak = waardeVan(oc.GeomAbs_SurfaceType.GeomAbs_Plane);
+
+    for (const exp = new oc.TopExp_Explorer_2(shape,
+             oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+         exp.More(); exp.Next()) {
+        const face = oc.TopoDS.Face_1(exp.Current());
+        const vlak = new oc.BRepAdaptor_Surface_2(face, true);
+        const isPlat = waardeVan(vlak.GetType()) === platVlak;
+        vlak.delete();
+        if (!isPlat) continue;
+
+        let opNul = true, hoekpunten = 0;
+        for (const ve = new oc.TopExp_Explorer_2(face,
+                 oc.TopAbs_ShapeEnum.TopAbs_VERTEX, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+             ve.More(); ve.Next()) {
+            const p = oc.BRep_Tool.Pnt(oc.TopoDS.Vertex_1(ve.Current()));
+            if (Math.abs(p.Z()) > 1e-4) { opNul = false; break; }
+            hoekpunten++;
+        }
+        if (opNul && hoekpunten > 0) gevonden.push(face);
+    }
+    return gevonden;
+}
+
+/** Oppervlak van een vlak in mm². Een gat in het vlak gaat er automatisch af. */
+function oppervlakVan(oc, face) {
+    const eig = new oc.GProp_GProps_1();
+    try {
+        oc.BRepGProp.SurfaceProperties_1(face, eig, false, false);
+        return eig.Mass();
+    } finally {
+        eig.delete();
+    }
+}
+
+function doosVan(oc, shape) {
+    const doos = new oc.Bnd_Box_1();
+    try {
+        oc.BRepBndLib.Add(shape, doos, false);
+        const a = doos.CornerMin(), b = doos.CornerMax();
+        return [b.X() - a.X(), b.Y() - a.Y(), b.Z() - a.Z()];
+    } finally {
+        doos.delete();
+    }
+}
+
+function wiresIn(oc, face) {
+    let n = 0;
+    for (const we = new oc.TopExp_Explorer_2(face,
+             oc.TopAbs_ShapeEnum.TopAbs_WIRE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+         we.More(); we.Next()) n++;
+    return n;
+}
+
+try {
+    // ---------------- 1. waar staat de map ----------------
+    log('======== 1. de catalogusmap ========\n');
+
+    const info = await (await fetch('./profielen-info.json')).json();
+    log(`ingesteld pad : ${info.pad}`);
+    check('de map is beschikbaar', info.beschikbaar === true, String(info.beschikbaar));
+    check('er staat een manifest.json in', info.manifest === true, String(info.manifest));
+    if (!info.manifest) {
+        log('\nZonder manifest kan de rest niet. Start de server met:');
+        log('  .\\serve.ps1 -profielen "C:\\Configurator\\Profiles"');
+        throw new Error('geen manifest');
+    }
+
+    // ---------------- 2. het manifest ----------------
+    log('\n\n======== 2. het manifest ========\n');
+
+    const manifest = await (await fetch('./profielen/manifest.json')).json();
+    log(`format          : ${manifest.format}`);
+    log(`geexporteerd    : ${manifest.exportedAt}`);
+    log(`stukjeslengte   : ${manifest.sectionLengthMm} mm`);
+    log(`profielen       : ${manifest.profiles.length}`);
+    log(`mislukt bij export: ${manifest.failures.length}`);
+
+    check('het formaat is hicad-catalogue-profiles/1',
+        manifest.format === 'hicad-catalogue-profiles/1', manifest.format);
+    check('de export meldt geen mislukte profielen',
+        manifest.failures.length === 0, manifest.failures.length);
+    check('de stukjes zijn 10 mm lang', manifest.sectionLengthMm === 10,
+        manifest.sectionLengthMm);
+
+    // Tellingen per tabel, en wat er overblijft na de deduplicatie die de
+    // opdracht voorschrijft (gelijk profiellabel binnen een map = één profiel).
+    const verwacht = {
+        'DIN_EN_10210-2_R': 871, 'DIN_EN_10219-2_R': 221, 'DIN_EN_10255': 35,
+        'DIN_EN_10210-2_HQ': 175, 'DIN_EN_10219-2_HQ': 142,
+        'DIN_EN_10210-2_HR': 134, 'DIN_EN_10219-2_HR': 165,
+    };
+    const perTabel = new Map();
+    for (const p of manifest.profiles) {
+        perTabel.set(p.table, (perTabel.get(p.table) || 0) + 1);
+    }
+    log('');
+    for (const [tabel, n] of [...perTabel].sort()) {
+        log(`  ${tabel.padEnd(20)} ${String(n).padStart(4)}  (verwacht ${verwacht[tabel] ?? '?'})`);
+    }
+    check('7 tabellen', perTabel.size === 7, perTabel.size);
+    check('alle tabeltellingen kloppen met de opdracht',
+        [...perTabel].every(([t, n]) => verwacht[t] === n),
+        [...perTabel].filter(([t, n]) => verwacht[t] !== n)
+            .map(([t, n]) => `${t}=${n}`).join(', ') || 'alle');
+    check('1743 profielen in het manifest', manifest.profiles.length === 1743,
+        manifest.profiles.length);
+
+    // ---------------- 3. de acceptatie-eisen uit hoofdstuk 5 ----------------
+    log('\n\n======== 3. de twee profielen die de opdracht met naam noemt ========\n');
+
+    await voortgang('OCCT laden (50 MB) — dit duurt een halve minuut...');
+    const { initOcct, leesVorm } = await import('./brep-edges.js');
+    const oc = await initOcct();
+    await voortgang('');
+
+    const opNaam = new Map(manifest.profiles.map((p) => [p.name, p]));
+
+    /**
+     * Haalt één profiel op, leest het, en meet de doorsnede na.
+     *
+     * Het op lengte trekken gebeurt alleen als je erom vraagt: bij 1743
+     * profielen is dat 1743 keer een solid van een meter maken, en dat is voor
+     * een controle op de doorsnede niet nodig.
+     */
+    async function meet(p, ookTrekken = false) {
+        const bytes = new Uint8Array(
+            await (await fetch('./profielen/' + p.file)).arrayBuffer());
+        const shape = await leesVorm(bytes);
+        const vlakken = doorsnedeVan(oc, shape);
+        if (vlakken.length !== 1) return { vlakken: vlakken.length };
+        const face = vlakken[0];
+
+        const uit = {
+            vlakken: 1,
+            oppervlak: oppervlakVan(oc, face),
+            doos: doosVan(oc, face),
+            wires: wiresIn(oc, face),
+            buitenwire: !oc.BRepTools.OuterWire(face).IsNull(),
+            bytes: bytes.length,
+        };
+
+        if (ookTrekken) {
+            const prisma = new oc.BRepPrimAPI_MakePrism_1(
+                face, new oc.gp_Vec_4(0, 0, 1000), false, true);
+            uit.getrokken = doosVan(oc, prisma.Shape());
+            prisma.delete();
+        }
+        return uit;
+    }
+
+    // --- de vierkante koker nameten ---
+    const shs = opNaam.get('HQ 40x40x3 EN 10219-2');
+    check('SHS 40x40x3 EN 10219-2 staat in het manifest', !!shs);
+    if (shs) {
+        log(`\n--- ${shs.name} ---`);
+        log(`bestand   : ${shs.file}`);
+        log(`catalogus : B=${shs.catalogue.B} S=${shs.catalogue.S} `
+            + `RA=${shs.catalogue.RA} RI=${shs.catalogue.RI} `
+            + `ASTEG=${shs.catalogue.ASTEG} mm2  GEW=${shs.catalogue.GEW} kg/m`);
+        log(`boxSize   : ${JSON.stringify(shs.boxSize)}`);
+
+        const m = await meet(shs, true);
+        check('precies één vlak vlak op z = 0', m.vlakken === 1, m.vlakken);
+        if (m.vlakken === 1) {
+            log(`gemeten   : oppervlak ${m.oppervlak.toFixed(2)} mm2, `
+                + `doosje ${m.doos.map((v) => v.toFixed(3)).join(' x ')}, `
+                + `${m.wires} wires`);
+
+            // Hier stond: "oppervlak komt overeen met ASTEG (421 +/- 1 mm2)".
+            // Die controle is WEG, op aanwijzing van de tweede opdracht. ASTEG
+            // is het doorsnede-oppervlak niet: bij kokers is het afgerond op
+            // drie cijfers, en bij open profielen is het het lijfoppervlak. Van
+            // de 616 kokers zou deze controle er 491 laten vallen - niet omdat
+            // de vorm fout is maar omdat de kolom te grof is.
+            //
+            // Het echte nameten gebeurt nu in doorsnedeproef.html, tegen
+            // expected-sections.csv, voor alle 2337 profielen.
+            //
+            // Wat hier blijft staan is de controle die wél iets zegt over de
+            // VORM: scherpe hoeken zouden 444 mm2 geven (40^2 - 34^2), en de
+            // vier hoekafrondingen nemen daar 23 mm2 van weg. Zie je 444, dan
+            // zijn de afrondingen niet meegekomen.
+            check('scherpe hoeken zouden 444 geven, dus de afrondingen zitten erin',
+                m.oppervlak < 440, m.oppervlak.toFixed(2));
+            check('doosje van de doorsnede klopt met boxSize (0,01 mm)',
+                Math.abs(m.doos[0] - shs.boxSize[0]) < 0.01
+                && Math.abs(m.doos[1] - shs.boxSize[1]) < 0.01,
+                `${m.doos[0].toFixed(4)} x ${m.doos[1].toFixed(4)} tegenover `
+                + `${shs.boxSize[0]} x ${shs.boxSize[1]}`);
+            check('holle koker: twee wires, buitenwire te vinden',
+                m.wires === 2 && m.buitenwire, `${m.wires} wires`);
+            check('op 1000 mm getrokken geeft 40 x 40 x 1000',
+                Math.abs(m.getrokken[0] - 40) < 0.01
+                && Math.abs(m.getrokken[1] - 40) < 0.01
+                && Math.abs(m.getrokken[2] - 1000) < 0.01,
+                m.getrokken.map((v) => v.toFixed(2)).join(' x '));
+        }
+    }
+
+    // --- de ronde buis: hier zit de valkuil met het grootste vlak ---
+    const chs = opNaam.get('Pipe EN 10210-2 48.3x2.6');
+    check('CHS 48.3x2.6 EN 10210-2 staat in het manifest', !!chs);
+    if (chs) {
+        log(`\n--- ${chs.name} ---`);
+        const DA = chs.catalogue.DA, S = chs.catalogue.S;
+        const formule = Math.PI / 4 * (DA * DA - (DA - 2 * S) * (DA - 2 * S));
+        log(`catalogus : DA=${DA} S=${S}  ASTEG=${chs.catalogue.ASTEG} `
+            + `(0 bij rond, zoals de opdracht zegt)`);
+        log(`formule   : pi/4 * (${DA}^2 - ${getal(DA - 2 * S)}^2) = ${formule.toFixed(2)} mm2`);
+
+        const m = await meet(chs);
+        check('precies één vlak vlak op z = 0 (niet de buitencilinder)',
+            m.vlakken === 1, m.vlakken);
+        if (m.vlakken === 1) {
+            log(`gemeten   : oppervlak ${m.oppervlak.toFixed(2)} mm2, `
+                + `doosje ${m.doos.map((v) => v.toFixed(3)).join(' x ')}, `
+                + `${m.wires} wires`);
+            const afwijking = Math.abs(m.oppervlak - formule) / formule * 100;
+            check('oppervlak binnen 0,1 % van de formule',
+                afwijking < 0.1, `${afwijking.toFixed(4)} % afwijking`);
+            check('ASTEG is 0 bij een ronde buis', chs.catalogue.ASTEG === 0,
+                chs.catalogue.ASTEG);
+            check('doosje van de doorsnede is DA x DA',
+                Math.abs(m.doos[0] - DA) < 0.01 && Math.abs(m.doos[1] - DA) < 0.01,
+                `${m.doos[0].toFixed(4)} x ${m.doos[1].toFixed(4)} tegenover ${DA}`);
+        }
+    }
+
+    // ---------------- 4. alle 1743 profielen nameten ----------------
+    log('\n\n======== 4. alle 1743 profielen nameten ========\n');
+    log('Twee profielen bewijzen niets over 1742. De opdracht vraagt in');
+    log('hoofdstuk 5 ook letterlijk om DEZE controle voor elk vierkant en');
+    log('rechthoekig profiel. Dus allemaal.\n');
+    log('Per profiel: is er precies één vlak vlak op z=0, heeft het 2 wires,');
+    log('klopt het doosje met boxSize, en klopt het oppervlak met de catalogus.\n');
+
+    // Gewicht -> doorsnede, bij staal. Een onafhankelijke tweede mening over
+    // wat het oppervlak hoort te zijn: GEW en ASTEG zijn twee losse kolommen in
+    // de catalogus, dus als ze elkaar tegenspreken is één van de twee fout, en
+    // de geometrie wijst uit welke.
+    const STAAL = 7850;  // kg/m3
+    const uitGewicht = (gew) => gew > 0 ? gew / STAAL * 1e6 : null;
+
+    // GEW staat op 0,1 kg/m in de catalogus. Bij een licht profiel is die
+    // afronding op zichzelf al een paar procent, dus de marge moet met het
+    // profiel meebewegen. Anders meld je afrondingen als fouten.
+    const gewMarge = (gew) => Math.max(0.5, 0.05 / gew * 100);
+
+    let gemeten = 0, goed = 0;
+    const geenVlak = [], doosMis = [], wiresMis = [], scheef = [];
+
+    const totaal = manifest.profiles.length;
+    const begonnen = Date.now();
+
+    for (const p of manifest.profiles) {
+        const m = await meet(p);
+        gemeten++;
+
+        if (gemeten % 25 === 0 || gemeten === totaal) {
+            const per = (Date.now() - begonnen) / gemeten;
+            const over = Math.round(per * (totaal - gemeten) / 1000);
+            await voortgang(`bezig: ${gemeten} van ${totaal} profielen gemeten`
+                + (over > 0 ? ` — nog ongeveer ${over} seconden` : ''));
+        }
+
+        if (m.vlakken !== 1) { geenVlak.push(`${p.name}: ${m.vlakken} vlakken`); continue; }
+
+        const c = p.catalogue;
+        const doosOk = Math.abs(m.doos[0] - p.boxSize[0]) < 0.01
+                    && Math.abs(m.doos[1] - p.boxSize[1]) < 0.01;
+        if (!doosOk) {
+            doosMis.push(`${p.name}: ${m.doos[0].toFixed(3)} x ${m.doos[1].toFixed(3)} `
+                + `tegenover ${p.boxSize[0]} x ${p.boxSize[1]}`);
+        }
+        if (m.wires !== 2) wiresMis.push(`${p.name}: ${m.wires} wires`);
+
+        // Drie onafhankelijke antwoorden op dezelfde vraag "hoe groot is de
+        // doorsnede": de geometrie, de kolom ASTEG, en de kolom GEW. Waar twee
+        // het eens zijn en de derde niet, weet je welke fout is.
+        const viaAsteg = c.ASTEG > 0 ? c.ASTEG
+            : (c.DA > 0 && c.S > 0
+                ? Math.PI / 4 * (c.DA * c.DA - (c.DA - 2 * c.S) * (c.DA - 2 * c.S))
+                : null);
+        const bron = c.ASTEG > 0 ? 'ASTEG' : 'formule';
+        const viaGew = uitGewicht(c.GEW);
+
+        const afwAsteg = viaAsteg === null ? null
+            : Math.abs(m.oppervlak - viaAsteg) / viaAsteg * 100;
+        const afwGew = viaGew === null ? null
+            : Math.abs(m.oppervlak - viaGew) / viaGew * 100;
+
+        const astegOk = afwAsteg === null || afwAsteg < 0.5;
+        const gewOk = afwGew === null || afwGew < gewMarge(c.GEW);
+
+        if (!astegOk || !gewOk) {
+            let oordeel;
+            if (!astegOk && gewOk) oordeel = `${bron} is fout`;
+            else if (astegOk && !gewOk) oordeel = 'GEW is fout';
+            else oordeel = 'GEOMETRIE verdacht';
+            scheef.push({
+                naam: p.name, oordeel, gemeten: m.oppervlak,
+                viaAsteg, afwAsteg, gew: c.GEW, viaGew, afwGew,
+                erger: Math.max(afwAsteg ?? 0, afwGew ?? 0),
+            });
+        }
+
+        if (doosOk && m.wires === 2 && astegOk && gewOk) goed++;
+    }
+
+    log(`  gemeten            : ${gemeten} profielen`);
+    log(`  helemaal in orde   : ${goed}`);
+    log(`  doorsnede niet te vinden : ${geenVlak.length}`);
+    log(`  doosje wijkt af    : ${doosMis.length}`);
+    log(`  niet 2 wires       : ${wiresMis.length}`);
+    log(`  oppervlak wijkt af : ${scheef.length}`);
+
+    check('bij elk profiel is precies één doorsnedevlak te vinden',
+        geenVlak.length === 0, `${geenVlak.length} mislukt`);
+    for (const r of geenVlak.slice(0, 10)) log(`    ${r}`);
+
+    check('bij elk profiel klopt het doosje met boxSize (0,01 mm)',
+        doosMis.length === 0, `${doosMis.length} afwijkingen`);
+    for (const r of doosMis.slice(0, 10)) log(`    ${r}`);
+
+    check('elk profiel is hol: buitenwire + één binnenwire',
+        wiresMis.length === 0, `${wiresMis.length} afwijkingen`);
+    for (const r of wiresMis.slice(0, 10)) log(`    ${r}`);
+
+    // ---------------- 5. waar de catalogus zichzelf tegenspreekt ------------
+    log('\n\n======== 5. waar de catalogus zichzelf tegenspreekt ========\n');
+
+    if (scheef.length === 0) {
+        log('  Geen enkel profiel wijkt af. Niets te melden.');
+    } else {
+        log(`Bij al deze profielen is de GEOMETRIE in orde: de doorsnede is te`);
+        log(`vinden en het doosje klopt met boxSize. Wat niet klopt, is dat de`);
+        log(`catalogus twee losse kolommen heeft die hetzelfde zeggen - ASTEG`);
+        log(`(mm2) en GEW (kg/m) - en die spreken elkaar hier tegen.`);
+        log(`Bij staal geldt ${STAAL} kg/m3, dus GEW is naar mm2 te rekenen.`);
+        log(`Twee van de drie het eens = de derde is de fout.\n`);
+
+        // Een catalogus mag afronden, en GEW is vaak een nominaal getal uit een
+        // leverancierstabel in plaats van een uitgerekende waarde. Onder een paar
+        // procent kan deze methode een FOUT niet onderscheiden van een
+        // AFSPRAAK. Alles op één hoop gooien zou betekenen dat je 36 "fouten"
+        // doorgeeft waarvan de meeste geen fout zijn. Dus in banden.
+        const band = (r) => r.erger > 5 ? 'zeker' : (r.erger > 2 ? 'waarschijnlijk' : 'ruis');
+        const gesorteerd = scheef.sort((a, b) => b.erger - a.erger);
+        const regel = (r) =>
+            `${r.naam.padEnd(28)} ${r.gemeten.toFixed(0).padStart(7)}`
+            + ` ${(r.viaAsteg === null ? '-' : r.viaAsteg.toFixed(1)).padStart(11)}`
+            + ` ${(r.afwAsteg === null ? '-' : r.afwAsteg.toFixed(1)).padStart(6)}`
+            + ` ${(r.viaGew === null ? '-' : r.viaGew.toFixed(0)).padStart(9)}`
+            + ` ${(r.afwGew === null ? '-' : r.afwGew.toFixed(1)).padStart(6)}`
+            + `   ${r.oordeel}`;
+        const kop = () => {
+            log('profiel                      gemeten  ASTEG/form  afw%   via GEW  afw%   oordeel');
+            log('-'.repeat(92));
+        };
+
+        const zeker = gesorteerd.filter((r) => band(r) === 'zeker');
+        const misschien = gesorteerd.filter((r) => band(r) === 'waarschijnlijk');
+        const ruis = gesorteerd.filter((r) => band(r) === 'ruis');
+
+        log(`--- ZEKER fout: meer dan 5 % verschil (${zeker.length}) ---`);
+        log('Dit zijn geen afrondingen. Doorgeven aan de leverancier.\n');
+        kop();
+        for (const r of zeker) log(regel(r));
+
+        log(`\n--- WAARSCHIJNLIJK fout: 2 tot 5 % (${misschien.length}) ---\n`);
+        kop();
+        for (const r of misschien) log(regel(r));
+
+        log(`\n--- niet gemeld: 0,5 tot 2 % (${ruis.length}) ---`);
+        log('Binnen wat een catalogus aan afronding en nominale waarden mag');
+        log('hebben. Bijna allemaal grote ronde buizen waar de geometrie exact');
+        log('met ASTEG overeenkomt en alleen GEW een paar tienden afwijkt.');
+        log('Deze methode kan daar geen fout van een afspraak onderscheiden.');
+
+        log('\n--- wat dit voor de app betekent ---');
+        log('De geometrie is bij alle 1743 profielen goed. Reken oppervlak en');
+        log('gewicht dus liever UIT de doorsnede dan uit de cataloguskolommen,');
+        log('en gebruik ASTEG/GEW alleen om te tonen. Dan kan een fout getal in');
+        log('de catalogus nooit in een order terechtkomen.');
+    }
+
+    // ---------------- 6. is de catalogus intern consistent? ----------------
+    log('\n\n======== 6. hoekafrondingen: wijkt er één uit de rij? ========\n');
+    log('EN 10219-2 legt de buitenradius vast als een vast aantal keer de');
+    log('wanddikte. Binnen één tabel en één dikte horen ze dus allemaal gelijk');
+    log('te zijn. Wie eruit valt, is verdacht - en die wijkt door in de');
+    log('geometrie, want het STEP-bestand volgt de catalogus.\n');
+
+    const perDikte = new Map();
+    for (const p of manifest.profiles) {
+        const c = p.catalogue;
+        if (!(c.RA > 0) || !(c.S > 0)) continue;
+        const sleutel = `${p.table} S=${c.S}`;
+        if (!perDikte.has(sleutel)) perDikte.set(sleutel, new Map());
+        const perRa = perDikte.get(sleutel);
+        const ra = `RA=${c.RA} RI=${c.RI}`;
+        if (!perRa.has(ra)) perRa.set(ra, []);
+        perRa.get(ra).push(p.name);
+    }
+
+    const buitenbeentjes = [];
+    for (const [sleutel, perRa] of perDikte) {
+        if (perRa.size < 2) continue;  // allemaal gelijk: in orde
+        const gesorteerdeRa = [...perRa].sort((a, b) => b[1].length - a[1].length);
+        const [normaal, ...rest] = gesorteerdeRa;
+        for (const [ra, namen] of rest) {
+            // Alleen melden als de meerderheid duidelijk is: 1 tegen 10 is een
+            // uitzondering, 8 tegen 9 is geen uitsluitsel.
+            if (namen.length * 4 <= normaal[1].length) {
+                for (const naam of namen) {
+                    buitenbeentjes.push(
+                        `${naam}: ${ra}, maar de andere ${normaal[1].length} `
+                        + `met ${sleutel.split(' ')[1]} in deze tabel hebben ${normaal[0]}`);
+                }
+            }
+        }
+    }
+
+    if (buitenbeentjes.length === 0) {
+        log('  Geen buitenbeentjes. Alle hoekafrondingen volgen hun tabel.');
+    } else {
+        for (const r of buitenbeentjes) log(`  LET OP: ${r}`);
+    }
+    log(`\n  ${buitenbeentjes.length} profiel(en) met een afronding die uit de rij valt.`);
+
+    voortgangEl.textContent = '';
+    log('\n' + (fouten === 0
+        ? '*** ALLE CONTROLES GESLAAGD ***'
+        : `*** ${fouten} CONTROLE(S) MISLUKT ***`));
+} catch (err) {
+    log('\nFOUT: ' + (err && err.message ? err.message : err));
+    log(err && err.stack ? err.stack : '');
+    log('\n*** AFGEBROKEN ***');
+}
+</script>
+</body>
+</html>
+

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<!--
+  Een echte HiCAD-balustrade nameten.
+
+  `sample/BALUSTRADE.STP` is een voorbeeld dat uit HiCAD komt. De vraag is niet
+  of wij hem kunnen inlezen - dat kan al - maar WAT HIJ DOET wat onze
+  configurator niet doet. Daarom wordt hier per solid de omhullende doos
+  gemeten en gegroepeerd: dan zie je vanzelf welke onderdelen er zijn, hoeveel
+  er van zijn, en waar ze staan.
+
+  Openen: http://localhost:8000/balustradeproef.html
+-->
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>HiCAD-balustrade nameten</title>
+<style>
+    body { font: 13px/1.5 Consolas, monospace; margin: 24px; max-width: 1100px; }
+    h1 { font-size: 17px; }
+    pre { background: #f6f6f6; padding: 14px; border: 1px solid #ddd;
+          white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>HiCAD-balustrade nameten</h1>
+<p>Meet <code>sample/BALUSTRADE.STP</code> door, zodat we weten wat een echte
+balustrade bevat en onze configurator daarnaast te leggen is.</p>
+<pre id="out">bezig... (de 50 MB OCCT moet eerst geladen worden)</pre>
+
+<script type="module">
+const out = document.getElementById('out');
+const log = (s = '') => { out.textContent += s + '\n'; };
+const g = (v) => String(+v.toFixed(2));
+const waardeVan = (e) => (e && typeof e === 'object' && 'value' in e) ? e.value : e;
+
+try {
+    const { initOcct, leesLosseVorm } = await import('./brep-edges.js');
+    const oc = await initOcct();
+    out.textContent = '';
+
+    const bytes = new Uint8Array(
+        await (await fetch('./sample/BALUSTRADE.STP')).arrayBuffer());
+    log(`bestand: ${(bytes.length / 1024).toFixed(0)} kB`);
+
+    const { shape } = await leesLosseVorm(bytes);
+
+    // --- 1. wat zit erin ---------------------------------------------------
+    log('\n======== 1. topologie ========\n');
+    const tel = {};
+    for (const soort of ['COMPOUND', 'SOLID', 'SHELL', 'FACE', 'EDGE', 'VERTEX']) {
+        const kaart = new oc.TopTools_IndexedMapOfShape_1();
+        oc.TopExp.MapShapes_1(shape, oc.TopAbs_ShapeEnum['TopAbs_' + soort], kaart);
+        tel[soort] = kaart.Size();
+        kaart.delete();
+    }
+    log('  ' + Object.entries(tel).map(([k, v]) => `${k} ${v}`).join(' · '));
+
+    // --- 2. elk onderdeel apart meten --------------------------------------
+    log('\n======== 2. de onderdelen ========\n');
+
+    const doosVan = (vorm) => {
+        const d = new oc.Bnd_Box_1();
+        try {
+            oc.BRepBndLib.Add(vorm, d, false);
+            if (d.IsVoid()) return null;
+            const a = d.CornerMin(), b = d.CornerMax();
+            return { x: [a.X(), b.X()], y: [a.Y(), b.Y()], z: [a.Z(), b.Z()],
+                     dx: b.X() - a.X(), dy: b.Y() - a.Y(), dz: b.Z() - a.Z() };
+        } finally { d.delete(); }
+    };
+
+    const onderdelen = [];
+    for (const v = new oc.TopExp_Explorer_2(shape,
+             oc.TopAbs_ShapeEnum.TopAbs_SOLID, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+         v.More(); v.Next()) {
+        const solid = v.Current();
+        const doos = doosVan(solid);
+        if (!doos) continue;
+
+        // Ronde vlakken tellen: daaraan herken je een buis.
+        let cilinders = 0;
+        for (const fv = new oc.TopExp_Explorer_2(solid,
+                 oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+             fv.More(); fv.Next()) {
+            const opp = new oc.BRepAdaptor_Surface_2(oc.TopoDS.Face_1(fv.Current()), true);
+            const soort = waardeVan(opp.GetType());
+            if (soort === waardeVan(oc.GeomAbs_SurfaceType.GeomAbs_Cylinder)) cilinders++;
+            opp.delete();
+        }
+        onderdelen.push({ doos, cilinders });
+    }
+
+    log(`  ${onderdelen.length} losse solids gevonden\n`);
+
+    // Groeperen op de twee kleinste maten: dat is het profiel. De langste maat
+    // is de lengte, en die verschilt per stuk.
+    const groepen = new Map();
+    for (const o of onderdelen) {
+        const maten = [o.doos.dx, o.doos.dy, o.doos.dz].sort((a, b) => a - b);
+        const sleutel = `${g(maten[0])} x ${g(maten[1])}`
+            + (o.cilinders > 0 ? ' (rond)' : '');
+        if (!groepen.has(sleutel)) groepen.set(sleutel, []);
+        groepen.get(sleutel).push({ ...o, lengte: maten[2] });
+    }
+
+    log('  profiel              aantal  lengtes');
+    log('  ' + '-'.repeat(62));
+    for (const [sleutel, lijst] of [...groepen].sort((a, b) => b[1].length - a[1].length)) {
+        const lengtes = [...new Set(lijst.map((o) => g(o.lengte)))].sort(
+            (a, b) => Number(a) - Number(b));
+        log(`  ${sleutel.padEnd(20)} ${String(lijst.length).padStart(5)}   `
+            + lengtes.join(', ') + ' mm');
+    }
+
+    // --- 3. de hele balustrade ---------------------------------------------
+    log('\n======== 3. de hele balustrade ========\n');
+    const geheel = doosVan(shape);
+    log(`  breedte (x): ${g(geheel.dx)} mm   van ${g(geheel.x[0])} tot ${g(geheel.x[1])}`);
+    log(`  diepte  (y): ${g(geheel.dy)} mm   van ${g(geheel.y[0])} tot ${g(geheel.y[1])}`);
+    log(`  hoogte  (z): ${g(geheel.dz)} mm   van ${g(geheel.z[0])} tot ${g(geheel.z[1])}`);
+
+    // --- 4. waar staan de spijlen ------------------------------------------
+    log('\n======== 4. de verdeling ========\n');
+
+    // De spijlen zijn de groep met de meeste stuks en de kleinste doorsnede.
+    const spijlGroep = [...groepen.entries()]
+        .sort((a, b) => b[1].length - a[1].length)[0];
+    const spijlen = spijlGroep[1];
+    log(`  spijlprofiel: ${spijlGroep[0]}, ${spijlen.length} stuks`);
+
+    const midden = spijlen.map((s) => (s.doos.x[0] + s.doos.x[1]) / 2)
+        .sort((a, b) => a - b);
+    log('  hartlijnen x: ' + midden.map(g).join(', '));
+
+    const steken = [];
+    for (let i = 1; i < midden.length; i++) steken.push(midden[i] - midden[i - 1]);
+    const uniek = [...new Set(steken.map((s) => g(s)))];
+    log('  steek       : ' + uniek.join(', ') + ' mm');
+
+    // De vrije doorgang: steek min de breedte van een spijl in die richting.
+    const spijlBreedteX = spijlen[0].doos.dx;
+    log(`  spijlbreedte in x: ${g(spijlBreedteX)} mm`);
+    log('  vrije doorgang   : '
+        + [...new Set(steken.map((s) => g(s - spijlBreedteX)))].join(', ') + ' mm');
+
+    // --- 5. staanders ------------------------------------------------------
+    log('\n======== 5. staanders en platen ========\n');
+    for (const [sleutel, lijst] of groepen) {
+        if (lijst.length > 6) continue;   // de spijlen slaan we over
+        log(`  ${sleutel} (${lijst.length}x):`);
+        for (const o of lijst.sort((a, b) => a.doos.x[0] - b.doos.x[0])) {
+            log(`     x ${g(o.doos.x[0])}..${g(o.doos.x[1])}  `
+                + `y ${g(o.doos.y[0])}..${g(o.doos.y[1])}  `
+                + `z ${g(o.doos.z[0])}..${g(o.doos.z[1])}`);
+        }
+    }
+
+    log('\nKLAAR');
+} catch (err) {
+    log('\nFOUT: ' + (err && err.message ? err.message : err));
+    log(err && err.stack ? err.stack : '');
+    log('KLAAR');
+}
+</script>
+</body>
+</html>

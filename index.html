@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Railing Configurator</title>
+
+<style>
+    /* Kolom: balk bovenaan, daaronder paneel naast het beeld. Met een echte
+       flex-indeling schuift niets achter de balk als die twee regels hoog wordt. */
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden;
+                 font-family: system-ui, sans-serif; }
+    body { display: flex; flex-direction: column; }
+    /* --- de bovenbalk -----------------------------------------------------
+       Links wat je met een BESTAND doet, in het midden wat de app te melden
+       heeft, rechts hoe je KIJKT. Hiervoor stonden die drie door elkaar, met
+       een kale <input type=file> ertussen - die tekent elke browser zelf, in
+       het Engels, en dat viel uit de toon. Het echte invoerveld zit nu
+       verstopt achter een gewone knop. */
+    #bar { flex: 0 0 auto; display: flex; gap: 14px; align-items: center;
+           padding: 7px 12px; background: #fff;
+           border-bottom: 1px solid #dde3ea; }
+    #bar .scheiding { width: 1px; align-self: stretch; background: #e4e9ee; }
+    /* De knoppen in de bovenbalk kregen GEEN opmaak mee: alles wat er stond
+       gold voor #panel. Ze stonden er dus als kale browserknoppen tussen, in
+       een ander lettertype en met een andere hoek dan de rest van de app.
+       Dezelfde vormtaal als de paneelknoppen - witte knop, rand #c6ccd2, ronde
+       hoek - maar op maat van een werkbalk in plaats van over de volle
+       breedte. */
+    #bar button { display: inline-flex; align-items: center; gap: 6px;
+                  font: inherit; font-size: 12.5px; line-height: 1;
+                  padding: 6px 11px; cursor: pointer; white-space: nowrap;
+                  color: #2a3338; background: #fff;
+                  border: 1px solid #c6ccd2; border-radius: 5px; }
+    #bar button:hover { border-color: #0b63ce; background: #f5f9ff;
+                        color: #0b63ce; }
+    #bar button:active { background: #e8f1fd; }
+    /* Alleen bij toetsenbordgebruik een ring, niet bij elke muisklik. */
+    #bar button:focus-visible { outline: 2px solid #0b63ce; outline-offset: 1px; }
+    #bar button svg { width: 14px; height: 14px; flex: none;
+                      fill: none; stroke: currentColor; stroke-width: 1.3;
+                      stroke-linecap: round; stroke-linejoin: round; }
+    /* --- sierpuntkiezer --- */
+    #sierDialoog { width: 760px; max-width: 94vw; padding: 0; border: 0;
+                   border-radius: 8px; box-shadow: 0 10px 40px #0004; }
+    #sierDialoog::backdrop { background: #0005; }
+    .sp_kop { padding: 12px 14px 9px; border-bottom: 1px solid #dfe3e7; }
+    .sp_kop b { font-size: 14px; display: block; }
+    .sp_kop .hint { margin: 3px 0 0; }
+    .sp_lijf { display: flex; gap: 0; height: 400px; }
+    #sp_lijst { flex: 1 1 340px; margin: 0; padding: 6px; overflow-y: auto;
+                list-style: none; border-right: 1px solid #dfe3e7; }
+    .sp_groep { padding: 9px 8px 4px; font-size: 11px; font-weight: 600;
+                color: #7a838c; text-transform: uppercase;
+                letter-spacing: .04em; }
+    .sp_rij { padding: 6px 9px; border-radius: 4px; cursor: pointer; }
+    .sp_rij:hover { background: #f1f4f7; }
+    .sp_rij[aria-selected="true"] { background: #eaf2fd; }
+    .sp_rij b { display: block; font-size: 12.5px; font-weight: 600; }
+    .sp_bij { font-size: 11px; color: #7a838c; }
+    /* Een model dat niet op deze staander past blijft ZICHTBAAR, maar grijs en
+       niet te kiezen. Weglaten zou de lijst korter maken en de vraag oproepen
+       waar dat ene model gebleven is. */
+    .sp_past-niet { opacity: .45; }
+    .sp_past-niet:hover { background: none; }
+    .sp_detail { flex: 1 1 380px; padding: 12px 14px; min-width: 0; }
+    #sp_voorbeeld { height: 230px; border: 1px solid #dde3ea; border-radius: 5px;
+                    overflow: hidden; margin-bottom: 9px; }
+    .sp_detail b { font-size: 13px; }
+    .sp_detail .hint { margin: 4px 0 0; }
+
+    /* --- zoeken --- */
+    #zoekVak { position: relative; flex: 0 0 auto; }
+    #zoek { width: 190px; padding: 5px 9px; font: inherit; font-size: 12.5px;
+            border: 1px solid #c6ccd2; border-radius: 5px; background: #fff; }
+    #zoek:focus { outline: none; border-color: #0b63ce;
+                  box-shadow: 0 0 0 2px #0b63ce22; }
+    /* De lijst hangt OVER het beeld heen: hij hoort bij het zoekveld en mag de
+       balk niet uit elkaar duwen terwijl je typt. */
+    #zoekLijst { position: absolute; z-index: 20; top: 100%; left: 0;
+                 margin: 3px 0 0; padding: 4px; list-style: none;
+                 min-width: 280px; max-height: 320px; overflow-y: auto;
+                 background: #fff; border: 1px solid #c6ccd2; border-radius: 6px;
+                 box-shadow: 0 6px 18px #0003; }
+    #zoekLijst li { padding: 5px 8px; border-radius: 4px; cursor: pointer;
+                    font-size: 12.5px; }
+    #zoekLijst li:hover, #zoekLijst li[aria-selected="true"] { background: #eaf2fd; }
+    #zoekLijst .waar { color: #7a838c; font-size: 11px; }
+    #zoekLijst .niets { color: #7a838c; cursor: default; }
+    #zoekLijst .niets:hover { background: none; }
+    /* Het gevonden veld even laten oplichten. Zonder dat sta je op het goede
+       tabblad maar weet je nog steeds niet welke regel je zocht. */
+    @keyframes zoekAandacht {
+        from { background: #ffe8c4; } to { background: transparent; }
+    }
+    .zoekGevonden { animation: zoekAandacht 1.8s ease-out;
+                    border-radius: 4px; }
+
+    #status { color: #4a555e; font-size: 13px; min-width: 0;
+              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* De kijkschakelaars bij elkaar, rechts. */
+    #kijk { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+    #edgeStatus { font-size: 12px; font-weight: 600; padding: 3px 9px;
+                  border-radius: 10px; background: #eef1f4; color: #55606a;
+                  white-space: nowrap; }
+    #edgeStatus.on { background: #ff8a2b; color: #fff; }
+    label { color: #4a555e; font-size: 13px; display: flex; gap: 5px;
+            align-items: center; white-space: nowrap; }
+
+    /* --- tabbladen --------------------------------------------------------
+       Het zijpaneel is eruit. De groepen zijn tabbladen over de volle breedte
+       geworden, zodat het 3D-beeld de ruimte krijgt en de velden naast elkaar
+       staan in plaats van onder elkaar.
+
+       De groepen zelf zijn ONGEWIJZIGD gebleven: het zijn nog steeds
+       <details class="groep">, alleen is hun kop verborgen en zet de tabbalk
+       er precies één open. Een <details> open- en dichtzetten IS tabgedrag.
+       Daardoor blijft alles werken dat er al aan hing - openGroep(), de
+       startkeuze, en het openklappen van Resultaat na het bouwen. */
+    /* De bovenbalk en de tabbalk lopen over de volle breedte; daaronder staat
+       het openstaande tabblad aan de zijkant, naast het beeld. Zo zie je in
+       één oogopslag welke onderdelen er zijn zonder dat ze allemaal tegelijk
+       in die zijkant staan - dat was de klacht over het oude zijpaneel. */
+    #main { flex: 1 1 auto; display: flex; min-height: 0; }
+    #tabs { flex: 0 0 auto; display: flex; gap: 2px; padding: 0 12px;
+            background: #f4f6f8; border-bottom: 1px solid #dde3ea;
+            overflow-x: auto; }
+    .tabknop { border: 0; background: none; font: inherit; font-size: 13px;
+               color: #55606a; padding: 7px 13px 6px; cursor: pointer;
+               border-bottom: 2px solid transparent; white-space: nowrap;
+               margin-bottom: -1px;
+               display: flex; align-items: center; gap: 7px; }
+    .tabknop:hover { color: #0b63ce; }
+    /* Het icoon tekent alleen lijnen en erft zijn kleur van de knop, dus hij
+       kleurt vanzelf mee met hoveren en met het actieve tabblad. Iets
+       flauwer dan de tekst: het icoon helpt zoeken, de naam zegt wat het is. */
+    .tabknop svg { width: 15px; height: 15px; flex: none;
+                   fill: none; stroke: currentColor; stroke-width: 1.3;
+                   stroke-linecap: round; stroke-linejoin: round;
+                   opacity: .75; }
+    .tabknop[aria-selected="true"] svg { opacity: 1; }
+    .tabknop[aria-selected="true"] { color: #10324f; font-weight: 600;
+                                     background: #fff;
+                                     border-bottom-color: #0b63ce; }
+    /* Een stipje op Resultaat zodra er iets te zien is. De afstand komt van de
+       gap van de knop; een eigen marge zou er nog eens bovenop komen. */
+    .tabknop .stip { width: 6px; height: 6px; flex: none;
+                     border-radius: 50%; background: #0b63ce; }
+
+    /* --- bezig met bouwen --- */
+    #bezigVak { position: absolute; inset: 0; z-index: 30;
+                display: flex; align-items: center; justify-content: center;
+                background: #f2f5f799; backdrop-filter: blur(1px);
+                opacity: 0; transition: opacity .16s linear; }
+    #bezigVak.aan { opacity: 1; }
+    #bezigVak[hidden] { display: none; }
+    .bezigKaart { background: #fff; border: 1px solid #c6ccd2; border-radius: 6px;
+                  padding: 15px 18px; min-width: 260px; max-width: 86%;
+                  text-align: center;
+                  box-shadow: 0 6px 24px #0002;
+                  font: 13px/1.45 "Segoe UI", system-ui, sans-serif; }
+    .bezigTekst { font-weight: 600; margin-bottom: 8px; }
+    .bezigBalk { height: 6px; background: #e3e8ec; border-radius: 3px;
+                 overflow: hidden; }
+    /* GEEN animatie op de vulling. Een overgang die halverwege bevriest omdat
+       OCCT de draad blokkeert ziet er kapot uit; een balk die in stappen
+       verspringt vertelt de waarheid. */
+    #bezigVoortgang { height: 100%; width: 0; background: #1f4d8f; }
+
+    /* --- de ring ------------------------------------------------------------
+       ALLES WAT HIER BEWEEGT HANGT AAN `transform` OF `opacity`, en dat is
+       geen smaakkwestie. Dat zijn de twee dingen die Chrome op de
+       compositor-draad afhandelt; al het andere wordt door de hoofddraad
+       getekend, en die staat tijdens het rekenen stil. Gemeten op 22-10 met
+       schermafdrukken van een venster waarin de hoofddraad aantoonbaar
+       vastzat: deze ring verschoof 3464 beeldpunten tussen twee afdrukken,
+       een met javascript gedraaide ring precies 0.
+       Zet hier dus NOOIT een overgang op `stroke-dasharray`, `width`,
+       `left` of een achtergrondverloop: dat bevriest op het moment dat je
+       de melding juist nodig hebt. */
+    .bezigRing { position: relative; width: 92px; height: 92px;
+                 margin: 2px auto 12px; }
+
+    /* De veeg: dun randje aan de buitenkant dat onafgebroken rondgaat en
+       alleen zegt "ik leef nog". */
+    .ringVeeg { position: absolute; inset: 0; border-radius: 50%;
+                border: 3px solid transparent; border-top-color: #1f2a36;
+                animation: bezigDraai 1.05s linear infinite; }
+    @keyframes bezigDraai { to { transform: rotate(360deg); } }
+
+    .ringBaan { position: absolute; inset: 9px; border-radius: 50%;
+                border: 9px solid #e3e8ec; }
+
+    /* DE VOORTGANG, ALS TWEE DRAAIENDE HALVE RINGEN. Een boog die groeit kun
+       je niet met `transform` maken, en alle manieren die dat wél kunnen
+       (stroke-dasharray, conic-gradient) lopen over de hoofddraad. Twee
+       halve ringen die ronddraaien kunnen het wel: de eerste dekt 0-50%, de
+       tweede 50-100%. Elke helft is geknipt tot haar eigen kant van de
+       cirkel, en het blad erin is de linkerhelft van een ring - die komt bij
+       het draaien precies in beeld. */
+    .ringHelft { position: absolute; inset: 9px; }
+    .ringHelft.een { clip-path: inset(0 0 0 50%); }
+    .ringHelft.twee { clip-path: inset(0 50% 0 0); }
+    .ringBlad { position: absolute; inset: 0; border-radius: 50%;
+                border: 9px solid #1f4d8f;
+                clip-path: inset(0 50% 0 0);
+                transform: rotate(0deg);
+                transition: transform .25s ease-out; }
+    /* De tweede helft begint buiten haar eigen venster, anders staat de ring
+       al halfvol voordat er iets gebeurd is. */
+    .ringHelft.twee .ringBlad { transform: rotate(180deg); }
+
+    @media (prefers-reduced-motion: reduce) {
+        .ringVeeg { animation: none; }
+        .ringBlad { transition: none; }
+        #bezigVak { transition: none; }
+    }
+    .ringCijfer { position: absolute; inset: 0; display: flex;
+                  align-items: center; justify-content: center;
+                  font: 600 15px "Segoe UI", system-ui, sans-serif;
+                  color: #1f2a36; }
+    .bezigHint { margin-top: 8px; font-size: 11.5px; color: #66707a; }
+    #viewport { flex: 1 1 auto; position: relative; min-width: 0;
+                min-height: 0; }
+    /* Naamplaatje onder de navigatiekubus. Ligt over de canvas heen, maar mag
+       geen muisklikken opvangen - die moeten bij de kubus terechtkomen. */
+    /* --- het openstaande tabblad, aan de zijkant -------------------------
+       Alleen de groep die openstaat, niet alle acht onder elkaar. Dat laatste
+       was het oude zijpaneel en dat werd 3175 px lang; de tabbalk hierboven
+       laat nu zien wat er is, zonder dat het allemaal tegelijk in deze kolom
+       staat. */
+    #panel { flex: 0 0 264px; background: #fbfcfd;
+             border-right: 1px solid #dde3ea; overflow-y: auto;
+             padding: 12px 14px 0; box-sizing: border-box;
+             font-size: 13px; color: #333; }
+    #panel h2 { font-size: 13px; margin: 0 0 2px; letter-spacing: .02em; }
+    /* Een vouwende rij, en geen CSS-kolommen. In deze kolom van 236 px komt
+       er toch één ding per regel te staan, maar de rij past zich aan: maak je
+       het venster breder of het paneel ruimer, dan gaan er twee naast elkaar
+       zonder dat hier iets voor hoeft te veranderen.
+
+       Kolommen (`columns:`) leken hiervoor het aangewezen gereedschap, maar
+       die gedroegen zich niet hetzelfde per tabblad: bij Balustrade verdeelde
+       hij netjes, bij Trap bleef alles in één kolom staan met de halve
+       breedte leeg ernaast. Een vouwende rij doet overal hetzelfde.
+
+       ::details-content en niet de <details> zelf.
+       Een browser zet de inhoud van een <details> in een eigen omhulsel, dus
+       `display: flex` op het element zelf regelt zijn kinderen niet - die
+       blijven onder elkaar staan. Nagemeten in deze Chrome met drie blokjes:
+       flex op de <details>     -> linkerranden 240, 240, 240  (gestapeld)
+       flex op ::details-content -> linkerranden 13, 221, 429  (naast elkaar)
+       Dat verklaarde ook waarom het bij Trap wél leek te werken: daar zit de
+       inhoud in een echte <div id="trapVak">.
+
+       Kent een browser ::details-content niet, dan valt alles terug op één
+       kolom. Dat is lelijker maar niet stuk - alles blijft leesbaar en
+       bedienbaar. */
+    .groep::details-content, .subgroep::details-content, #trapVak {
+        display: flex; flex-wrap: wrap; align-items: flex-start;
+        align-content: flex-start; gap: 2px 26px; }
+    .groep > *, .subgroep > *, #trapVak > * { flex: 0 1 250px; min-width: 0; }
+    /* Uitleg mag breder zijn dan een invulveld, anders wordt het een smalle
+       sliert van tien regels. */
+    .groep > .hint, .subgroep > .hint, #trapVak > .hint {
+        flex: 1 1 250px; max-width: 430px; }
+    /* Deze pakken de volle breedte en beginnen dus op een nieuwe regel. */
+    .groep > summary, .groep > h2,
+    .groep > .subgroep, #trapVak > .subgroep,
+    .groep > button.primair, #trapVak > button.primair,
+    .groep > #paneelFout, #trapVak > #trapFout, #trapVak > #trapLet,
+    .groep > #trapVak, .groep > #instellingen, .groep > #chat {
+        flex: 1 0 100%; max-width: none; }
+    /* De kop van de groep staat nu in de tabbalk, dus hier weg. Het element
+       blijft wel bestaan: de tabbalk leest er zijn naam uit, en de zelftest
+       controleert dat elke groep er een heeft. */
+    .groep > summary { display: none; }
+    /* De bouwknop plakt onderaan de kolom. Past de inhoud van een tabblad er
+       niet in - bij Trap is dat zo - dan zou hij onder de rand verdwijnen en
+       moest je scrollen om te kunnen bouwen. Precies de klacht waarvoor de
+       groepen ooit inklapbaar zijn gemaakt. */
+    #panel button.primair { position: sticky; bottom: 0; z-index: 1;
+                            margin-bottom: 12px; }
+
+    /* De drie uitkomsten onder elkaar, elk over de volle breedte van de
+       kolom. Naast elkaar zou in 236 px niet passen - dan wordt een stuklijst
+       drie kolommen van 78 px. */
+    #resultaatGroep > div { flex: 1 1 100%; min-width: 0; max-width: none; }
+    /* Een uitklapper BINNEN een groep, voor instellingen die er wel toe doen
+       maar niet bij elke leuning. Bewust onopvallender dan een groepskop. */
+    .subgroep > summary { font-size: 11px; color: #7a838c; cursor: pointer;
+                          padding: 2px 0 8px 13px; position: relative;
+                          list-style: none; user-select: none; }
+    .subgroep > summary::-webkit-details-marker { display: none; }
+    .subgroep > summary::before { content: '▸'; position: absolute; left: 0;
+                                  font-size: 10px; }
+    .subgroep[open] > summary::before { content: '▾'; }
+    .subgroep > summary:hover { color: #0b63ce; }
+
+    /* De configuratiebalk: een keuzelijst over de volle breedte, met daaronder
+       een naamveld en twee knoppen. Op één regel zou het naamveld tot niets
+       worden samengedrukt - het paneel is maar 216 px breed. */
+    #panel select.breed { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+    #panel textarea.breed { width: 100%; box-sizing: border-box; margin-bottom: 6px;
+                            padding: 4px 5px; font: inherit; resize: vertical;
+                            border: 1px solid #c6ccd2; border-radius: 3px; }
+    #panel input[type=text] { width: 110px; padding: 3px 5px; font: inherit;
+                              border: 1px solid #c6ccd2; border-radius: 3px; }
+    #panel input[type=file] { width: 110px; font-size: 11px; }
+    .cfg_rij { display: flex; gap: 5px; margin-bottom: 8px; }
+    .cfg_rij input { flex: 1; min-width: 0; padding: 3px 5px; font: inherit;
+                     border: 1px solid #c6ccd2; border-radius: 3px; }
+
+    /* Het startscherm. */
+    /* --- hulp vragen --- */
+    #hulpDialoog { width: min(620px, 94vw); border: 1px solid #c6ccd2;
+                   border-radius: 6px; padding: 20px 22px 22px;
+                   box-shadow: 0 8px 30px #0003;
+                   font: 13px/1.45 "Segoe UI", system-ui, sans-serif; }
+    #hulpDialoog::backdrop { background: #0f161c99; }
+    #hulpDialoog h2 { margin: 0 0 10px; font-size: 16px; }
+    #hulp_rapport { width: 100%; box-sizing: border-box; margin-top: 8px;
+                    font: 11px/1.4 ui-monospace, Consolas, monospace;
+                    border: 1px solid #c6ccd2; border-radius: 4px; padding: 7px;
+                    background: #f7f9fa; color: #33413c; resize: vertical; }
+    .hulp_knoppen { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+    /* De hulpknop valt op zonder de bouwknop te beconcurreren: hij is er voor
+       als je vastloopt, niet voor het gewone werk. */
+    #hulpKnop { width: 100%; margin-top: 10px; }
+    #startDialoog { border: 1px solid #c6ccd2; border-radius: 6px;
+                    padding: 22px 24px 24px; box-shadow: 0 8px 30px #0003; }
+    #startDialoog::backdrop { background: #0f161c99; }
+    #startDialoog h2 { margin: 0 0 16px; font-size: 16px; }
+    .start_keuze { display: flex; gap: 12px; }
+    .start_keuze button { display: flex; flex-direction: column; gap: 5px;
+                          width: 215px; padding: 16px 15px; text-align: left;
+                          border: 1px solid #c6ccd2; border-radius: 5px;
+                          background: #fff; cursor: pointer; font: inherit; }
+    .start_keuze button:hover { border-color: #0b63ce; background: #f5f9ff; }
+    .start_keuze button.primair { border-color: #0b63ce; }
+    .start_titel { font-size: 14px; font-weight: 600; }
+    .start_uitleg { font-size: 11px; color: #7a838c; line-height: 1.45; }
+    #panel .hint { color: #7a838c; font-size: 11px; margin: 0 0 12px; line-height: 1.4; }
+    #panel .veld { display: flex; align-items: center; justify-content: space-between;
+                   gap: 8px; margin-bottom: 7px; }
+    #panel .veld label { flex: 1; }
+    #panel input[type=number] { width: 72px; padding: 3px 5px; font: inherit;
+                                border: 1px solid #c6ccd2; border-radius: 3px; }
+    /* Een vinkje rechts uitlijnen met de getalvelden erboven, anders staat hij
+       los van de kolom. */
+    #panel input[type=checkbox] { width: 72px; margin: 0; }
+    #panel select { width: 84px; padding: 3px 4px; font: inherit;
+                    border: 1px solid #c6ccd2; border-radius: 3px; background: #fff; }
+    #panel button { width: 100%; margin-top: 10px; padding: 7px; font: inherit;
+                    cursor: pointer; border: 1px solid #c6ccd2; border-radius: 4px;
+                    background: #fff; }
+    #panel button.primair { background: #2d6cdf; border-color: #2d6cdf; color: #fff;
+                            font-weight: 600; }
+    /* Berekend, niet ingevuld: dit is precies het onderscheid dat we willen
+       laten zien. De gebruiker geeft de bedoeling, de regels geven de uitkomst. */
+    #afgeleid { margin-top: 14px; padding: 9px 10px; border-radius: 4px;
+                background: #eef2f7; border: 1px solid #dde3ea; font-size: 12px; }
+    #afgeleid h3 { font-size: 11px; margin: 0 0 6px; color: #55606a;
+                   text-transform: uppercase; letter-spacing: .04em; }
+    #afgeleid .regel { display: flex; justify-content: space-between; margin-bottom: 3px; }
+    #afgeleid .regel b { font-weight: 600; }
+    #paneelFout, #trapFout { margin-top: 10px; padding: 8px 10px; border-radius: 4px;
+                  background: #fdecec; border: 1px solid #f3c2c2; color: #8c2b2b;
+                  font-size: 12px; white-space: pre-line; }
+    /* Geen fout, wel het vermelden waard: een trap die net buiten het
+       comfortbereik valt is veilig maar loopt vervelend. */
+    #trapLet { margin-top: 10px; padding: 8px 10px; border-radius: 4px;
+               background: #fff6e5; border: 1px solid #f0dcb4; color: #7a5a1e;
+               font-size: 12px; white-space: pre-line; }
+    /* --- samenstellingsboom --- */
+    #boomVak { margin-top: 14px; display: none; }
+    #boomVak h3 { font-size: 11px; margin: 0 0 6px; color: #55606a;
+                  text-transform: uppercase; letter-spacing: .04em; }
+    #boomTekst { font-size: 11.5px; line-height: 1.5; }
+    /* De takken met een randje links in plaats van met tekentjes: dat blijft
+       uitlijnen hoe lang de namen ook zijn. */
+    #boomTekst .tak { padding: 2px 0 2px 10px; border-left: 2px solid #dde3ea;
+                      margin-left: 2px; }
+    #boomTekst .blad { padding: 1px 0 1px 22px; color: #55606a; }
+    #boomTekst .wortel { font-weight: 600; padding-bottom: 2px; }
+    #boomTekst .st { color: #2b6cb0; font-variant-numeric: tabular-nums; }
+    #boomTekst .nr { color: #8b959d; font-size: 10.5px; }
+
+    /* --- stuklijst --- */
+    #stuklijstVak { margin-top: 14px; display: none; }
+    #stuklijstVak h3 { font-size: 11px; margin: 0 0 6px; color: #55606a;
+                       text-transform: uppercase; letter-spacing: .04em; }
+    #stuklijstTabel { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+    #stuklijstTabel th { text-align: left; font-weight: 600; color: #55606a;
+                         border-bottom: 1px solid #dde3ea; padding: 2px 4px 3px 0; }
+    #stuklijstTabel td { padding: 2px 4px 2px 0; border-bottom: 1px solid #f0f3f6; }
+    #stuklijstTabel .getal { text-align: right; white-space: nowrap; }
+    /* De norm onder de profielnaam: hoort erbij om te kunnen bestellen, maar
+       mag de kolom niet domineren. */
+    #stuklijstTabel .norm { color: #8b959d; font-size: 10.5px; }
+
+    #onderdelenVak { display: none; margin-top: 14px; }
+    #onderdelenTabel { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+    #onderdelenTabel th { text-align: left; font-weight: 600; color: #55606a;
+                          border-bottom: 1px solid #dde3ea; padding: 2px 4px 3px 0; }
+    #onderdelenTabel td { padding: 3px 4px 3px 0; border-bottom: 1px solid #f0f3f6;
+                          vertical-align: top; }
+    #onderdelenTabel .getal { text-align: right; white-space: nowrap; }
+    #onderdelenTabel .nr { color: #8b959d; white-space: nowrap; }
+    #onderdelenTabel .maat { color: #8b959d; font-size: 10.5px; }
+    /* Per regel een eigen knop. Eén klik is één bestand: zo loop je niet tegen
+       de blokkade van de browser op meerdere downloads achter elkaar. */
+    #onderdelenTabel button { width: auto; margin: 0; padding: 1px 7px;
+                              font-size: 10.5px; }
+
+    /* --- zaaglijst ---
+       Per stang een balk op schaal. Een tabel met getallen zou het ook zeggen,
+       maar afval zie je in een balk in één oogopslag: een stang die halfvol is
+       valt meteen op. De breedtes zijn echte verhoudingen van de stanglengte,
+       dus de balk liegt niet - hij staat alleen naast de getallen, niet
+       in plaats daarvan. */
+    /* --- kostenraming --- */
+    #kostenVak { display: none; margin-top: 14px; }
+    #kostenVak h3 { font-size: 11px; margin: 0 0 6px; color: #55606a;
+                    text-transform: uppercase; letter-spacing: .04em; }
+    .ksRegel { display: flex; gap: 6px; font-size: 11.5px; padding: 2px 0;
+               border-bottom: 1px solid #eef1f3; }
+    .ksRegel .ksNaam { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .ksRegel .ksAantal { color: #8b959d; white-space: nowrap; }
+    .ksRegel .ksBedrag { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .ksRegel.ksLeeg .ksBedrag { color: #8c2b2b; }
+    .ksRegel.ksTotaal { border-bottom: 0; border-top: 2px solid #cfd6dc;
+                        font-weight: 600; margin-top: 3px; padding-top: 4px; }
+    .ksBron { font-size: 10px; color: #98a1a9; }
+    #levVak { display: none; margin-top: 10px; }
+    .levSoort { font-size: 11px; font-weight: 600; color: #55606a;
+                margin: 7px 0 3px; }
+    .levRij { font-size: 11.5px; padding: 2px 0 3px;
+              border-bottom: 1px solid #eef1f3; overflow-wrap: anywhere; }
+    .levRij a { color: #1f4d8f; }
+    .levRij .levPlaats { color: #8b959d; }
+    .levRij .levZegt { display: block; color: #6b757d; font-size: 10.5px; }
+    .levRij .levOnzeker { display: block; color: #8c6b2b; font-size: 10.5px; }
+    #zaaglijstVak { display: none; margin-top: 14px; }
+    #zaaglijstVak h3 { font-size: 11px; margin: 0 0 6px; color: #55606a;
+                       text-transform: uppercase; letter-spacing: .04em; }
+    .zlGroep { margin-bottom: 11px; }
+    .zlKop { font-size: 11.5px; font-weight: 600; overflow-wrap: anywhere; }
+    .zlKop .norm { font-weight: 400; color: #8b959d; font-size: 10.5px; }
+    .zlTotaal { font-size: 10.5px; color: #55606a; margin: 1px 0 4px; }
+    .zlStang { display: flex; align-items: center; gap: 5px; margin-bottom: 2px; }
+    .zlStang > .nr { color: #8b959d; font-size: 10.5px; width: 16px;
+                     text-align: right; flex: none; }
+    .zlBalk { flex: 1; display: flex; height: 15px; background: #f0f3f6;
+              border: 1px solid #dde3ea; border-radius: 2px; overflow: hidden; }
+    .zlStuk { background: #bcd3ea; border-right: 1px solid #fff; font-size: 9px;
+              color: #1f4d8f; text-align: center; line-height: 15px;
+              overflow: hidden; white-space: nowrap; min-width: 0; }
+    /* De zaagsnede als eigen streepje. Het is een halve millimeter op het
+       scherm, maar het hoort ergens te staan: het is staal dat wegvalt. */
+    .zlSnede { background: #8b959d; flex: none; }
+    .zlRest { font-size: 10.5px; color: #8b959d; width: 68px; flex: none;
+              text-align: right; font-variant-numeric: tabular-nums; }
+    .zlTeLang { background: #fdf3f2; border: 1px solid #e8c4bf; border-radius: 4px;
+                padding: 6px 8px; font-size: 11.5px; color: #7a2e26;
+                margin-bottom: 9px; }
+    .zlAanname { font-size: 10.5px; color: #8b959d; margin: 6px 0 0; }
+
+    /* Eén regel per onderdeel: waar het profiel voor gebruikt wordt, wat er
+       gekozen is, en twee knopjes. Zo zie je in één oogopslag wat er straks
+       gebouwd wordt, op de plek waar je toch al kijkt. */
+    .profielrij { margin: 7px 0; }
+    .profielkop { display: flex; align-items: center; gap: 5px; }
+    .profielkop > span { flex: 1; color: #55606a; }
+    .profielrij > b { display: block; margin-top: 1px; font-weight: 600;
+                      font-size: 11.5px; overflow-wrap: anywhere; }
+    .profielrij > b.leeg { font-weight: 400; color: #949ca3; }
+    .profielrij button { width: auto; margin: 0; padding: 2px 8px; font-size: 11px; }
+    .profielrij button.wis { padding: 2px 7px; color: #8c2b2b; }
+    #stuklijstTabel tfoot td { font-weight: 600; border-top: 1px solid #dde3ea;
+                               border-bottom: none; padding-top: 4px; }
+    /* --- instellingen bewaren --- */
+    #instellingen { margin-top: 18px; border-top: 1px solid #e2e6ea; padding-top: 12px; }
+    #instelRij { display: flex; gap: 6px; }
+    #instelRij button { margin-top: 0; }
+    /* --- opdrachtvenster onderaan het paneel --- */
+    #chat { margin-top: 18px; border-top: 1px solid #e2e6ea; padding-top: 12px; }
+    #chatLog { height: 190px; overflow-y: auto; background: #fff;
+               border: 1px solid #dde3ea; border-radius: 4px; padding: 7px;
+               font-size: 12px; line-height: 1.45; }
+    #chatLog .ik { color: #1f4d8f; margin-bottom: 2px; }
+    #chatLog .ik::before { content: '› '; }
+    #chatLog .uit { color: #33413c; margin-bottom: 9px; }
+    #chatLog .nee { color: #8c2b2b; margin-bottom: 9px; }
+    /* De parameterregel kan lang zijn; laten afbreken in plaats van het hele
+       venster te laten schuiven. */
+    #chatLog code { background: #eef2f7; padding: 0 3px; border-radius: 2px;
+                    font-size: 11px; overflow-wrap: anywhere; }
+    #chatRij { display: flex; gap: 6px; margin-top: 7px; }
+    #chatInvoer { flex: 1; min-width: 0; padding: 5px 7px; font: inherit;
+                  border: 1px solid #c6ccd2; border-radius: 3px; }
+    #chat button { width: auto; margin-top: 0; padding: 5px 11px; }
+    .navTip { position: absolute; z-index: 2; pointer-events: none;
+              text-align: center; font-size: 11px; letter-spacing: .02em;
+              color: #55606a; background: #ffffffcc; border-radius: 3px;
+              padding: 1px 0; text-transform: uppercase; }
+
+    /* --- de profielkiezer -------------------------------------------------
+       Een <dialog>: die regelt modaal gedrag, focus en Escape zelf. Vaste
+       hoogte, want de boom kan 871 regels lang worden en dan moet het venster
+       niet meegroeien - de lijst schuift, het venster blijft staan. */
+    #profielDialoog { width: min(900px, 94vw); height: min(680px, 90vh);
+                      padding: 0; border: 1px solid #b9c0c7; border-radius: 5px;
+                      font: 13px/1.45 "Segoe UI", system-ui, sans-serif; }
+    #profielDialoog::backdrop { background: #0b141b66; }
+    #profielDialoog form { display: flex; flex-direction: column; height: 100%;
+                           margin: 0; }
+    .pz_kop { padding: 12px 14px 10px; border-bottom: 1px solid #dfe3e7; }
+    .pz_kop h2 { margin: 0 0 9px; font-size: 15px; }
+    .pz_regel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    #pz_zoek { flex: 1; min-width: 170px; padding: 5px 8px; font: inherit;
+               border: 1px solid #c6ccd2; border-radius: 3px; }
+    #pz_categorie, #pz_vorm, #pz_soort { padding: 4px 6px; font: inherit;
+                          border: 1px solid #c6ccd2; border-radius: 3px; }
+    /* De soort staat op zijn eigen regel en krijgt de volle breedte: dat is de
+       knop waarmee je van buis naar strip wisselt, en die moet je zien staan. */
+    #pz_categorie { flex: 1; min-width: 170px; }
+    /* Knopjes met wat je eerder gebruikte, in het paneel. Zelfde uiterlijk als
+       de rij in de profielkiezer, zodat het herkenbaar hetzelfde ding is. */
+    .gw_knopjes { display: flex; flex-wrap: wrap; gap: 4px; margin: -2px 0 8px; }
+    .gw_knopjes button { font: inherit; font-size: 11px; padding: 1px 7px;
+                         border: 1px solid #c3cbd2; border-radius: 10px;
+                         background: #f3f6f8; cursor: pointer;
+                         white-space: nowrap; }
+    .gw_knopjes button:hover { background: #e6edf3; border-color: #9aa7b1; }
+    .gw_knopjes .gw_keer { color: #8a949d; margin-left: 4px; }
+
+    /* --- vaak gebruikt: wat de app van je afkeek --- */
+    .pz_vaak { display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+               margin-top: 8px; }
+    .pz_vaak .pz_vaakKop { color: #66707a; font-size: 12px; margin-right: 2px; }
+    .pz_vaak button { font: inherit; font-size: 12px; padding: 2px 8px;
+                      border: 1px solid #c3cbd2; border-radius: 11px;
+                      background: #f3f6f8; cursor: pointer; white-space: nowrap; }
+    .pz_vaak button:hover:not(:disabled) { background: #e6edf3;
+                                           border-color: #9aa7b1; }
+    .pz_vaak button.gekozen { background: #1f4d8f; border-color: #1f4d8f;
+                              color: #fff; }
+    .pz_vaak button:disabled { opacity: .5; cursor: not-allowed; }
+    .pz_vaak button b { font-weight: 600; }
+    .pz_vaak button .pz_keer { color: #8a949d; margin-left: 4px; }
+    .pz_vaak button.gekozen .pz_keer { color: #c9d8ea; }
+    #pz_aantal { margin-left: auto; color: #66707a; font-size: 12px;
+                 white-space: nowrap; }
+    .pz_romp { display: flex; flex: 1; min-height: 0; }
+    #pz_boom { width: 46%; overflow: auto; border-right: 1px solid #dfe3e7;
+               padding: 6px 0; }
+    #pz_detail { flex: 1; overflow: auto; padding: 12px 14px;
+                 display: flex; flex-direction: column; }
+    #pz_tekst { flex: none; }
+    /* Het voorbeeldvenster pakt de ruimte die overblijft, met een bodem zodat
+       het niet wegvalt bij een lang detailpaneel. */
+    #pz_voorbeeld { flex: 1; min-height: 150px; margin-top: 12px; position: relative;
+                    border: 1px solid #dfe3e7; border-radius: 3px; overflow: hidden;
+                    background: #f2f4f6; }
+    #pz_voorbeeld canvas { display: block; width: 100%; height: 100%; }
+    .pz_voorbeeldtekst { position: absolute; inset: 0; margin: 0; display: flex;
+                         align-items: center; justify-content: center;
+                         text-align: center; padding: 10px; white-space: pre-line;
+                         color: #8b959d; }
+    .pz_voorbeeldtekst.fout { color: #8c2b2b; }
+    .pz_knoop { display: flex; width: 100%; gap: 6px; align-items: center;
+                background: none; border: 0; text-align: left; font: inherit;
+                padding: 4px 10px; cursor: pointer; color: #1d2b33; }
+    .pz_knoop:hover { background: #eef2f6; }
+    .pz_niveau2 { padding-left: 24px; color: #3d4b55; }
+    .pz_pijl { width: 11px; color: #8b959d; flex: none; }
+    .pz_telling { margin-left: auto; color: #8b959d; font-size: 11px;
+                  flex: none; }
+    .pz_lijst { display: flex; flex-direction: column; }
+    .pz_profiel { background: none; border: 0; text-align: left; font: inherit;
+                  padding: 3px 10px 3px 46px; cursor: pointer; color: #26323a; }
+    .pz_profiel:hover { background: #eef2f6; }
+    .pz_profiel.gekozen { background: #d8e6f2; font-weight: 600; }
+    .pz_profiel.pz_stuk { color: #a9b1b8; cursor: not-allowed;
+                          text-decoration: line-through; }
+    .pz_leeg { color: #8b959d; padding: 6px 12px; }
+    #pz_detail h3 { margin: 0 0 3px; font-size: 15px; }
+    .pz_norm { margin: 0 0 12px; color: #55606a; }
+    .pz_vorm { color: #7a848d; font-size: 12px; }
+    .pz_maten { border-collapse: collapse; margin-bottom: 14px; }
+    .pz_maten th { text-align: left; font-weight: 400; color: #66707a;
+                   padding: 2px 16px 2px 0; vertical-align: top; }
+    .pz_maten td { padding: 2px 0; }
+    /* Klein en grijs, puur om te kunnen herleiden waar dit vandaan komt. */
+    .pz_herkomst { color: #949ca3; font-size: 11px; line-height: 1.5;
+                   overflow-wrap: anywhere; }
+    .pz_voet { display: flex; gap: 8px; justify-content: flex-end;
+               padding: 10px 14px; border-top: 1px solid #dfe3e7; }
+    .pz_voet button { padding: 5px 14px; font: inherit; cursor: pointer;
+                      border: 1px solid #c6ccd2; border-radius: 3px;
+                      background: #f4f6f8; }
+    .pz_voet button.primair { background: #2f6f4f; border-color: #2f6f4f;
+                              color: #fff; }
+    .pz_voet button:disabled { opacity: .5; cursor: not-allowed; }
+</style>
+
+<!-- three.js en OrbitControls zijn ES-modules. De importmap koppelt de bare
+     specifier 'three' (die OrbitControls.js intern gebruikt) aan het lokale bestand. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+  }
+}
+</script>
+</head>
+
+<body>
+    <!-- De iconen voor de tabbalk, als één blok symbolen.
+         Zelf getekend en inline, net als al het andere hier: geen
+         iconenlettertype en geen download, dus ook niets dat stuk kan als er
+         geen internet is. Elk symbool tekent alleen lijnen; kleur en dikte
+         komen van de knop waar hij in staat, zodat hij meekleurt met het
+         actieve tabblad.
+
+         Welk icoon bij welke groep hoort staat niet hier maar op de groep
+         zelf, als data-icoon. Dan is er één plek waar een groep zijn naam EN
+         zijn icoon vandaan haalt en kan dat niet uit de pas lopen. -->
+    <svg id="iconen" aria-hidden="true" style="display:none">
+        <!-- een hek: bovenregel, onderregel, vier spijlen -->
+        <symbol id="ic-balustrade" viewBox="0 0 16 16">
+            <path d="M1.5 4.5h13M1.5 12.5h13M4.5 4.5v8M7.5 4.5v8M10.5 4.5v8"/>
+        </symbol>
+        <!-- de doorsnede van een I-profiel -->
+        <symbol id="ic-profielen" viewBox="0 0 16 16">
+            <path d="M3.5 3.5h9M3.5 12.5h9M8 3.5v9"/>
+        </symbol>
+        <!-- een druppel verf -->
+        <symbol id="ic-afwerking" viewBox="0 0 16 16">
+            <path d="M8 2.2c0 0 4 4.6 4 7a4 4 0 0 1-8 0c0-2.4 4-7 4-7z"/>
+        </symbol>
+        <!-- een trap, van linksonder naar rechtsboven -->
+        <symbol id="ic-trap" viewBox="0 0 16 16">
+            <path d="M2 14v-4h4V6h4V2h4"/>
+        </symbol>
+        <!-- een lijst -->
+        <!-- kosten: een prijskaartje met een gaatje -->
+        <symbol id="ic-kosten" viewBox="0 0 16 16">
+            <path d="M8.2 2.2H13.2a.8.8 0 0 1 .8.8v5a.8.8 0 0 1-.23.57l-5.2
+                     5.2a.8.8 0 0 1-1.14 0l-5-5a.8.8 0 0 1 0-1.14l5.2-5.2a.8.8
+                     0 0 1 .57-.23z"/>
+            <circle cx="11" cy="5.2" r="1.1"/>
+        </symbol>
+        <symbol id="ic-resultaat" viewBox="0 0 16 16">
+            <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h6.5"/>
+        </symbol>
+        <!-- een blad met een titelblok rechtsonder -->
+        <symbol id="ic-tekening" viewBox="0 0 16 16">
+            <rect x="2" y="2.5" width="12" height="11" rx="1"/>
+            <path d="M2 10h12M9 10v3.5"/>
+        </symbol>
+        <!-- twee schuifjes -->
+        <symbol id="ic-instellingen" viewBox="0 0 16 16">
+            <path d="M2 5h6.5M12 5h2M2 11h2M7.5 11h6.5"/>
+            <circle cx="10.2" cy="5" r="1.7"/>
+            <circle cx="5.3" cy="11" r="1.7"/>
+        </symbol>
+        <!-- een tekstballon -->
+        <symbol id="ic-chat" viewBox="0 0 16 16">
+            <rect x="2" y="3" width="12" height="8.5" rx="2"/>
+            <path d="M5.5 11.5V14l3.2-2.5"/>
+        </symbol>
+        <!-- een bestand dat naar binnen gaat: pijl omhoog uit een bak -->
+        <symbol id="ic-open" viewBox="0 0 16 16">
+            <path d="M8 10.5V2.5M5 5.5 8 2.5l3 3M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10"/>
+        </symbol>
+    </svg>
+
+    <!-- Het keuzevenster voor sierpunten. Zelfde opzet als de profielkiezer:
+         een lijst links, een 3D-voorbeeld rechts. -->
+    <dialog id="sierDialoog">
+        <div class="sp_kop">
+            <b>Sierpunten &amp; paalkoppen</b>
+            <span class="hint">Eigen meetkunde op algemene vormen, naar de
+               modelfamilies van geran.nl en consepto.nl. De hoogtes zijn
+               afgeleid, geen opgegeven maten — zie regels.json.</span>
+        </div>
+        <div class="sp_lijf">
+            <ul id="sp_lijst" role="listbox" aria-label="Modellen"></ul>
+            <div class="sp_detail">
+                <div id="sp_voorbeeld"></div>
+                <b id="sp_naam">—</b>
+                <p id="sp_uitleg" class="hint"></p>
+                <p id="sp_maat" class="hint"></p>
+            </div>
+        </div>
+        <div class="pz_voet">
+            <button type="button" onclick="document.getElementById('sierDialoog').close()">Annuleren</button>
+            <button type="button" id="sp_ok" class="primair">Kiezen</button>
+        </div>
+    </dialog>
+
+    <div id="bar">
+        <!-- Het echte bestandsveld blijft in de DOM staan - main.js en de
+             zelftest hangen eraan - maar je ziet het niet. Elke browser tekent
+             zo'n veld zelf, in zijn eigen taal, en dat stond er als
+             "Choose File / No file chosen" tussen. -->
+        <button id="openModel" type="button">
+            <svg aria-hidden="true"><use href="#ic-open"></use></svg>Model openen…</button>
+        <input type="file" id="file" accept=".stp,.step" hidden>
+        <span class="scheiding"></span>
+        <!-- Zoeken naar een veld, een knop of een onderdeel. De app heeft
+             zeven tabbladen en een stuk of twintig velden; "waar staat dat ook
+             alweer" is een echte vraag geweest. -->
+        <div id="zoekVak">
+            <input type="search" id="zoek" placeholder="Zoek een instelling…"
+                   autocomplete="off" aria-label="Zoek in het paneel">
+            <ul id="zoekLijst" role="listbox" hidden></ul>
+        </div>
+        <span class="scheiding"></span>
+        <!-- HIER STOND "Kies een STEP-bestand (.stp / .step)." Dat was de
+             begintekst uit de tijd dat dit alleen een STEP-kijker was, en het
+             stuurde de gebruiker de verkeerde kant op: een bestand openen is
+             optioneel, bouwen in het paneel is het normale begin. kiesStart()
+             in main.js maakt dit zinnetje nog specifiek voor de keuze uit het
+             startscherm. -->
+        <span id="status">Vul de maten in en druk op Genereer.</span>
+        <!-- HIER STOND "STEP exporteren". Weg, want het productiepakket onder
+             Resultaat bevat die STEP al (balustrade.stp) plus een STEP per
+             onderdeel, de DXF's, het productieblad en de stuklijst. Twee
+             knoppen voor hetzelfde bestand, waarvan de ene minder geeft, is
+             een keuze die niemand hoeft te maken. -->
+        <div id="kijk">
+            <label><input type="checkbox" id="showEdges" checked> randen</label>
+            <label><input type="checkbox" id="showMaten"> maten</label>
+            <span class="scheiding"></span>
+            <span id="edgeStatus">Geen rand geselecteerd</span>
+        </div>
+    </div>
+
+    <!-- De tabbalk wordt door main.js gevuld uit de groepen hieronder, zodat
+         de namen op één plek staan en niet uit de pas kunnen lopen. Hij staat
+         BUITEN #main, over de volle breedte, net als de bovenbalk. -->
+    <nav id="tabs" role="tablist" aria-label="Onderdelen van de configurator"></nav>
+
+    <div id="main">
+
+    <!-- De groepen. Dit stond eerst als één lange kolom in een zijpaneel van
+         232 px: opengeklapt 3175 px bij een venster van 839, bijna vier
+         schermen scrollen. Daarna werden het inklapbare groepen, en nu
+         tabbladen - de strook hieronder toont er één tegelijk, over de volle
+         breedte.
+
+         Het zijn nog steeds gewone <details>. De tabbalk zet er precies één
+         open; hun eigen kop is in de CSS verborgen. Daardoor staat alles nog
+         in de DOM en blijft het bereikbaar, ook als er geen JavaScript
+         draait - dan heb je weer de oude uitklapgroepen. -->
+    <div id="panel">
+    <details class="groep" data-icoon="balustrade" open>
+        <summary>Balustrade</summary>
+        <p class="hint">Geef de bedoeling op. Het aantal spijlen volgt uit de
+           veiligheidsregel en is niet in te vullen.</p>
+
+        <div class="veld"><label for="p_lengte">lengte</label>
+            <input type="number" id="p_lengte" step="10"></div>
+        <div class="veld"><label for="p_hoogte">hoogte</label>
+            <input type="number" id="p_hoogte" step="10"></div>
+        <!-- Waarmee het veld tussen de staanders gevuld wordt. Staat vóór de
+             spijlbreedte, want deze keuze bepaalt of dat veld er nog toe doet. -->
+        <div class="veld"><label for="p_vulling">vulling</label>
+            <select id="p_vulling">
+                <option value="spijlen">verticale spijlen</option>
+                <option value="horizontaal">horizontale regels</option>
+                <option value="glas">glas in klemmen</option>
+                <option value="geen">geen — alleen handregel</option>
+            </select></div>
+        <!-- Een VASTE uitleg naast de melding die pas verschijnt als je al
+             gekozen hebt. Die melding was onvindbaar met zoeken: de woorden
+             "beklimbaar" en "gelaagd" stonden er pas in nadat je de keuze had
+             gemaakt, en je moest dus al weten waar je moest zijn. -->
+        <p class="hint" style="margin-top:-2px">Liggende regels zijn
+           beklimbaar; glas is gelaagd veiligheidsglas in klemmen.</p>
+        <p class="hint" id="vullingLet" style="display:none"></p>
+        <div class="veld"><label for="p_spijlBreedte">spijlbreedte</label>
+            <input type="number" id="p_spijlBreedte" step="1"></div>
+        <div class="veld"><label for="p_maxDoorgang">max. doorgang</label>
+            <input type="number" id="p_maxDoorgang" step="5"></div>
+        <div class="veld"><label for="p_staanderBreedte">staanderbreedte</label>
+            <input type="number" id="p_staanderBreedte" step="5"></div>
+        <div class="veld"><label for="p_handregelHoogte">handregelhoogte</label>
+            <input type="number" id="p_handregelHoogte" step="5"></div>
+        <div class="veld"><label for="p_maxStaanderAfstand">max. staanderafstand</label>
+            <input type="number" id="p_maxStaanderAfstand" step="50"></div>
+        <p class="hint">Is een veld langer, dan komen er staanders tussen en wordt
+           het in gelijke stukken verdeeld. 850 mm komt uit een
+           referentiebalustrade.</p>
+        <!-- De verfijningen apart. Ze doen er wel degelijk toe, maar niet bij
+             elke leuning; stonden ze allemaal uitgeklapt, dan zakte de knop
+             "Genereer balustrade" onder de vouw en moest je scrollen om te
+             kunnen bouwen. Eén klik en ze staan er weer. -->
+        <details class="subgroep">
+            <summary>meer opties</summary>
+            <!-- De hoeken. De meetkunde hiervoor zat er al lang in - verstek,
+                 een staander in de deelhoek, gesloten rondes - maar je kon er
+                 alleen bij door randen in een ingeladen model aan te klikken.
+                 Leeg betekent precies wat het altijd deed: één recht stuk. -->
+            <div class="veld"><label for="p_vervolg">hoeken</label>
+                <input type="text" id="p_vervolg" placeholder="leeg = recht"></div>
+            <p class="hint">Wat er ná de eerste zijde komt, in paren: eerst de
+               hoek, dan de lengte. <b>90, 1500</b> is de hoek om en nog
+               anderhalve meter. Min draait de andere kant op.</p>
+            <!-- Je eerder gebruikte hoeken als knopjes. Dit veld heeft een
+                 schrijfwijze die je moet onthouden; een knopje met wat je
+                 vorige week typte scheelt dat. Staat er alleen als er iets te
+                 tonen valt - zie gewoonten.js. -->
+            <div class="gw_knopjes" id="gw_hoeken" hidden></div>
+
+            <!-- Sierpunt of paalkop. Zelfde rij-opzet als de profielkeuzes:
+                 wat er gekozen is, een knop om te kiezen en een kruisje. -->
+            <div class="profielrij">
+                <div class="profielkop">
+                    <span>sierpunt</span>
+                    <button type="button" id="kies_sierpunt">kies…</button>
+                    <button type="button" id="wis_sierpunt" class="wis"
+                            title="geen sierpunt">×</button>
+                </div>
+                <b id="pr_sierpunt" class="leeg">— geen</b>
+            </div>
+            <div class="veld"><label for="p_sierpuntWaar">sierpunt op</label>
+                <select id="p_sierpuntWaar">
+                    <option value="alle">alle staanders</option>
+                    <option value="eind">alleen de eindstaanders</option>
+                </select></div>
+            <div class="veld"><label for="p_sierpuntHoogte">hoogte sierpunt</label>
+                <input type="number" id="p_sierpuntHoogte" step="5"></div>
+            <p class="hint">0 leidt de hoogte af uit het model. Het ornament
+               staat bovenop de handregel, recht boven de staander — de
+               handregel loopt bij deze opbouw over elke staanderkop heen, dus
+               er past niets op de kop zelf.</p>
+
+            <!-- EN OP DE SPIJLEN, en daar was het om begonnen. Op een
+                 smeedijzeren hek staat op elke staaf een punt en niet alleen
+                 op de palen: de spijl loopt door de bovenste regel heen en
+                 eindigt erboven in een bol of een speerpunt. -->
+            <div class="profielrij">
+                <div class="profielkop">
+                    <span>punt op de spijlen</span>
+                    <button type="button" id="kies_spijlSierpunt">kies…</button>
+                    <button type="button" id="wis_spijlSierpunt" class="wis"
+                            title="geen punt op de spijlen">×</button>
+                </div>
+                <b id="pr_spijlSierpunt" class="leeg">— geen</b>
+            </div>
+            <!-- Gedraaide balusters in plaats van rechte spijlen. Een baluster
+                 wordt gedraaid of gegoten, niet uit een stang gezaagd: hij
+                 negeert daarom het spijlprofiel en gebruikt de spijlbreedte
+                 als zijn vierkante voetmaat. Zie balusters.js. -->
+            <div class="veld"><label for="p_spijlModel">balustervorm</label>
+                <select id="p_spijlModel"></select></div>
+            <!-- Alleen van toepassing op een gedraaide baluster; bij rechte
+                 spijlen staat hij uit. Steen is de gewone keuze - daar is deze
+                 vorm voor - maar gedraaid metaal bestaat ook, dus het is een
+                 keuze en geen aanname. -->
+            <div class="veld"><label for="p_spijlMateriaal">balustermateriaal</label>
+                <select id="p_spijlMateriaal">
+                    <option value="steen">steen</option>
+                    <option value="staal">staal</option>
+                </select></div>
+            <p class="hint" id="spijlModelLet">Rechte spijlen worden gedraaide
+               balusters, zoals op een stenen bordestrap. De spijlbreedte is
+               dan de maat van het vierkante voetblokje — reken op 80 à 120 mm,
+               niet op 20.</p>
+
+            <!-- De dekband: een geprofileerde handregel in plaats van een
+                 stalen buis. Negeert het handregelprofiel en wordt breder dan
+                 de paal, want een dekband steekt over de balusters heen. -->
+            <div class="veld"><label for="p_handregelModel">dekband</label>
+                <select id="p_handregelModel"></select></div>
+            <div class="veld"><label for="p_handregelMateriaal">dekbandmateriaal</label>
+                <select id="p_handregelMateriaal">
+                    <option value="steen">steen</option>
+                    <option value="staal">staal</option>
+                </select></div>
+            <p class="hint" id="dekbandLet">Vervangt de stalen handregel door
+               een geprofileerde band, zoals op een stenen balustrade. Hij
+               negeert het handregelprofiel en wordt breder dan de paal —
+               de plaat steekt over, zodat regenwater vrij valt.</p>
+
+            <div class="veld"><label for="p_spijlOverstek">spijloverstek</label>
+                <input type="number" id="p_spijlOverstek" step="10"></div>
+            <p class="hint">Hoeveel de spijlen bóven de handregel uitsteken. De
+               staaf gaat dan door een gat in de regels heen, zoals bij een
+               smeedijzeren hek, en de punt komt daar bovenop. 0 laat ze
+               stoppen waar ze altijd stopten. De maat van de punt volgt de
+               spijlbreedte.</p>
+            <p class="hint" id="spijlPuntLet" style="display:none"></p>
+
+            <div class="veld"><label for="p_handregelOverstek">handregeloverstek</label>
+                <input type="number" id="p_handregelOverstek" step="10"></div>
+            <p class="hint">Hoeveel de handregel voorbij de buitenste staanders
+               uitsteekt, gemeten vanaf het staanderhart. Alleen aan vrije
+               uiteinden, niet in een hoek. 0 laat hem op de staander eindigen.</p>
+            <div class="veld"><label for="p_voetplaatDikte">voetplaatdikte</label>
+                <input type="number" id="p_voetplaatDikte" step="1"></div>
+            <p class="hint">Onder elke staander komt een plaat van 150 × 50 met
+               twee boutgaten van ⌀20. De staander staat erop en wordt dus even
+               veel korter, zodat de hoogte klopt. 0 betekent geen voetplaat.</p>
+            <div class="veld"><label for="p_vulraamwerk">vulraamwerk</label>
+                <input type="checkbox" id="p_vulraamwerk"></div>
+            <p class="hint">Zet de spijlen in een eigen raam van twee regels in
+               plaats van rechtstreeks tussen de vloer en de handregel. Zo'n
+               vulpaneel las je plat op een bok en hang je daarna tussen de
+               staanders; zonder raam moet je de hele leuning staand opbouwen.</p>
+            <div class="veld"><label for="p_stripBreedte">stripbreedte</label>
+                <input type="number" id="p_stripBreedte" step="1"></div>
+            <p class="hint">Hoe diep de regels van het vulraamwerk zijn. De strip
+               hoort smaller te zijn dan de staander: hij komt met zijn voorkant
+               vlak tegen de paal en laat aan weerszijden 5 mm schouder vrij.
+               <strong>0 betekent: uit de staanderbreedte afleiden</strong> —
+               staander 40 geeft 30, staander 50 geeft 40. Vul een eigen maat in
+               om dat te overrulen. Een gekozen regelprofiel gaat voor op beide.</p>
+            <div class="veld"><label for="p_paalkapDikte">paalkapdikte</label>
+                <input type="number" id="p_paalkapDikte" step="1"></div>
+            <p class="hint">Het plaatje bovenop de staander, 3 mm oversteek
+               rondom — rond op een buis, vierkant op een koker. Zonder kap
+               eindigt een koker in een afgezaagde kop en kijk je de buis in.
+               0 betekent geen kap. Telt niet mee in de hoogte: die wordt tot de
+               bovenkant van de handregel gemeten.</p>
+            <div class="veld"><label for="p_uitklinken">staanderkop uitklinken</label>
+                <input type="checkbox" id="p_uitklinken"></div>
+            <p class="hint">Snijdt in de staanderkop een bed waar de handregel in
+               valt, in plaats van hem er stomp tegenaan te zetten. Bij een ronde
+               staander en een ronde regel wordt dat een vismuil. Een eindstaander
+               krijgt er één, een midden- of hoekstaander twee — dat zijn dan ook
+               verschillende stukken in de stuklijst.</p>
+            <div class="veld"><label for="p_hoogteverschil">hoogteverschil</label>
+                <input type="number" id="p_hoogteverschil" step="50"></div>
+            <p class="hint">Hoogteverschil 0 geeft een vlakke balustrade. Vul er
+               iets in en je krijgt een trapleuning: de lengte is dan de
+               horizontale maat.</p>
+            <div class="veld"><label for="p_verschuiving">verschuiving opzij</label>
+                <input type="number" id="p_verschuiving" step="5"></div>
+            <p class="hint">Alleen voor "op geselecteerde randen": zet de leuning
+               naast de rand in plaats van erop. Een min-teken zet hem aan de
+               andere kant.</p>
+        </details>
+
+        <div id="afgeleid">
+            <h3>Berekend</h3>
+            <!-- De KOPJES bewegen mee met de vulling, net als de getallen.
+                 Stonden ze vast, dan las je bij glas "hart op hart:
+                 621 × 728 × 10,76 mm" - een label dat niet hoort bij wat
+                 ernaast staat is erger dan geen label. Zie werkAfgeleideBij. -->
+            <div class="regel"><span id="a_aantalKop">aantal spijlen</span><b id="a_aantal">–</b></div>
+            <div class="regel"><span id="a_doorgangKop">vrije doorgang</span><b id="a_doorgang">–</b></div>
+            <div class="regel"><span id="a_steekKop">hart op hart</span><b id="a_steek">–</b></div>
+            <div class="regel"><span>helling</span><b id="a_helling">–</b></div>
+            <!-- De stripbreedte is sinds punt 2 van de tweede opdracht een
+                 AFGELEIDE maat en hoort dus hier te staan, naast het aantal
+                 spijlen: je ziet dan dat hij een gevolg is van de
+                 staanderbreedte en geen invoer. Vul je hem met de hand in, dan
+                 staat hier wat je hebt ingevuld. -->
+            <div class="regel"><span>stripbreedte</span><b id="a_strip">–</b></div>
+        </div>
+
+        <div id="paneelFout"></div>
+
+        <!-- TECHNISCHE AANDACHTSPUNTEN. Iets anders dan #paneelFout: dat gaat
+             over invoer die niet kan (een getal buiten zijn grenzen), dit gaat
+             over een combinatie die wél te bouwen is maar niet deugt - een
+             handregel die smaller is dan de paal waar hij overheen ligt.
+             Vandaar een waarschuwing en geen foutmelding: je kunt gewoon
+             doorgaan, maar je hoort het te weten. -->
+        <div id="keuringVak" style="display:none">
+            <h3>⚠ Technisch aandachtspunt</h3>
+            <div id="keuringLijst"></div>
+        </div>
+
+        <button id="genereer" class="primair">Genereer balustrade</button>
+        <button id="opRand" disabled>Op geselecteerde randen</button>
+        <p class="hint" id="opRandHint" style="margin-top:6px">
+           Laad een STEP-model en klik op een liggende rand. Houd Shift
+           ingedrukt om er meer bij te kiezen; om een hoek heen werkt ook.</p>
+    </details>
+
+    <!-- Profielen en afwerking stonden ONDER Balustrade, maar ze gelden voor de
+         trapleuning net zo goed. Nu staan ze op hun eigen plek. -->
+    <details class="groep" data-icoon="profielen">
+        <summary>Profielen</summary>
+        <p class="hint" style="margin-top:0">Kies per onderdeel een profiel uit de
+           profielcatalogus. Laat je er een leeg, dan wordt dat onderdeel een
+           massief blok van de maat bij Balustrade.</p>
+
+        <!-- Bewaarde configuraties: de vijf keuzes die bij een werkplaats
+             meestal vastliggen, onder een naam. -->
+        <div class="veld"><label for="cfg_keuze">configuratie</label></div>
+        <select id="cfg_keuze" class="breed"></select>
+        <div class="cfg_rij">
+            <input type="text" id="cfg_naam" placeholder="naam om te bewaren"
+                   autocomplete="off">
+            <button id="cfg_bewaar" title="de huidige keuzes onder deze naam bewaren">Bewaar</button>
+            <button id="cfg_wis" class="wis" title="de gekozen configuratie verwijderen" disabled>×</button>
+        </div>
+        <p class="hint">Bewaart alle vier de profielen — staander, handregel,
+           spijl en trapboom — plus het trede-materiaal en de coatkleur. Blijft
+           in deze browser staan, dus niet in het instellingenbestand — dat is
+           voor één ontwerp.</p>
+
+        <!-- MIJN STANDAARD: niet een configuratie die je zelf een naam geeft,
+             maar wat de app van je afkeek. Zie gewoonten.js voor wat er geteld
+             wordt en waarom pas bij het bouwen.
+
+             Hij staat hier en niet bovenaan het paneel, vlak bij de
+             configuraties: het zijn twee antwoorden op dezelfde vraag - "zet
+             alles op wat wij altijd doen" - en dan horen ze bij elkaar te
+             staan in plaats van elkaar te beconcurreren vanaf twee plekken. -->
+        <div class="cfg_rij" style="margin-top:9px">
+            <button id="gw_toepassen" type="button"
+                    title="alle velden zetten op wat je het vaakst gebruikt"
+                    disabled>Mijn standaard</button>
+            <button id="gw_vergeet" type="button" class="wis"
+                    title="vergeten wat de app van je geleerd heeft"
+                    disabled>×</button>
+        </div>
+        <p class="hint" id="gw_hint">De app kijkt af wat je het vaakst kiest en
+           zet dat hier klaar. Nog niets geleerd — bouw eerst een paar keer
+           iets.</p>
+        <!-- Naam op een EIGEN regel onder de knoppen. Het paneel is maar 188 px
+             breed; zet je label, naam en twee knoppen op één regel, dan wordt de
+             naam tot nul samengedrukt en zie je niet wat je gekozen hebt. -->
+        <div class="profielrij">
+            <div class="profielkop">
+                <span>staander</span>
+                <button id="kies_staander">kies…</button>
+                <button id="wis_staander" class="wis" title="terug naar een blok">×</button>
+            </div>
+            <b id="pr_staander" class="leeg">— massief blok</b>
+        </div>
+        <div class="profielrij">
+            <div class="profielkop">
+                <span>handregel</span>
+                <button id="kies_handregel">kies…</button>
+                <button id="wis_handregel" class="wis" title="terug naar een blok">×</button>
+            </div>
+            <b id="pr_handregel" class="leeg">— massief blok</b>
+        </div>
+        <div class="profielrij">
+            <div class="profielkop">
+                <span>spijl</span>
+                <button id="kies_spijl">kies…</button>
+                <button id="wis_spijl" class="wis" title="terug naar een blok">×</button>
+            </div>
+            <b id="pr_spijl" class="leeg">— massief blok</b>
+        </div>
+    </details>
+
+    <details class="groep" data-icoon="afwerking">
+        <summary>Afwerking</summary>
+        <div class="veld"><label for="p_afwerking">poedercoat</label>
+            <select id="p_afwerking"></select></div>
+        <p class="hint">Geldt voor alle metalen onderdelen, van de balustrade én
+           van de trap. Hout wordt niet gecoat — dat verbrandt in de oven. De
+           kleur op het scherm is een benadering; <b>het RAL-nummer</b> is wat
+           de poedercoater nodig heeft.</p>
+    </details>
+
+    <details class="groep" data-icoon="trap">
+        <summary>Trap</summary>
+        <div id="trapVak">
+            <p class="hint">Rechte steektrap. Geef de hoogte; het aantal treden,
+               de optrede en de aantrede volgen uit de regels.</p>
+
+            <div class="veld"><label for="t_hoogte">hoogte</label>
+                <input type="number" id="t_hoogte" step="50"></div>
+            <div class="veld"><label for="t_breedte">breedte</label>
+                <input type="number" id="t_breedte" step="50"></div>
+            <div class="veld"><label for="t_tredeMateriaal">trede-materiaal</label>
+                <select id="t_tredeMateriaal"></select></div>
+            <p class="hint">Geldt voor de treden en het bordes. Kies je een
+               andere soort, dan springt de trededikte naar de gangbare maat
+               daarvan — 7 voor traanplaat, 30 voor een rooster, 32 voor glas,
+               40 voor hout en steen, 60 voor beton. Daarna kun je hem gewoon
+               aanpassen. Rooster, hout, glas, steen en beton worden op maat
+               besteld en staan daarom niet in de zaaglijst.</p>
+            <div class="veld"><label for="t_tredeDikte">trededikte</label>
+                <input type="number" id="t_tredeDikte" step="1"></div>
+            <div class="veld"><label for="t_tredeOverstek">overstek</label>
+                <input type="number" id="t_tredeOverstek" step="5"></div>
+            <!-- De trapboom: een plaat op maat, of een profiel uit de
+                 catalogus zoals een UNP 220. Dat zijn twee verschillende
+                 constructies, dus twee manieren van bouwen. -->
+            <div class="profielrij">
+                <div class="profielkop">
+                    <span>trapboom</span>
+                    <button id="kies_boom">kies…</button>
+                    <button id="wis_boom" class="wis" title="terug naar een plaat">×</button>
+                </div>
+                <b id="pr_boom" class="leeg">— plaat op maat</b>
+            </div>
+            <p class="hint">Zonder profiel wordt de boom uit plaatstaal
+               gesneden en onderaan op de vloer afgeknipt. Kies je een profiel,
+               bijvoorbeeld <b>UPN 220</b> bij Channels, dan wordt het een recht
+               stuk balk met de opening naar binnen, waar de treden in komen.
+               De boomhoogte en -dikte hieronder gelden dan niet meer.</p>
+            <div class="veld"><label for="t_boomHoogte">boomhoogte</label>
+                <input type="number" id="t_boomHoogte" step="10"></div>
+            <div class="veld"><label for="t_boomDikte">boomdikte</label>
+                <input type="number" id="t_boomDikte" step="1"></div>
+            <div class="veld"><label for="t_bordesNa">bordes na stap</label>
+                <input type="number" id="t_bordesNa" step="1"></div>
+            <div class="veld"><label for="t_bordesLengte">bordeslengte</label>
+                <input type="number" id="t_bordesLengte" step="50"></div>
+            <p class="hint">Bordes na stap 0 betekent geen bordes. Bij 3 meter
+               hoogte kan het na stap 2 tot en met 14.</p>
+
+            <div id="afgeleid">
+                <h3>Berekend</h3>
+                <div class="regel"><span>treden</span><b id="t_a_treden">–</b></div>
+                <div class="regel"><span>optreden</span><b id="t_a_optreden">–</b></div>
+                <div class="regel"><span>optrede</span><b id="t_a_optrede">–</b></div>
+                <div class="regel"><span>aantrede</span><b id="t_a_aantrede">–</b></div>
+                <div class="regel"><span>aanzet</span><b id="t_a_aanzet">–</b></div>
+                <div class="regel"><span>helling</span><b id="t_a_helling">–</b></div>
+            </div>
+
+            <div class="veld"><label for="t_leuning">leuning</label>
+                <select id="t_leuning">
+                    <option value="geen">geen</option>
+                    <option value="links">links</option>
+                    <option value="rechts">rechts</option>
+                    <option value="beide">beide zijden</option>
+                </select></div>
+            <p class="hint">De leuning komt automatisch tegen de buitenkant van
+               de trapboom. Maten komen uit het kopje Balustrade hierboven.</p>
+
+            <div class="veld"><label for="t_wandleuning">wandleuning</label>
+                <select id="t_wandleuning">
+                    <option value="geen">geen</option>
+                    <option value="links">links</option>
+                    <option value="rechts">rechts</option>
+                </select></div>
+            <p class="hint">Een ronde regel op muurhouders, aan de kant van de
+               muur. Kan niet aan de kant waar al een leuning staat.</p>
+            <div class="veld"><label for="t_stootborden">stootborden</label>
+                <input type="checkbox" id="t_stootborden"></div>
+            <p class="hint">Een dichte plaat aan de voorkant van elke trede: een
+               gesloten trap. Bij houten treden van hetzelfde hout, anders
+               staalplaat.</p>
+            <div class="veld"><label for="t_platen">voet- en kopplaten</label>
+                <input type="checkbox" id="t_platen"></div>
+            <p class="hint">Een voetplaat onder elke boom op de vloer en een
+               kopplaat tegen de bovenvloer, met boutgaten. De bomen worden er
+               stomp op afgezaagd. Steunhoeken onder de treden komen er vanzelf
+               bij als de soort trede daarom vraagt (rooster, hout, glas, steen,
+               beton).</p>
+
+            <div id="trapFout" style="display:none"></div>
+            <div id="trapLet" style="display:none"></div>
+
+            <button id="genereerTrap" class="primair">Genereer trap</button>
+        </div>
+    </details>
+
+    <!-- Wat eruit komt: de stuklijst en de productieonderdelen. Deze groep
+         klapt vanzelf open zodra er iets gegenereerd is; zie main.js. -->
+    <details class="groep" id="resultaatGroep" data-icoon="resultaat">
+        <summary>Resultaat</summary>
+
+        <!-- De samenstellingsboom. Dezelfde onderdelen als in de lijsten
+             hieronder, maar gegroepeerd zoals je ze in elkaar zet: een
+             staander met zijn voetplaat, een vulveld als paneel. -->
+        <div id="boomVak">
+            <h3>Samenstelling</h3>
+            <p class="hint" style="margin-top:0">Hoe het in elkaar zit. Een
+               vulveld las je plat op een bok en hang je daarna tussen de
+               staanders; identieke velden staan hier als één regel.</p>
+            <div id="boomTekst"></div>
+        </div>
+
+        <div id="stuklijstVak">
+            <h3>Stuklijst</h3>
+            <table id="stuklijstTabel"></table>
+            <button id="stuklijstCsv">Stuklijst als CSV</button>
+        </div>
+
+        <!-- Unieke productieonderdelen. De stuklijst hierboven groepeert op
+             profiel en lengte; deze lijst groepeert op de GEOMETRIE. Zodra er
+             een gat of een verstek in één exemplaar zit, splitst deze lijst wel
+             en die niet. -->
+        <div id="onderdelenVak">
+            <h3>Productieonderdelen</h3>
+            <p class="hint" style="margin-top:0">Onderdelen met dezelfde vorm
+               zijn hetzelfde productieonderdeel, waar ze ook staan. Per uniek
+               onderdeel is er één STEP nodig.</p>
+            <table id="onderdelenTabel"></table>
+            <button id="onderdelenAlles">Alle onderdelen als STEP</button>
+            <button id="bomCsv">Onderdelenlijst als CSV</button>
+            <!-- Alles wat de werkplaats nodig heeft in één bestand. De losse
+                 knoppen hierboven blijven: soms wil je alleen de BOM. -->
+            <button id="productie" class="primair">Productiepakket (ZIP)</button>
+            <p class="hint">Eén ZIP met: de STEP van het geheel, een STEP per
+               uniek onderdeel, een DXF van elk plaatdeel (voor de snijtafel),
+               een PDF van twee bladen — vier aanzichten met maten, en het
+               zaagplan met de stukken over de stangen verdeeld — en de
+               stuklijst en de zaaglijst als CSV.</p>
+        </div>
+
+        <!-- Hoe de stukken uit ingekochte stangen komen. De stuklijst zegt WAT
+             je nodig hebt, dit zegt hoeveel stangen je moet bestellen en wat er
+             overblijft. Platen staan hier niet in: die worden gesneden, niet
+             gezaagd, en hebben hun DXF. -->
+        <div id="zaaglijstVak">
+            <h3>Zaaglijst</h3>
+            <p class="hint" style="margin-top:0">Wat er in welke stang ligt.
+               Stukken van lang naar kort in de eerste stang waar ze bij passen —
+               dat is een goede indeling, niet bewijsbaar de beste.</p>
+            <div id="zaaglijstInhoud"></div>
+            <button id="zaaglijstCsv">Zaaglijst als CSV</button>
+        </div>
+
+        <!-- RAMING, GEEN OFFERTE. De hoeveelheden komen uit de gemeten
+             geometrie en zijn hard; de tarieven komen van internet en zijn
+             dat niet. Daarom staat er een bereik en geen bedrag, en daarom
+             staat er bij elke post waar het getal vandaan komt. Zie
+             tarieven.json en kosten.js. -->
+    </details>
+
+    <!-- KOSTEN OP EEN EIGEN TABBLAD, en niet onderaan het resultaat. Het stond
+         daar onder de zaaglijst, en dan moet je eerst bouwen, dan het goede
+         tabblad kiezen, dan helemaal naar beneden scrollen voordat je ziet dat
+         het er is. Een functie die je niet vindt bestaat niet. -->
+    <details class="groep" data-icoon="kosten">
+        <summary>Kosten</summary>
+        <div id="kostenVak">
+            <h3>Kostenraming</h3>
+            <p class="hint" style="margin-top:0" id="kostenKop"></p>
+            <div id="kostenInhoud"></div>
+            <p class="hint" id="kostenSlot"></p>
+
+            <!-- EEN BEGINLIJST OM TE BELLEN, GEEN ADVIES. Alleen de soorten
+                 die in DIT model zitten; zie leveranciers.json voor wat er
+                 wel en niet van gecontroleerd is. -->
+            <details class="subgroep" id="levVak">
+                <summary>Waar koop je dit</summary>
+                <p class="hint" style="margin-top:4px" id="levKop"></p>
+                <div id="levInhoud"></div>
+            </details>
+        </div>
+        <!-- Zolang er niets gebouwd is valt er niets te rekenen. Dat hoort er
+             te staan, niet een leeg tabblad dat op een fout lijkt. -->
+        <p class="hint" id="kostenLeeg">Bouw eerst iets; dan staat hier wat het
+           ongeveer kost en waar je de onderdelen kunt kopen.</p>
+    </details>
+
+    <!-- Het tekeningkader. De gegevens hiervoor kent de app niet uit zichzelf:
+         een opdrachtnummer of een tekenaar staat nergens in de geometrie. -->
+    <details class="groep" data-icoon="tekening">
+        <summary>Tekening</summary>
+        <p class="hint" style="margin-top:0">Zet het model, de stuklijst en een
+           titelblok op een blad om te printen of als PDF te bewaren.</p>
+        <div class="veld"><label for="k_blad">bladformaat</label>
+            <select id="k_blad">
+                <option value="A4">A4 liggend</option>
+                <option value="A3">A3 liggend</option>
+            </select></div>
+        <div class="veld"><label for="k_opdracht">opdracht</label>
+            <input type="text" id="k_opdracht" autocomplete="off"></div>
+        <div class="veld"><label for="k_nummer">tek.nummer</label>
+            <input type="text" id="k_nummer" autocomplete="off"></div>
+        <div class="veld"><label for="k_omschrijving">omschrijving</label>
+            <input type="text" id="k_omschrijving" autocomplete="off"></div>
+        <div class="veld"><label for="k_getekend">getekend door</label>
+            <input type="text" id="k_getekend" autocomplete="off"></div>
+
+        <details class="subgroep">
+            <summary>bedrijfsgegevens en logo</summary>
+            <label for="k_bedrijf" style="font-size:11px;color:#7a838c">
+                naam en adres, zoals het in het titelblok moet staan</label>
+            <textarea id="k_bedrijf" rows="4" class="breed"></textarea>
+            <div class="veld"><label for="k_logo">logo</label>
+                <input type="file" id="k_logo" accept="image/*"></div>
+            <p class="hint">Een PNG of SVG. Blijft in deze browser bewaard,
+               net als een configuratie.</p>
+            <button id="k_logoWis" class="wis" title="logo weghalen">logo weghalen</button>
+        </details>
+
+        <button id="k_maak" class="primair">Tekening maken</button>
+        <p class="hint">Opent het blad in een nieuw venster. Daar kun je het
+           printen of met "Opslaan als PDF" bewaren.</p>
+    </details>
+
+    <details class="groep" data-icoon="instellingen">
+        <summary>Instellingen</summary>
+        <div id="instellingen">
+            <!-- HULP VRAGEN, bovenaan de instellingen. Wie vastloopt zoekt
+                 hier, en niet onderaan een lijst met keuzes. -->
+            <button type="button" id="hulpKnop">Hulp nodig</button>
+            <p class="hint">Verzamelt je maten, je profielen en wat er misging,
+               zodat je het in één keer kunt doorsturen. Je ziet eerst wat
+               erin staat.</p>
+
+            <!-- DE TECHNISCHE KEURING. Hij heeft hier twee keer gestaan voordat
+                 hij op zijn plek kwam: eerst IN het waarschuwingsvak (dat is
+                 verborgen zolang er niets mis is, dus onvindbaar tot het te
+                 laat was), daarna bij de balustradematen. Maar dit is geen maat
+                 van een balustrade, het is een keuze over hoe de app zich
+                 gedraagt - en dan hoort hij bij Instellingen, want daar wordt
+                 hij gezocht. -->
+            <h4 style="margin:0 0 4px">Technische keuring</h4>
+            <div class="veld"><label for="p_autoCorrectie">automatisch corrigeren</label>
+                <input type="checkbox" id="p_autoCorrectie"></div>
+            <p class="hint">Na elke bouw wordt gecontroleerd of de profielen op
+               elkaar aansluiten — of een handregel bijvoorbeeld breed genoeg is
+               voor de staander waar hij overheen ligt. Die controle draait
+               altijd.<br>
+               <strong>Aan:</strong> de app kiest zelf een passend profiel uit
+               dezelfde norm en vertelt wat er is aangepast.<br>
+               <strong>Uit:</strong> u ziet alleen de waarschuwing met het
+               voorstel, en kiest zelf.</p>
+
+            <h4 style="margin:12px 0 4px">Ontwerp bewaren</h4>
+            <p class="hint">Bewaart alle maten hierboven als bestand, zodat je
+               een ontwerp later terug kunt halen.</p>
+            <div id="instelRij">
+                <button id="instelOpslaan">Opslaan</button>
+                <button id="instelLaden">Laden</button>
+            </div>
+            <input type="file" id="instelBestand" accept=".json" hidden>
+        </div>
+    </details>
+
+    <details class="groep" data-icoon="chat">
+        <summary>Opdracht in woorden</summary>
+        <div id="chat">
+            <p class="hint">Typ wat je wilt. De zin wordt omgezet naar maten en
+               instellingen; het model wordt daarna exact berekend.</p>
+            <div id="chatLog"></div>
+            <div id="chatRij">
+                <input type="text" id="chatInvoer" autocomplete="off"
+                       placeholder="maak een kubus van 300 mm">
+                <button id="chatVerstuur">Ga</button>
+            </div>
+        </div>
+    </details>
+    </div>
+
+    <div id="viewport">
+        <!-- BEZIG MET BOUWEN.
+             De rekenkern werkt SYNCHROON op de hoofddraad: zolang hij bezig is
+             tekent de browser niets. Een spinner die je met javascript
+             ronddraait bevriest dus precies tijdens het wachten. Deze ring
+             draait met een css-animatie op `transform` en de voortgang met
+             twee draaiende helften; dat loopt over de compositor-draad en
+             blijft dus wél doorgaan. Elke stap wordt bovendien getekend vóór
+             het werk begint; zie `adem()` in main.js. -->
+        <div id="bezigVak" hidden>
+            <div class="bezigKaart" role="status" aria-live="polite">
+                <div class="bezigRing" aria-hidden="true">
+                    <div class="ringBaan"></div>
+                    <div class="ringHelft een"><div class="ringBlad"
+                         id="bezigBlad1"></div></div>
+                    <div class="ringHelft twee"><div class="ringBlad"
+                         id="bezigBlad2"></div></div>
+                    <div class="ringVeeg"></div>
+                    <div class="ringCijfer" id="bezigCijfer"></div>
+                </div>
+                <div class="bezigTekst" id="bezigTekst">Bezig…</div>
+                <div class="bezigHint">Het beeld staat even stil terwijl de
+                    geometrie exact berekend wordt.</div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- HULP VRAGEN. Geen knop die stilletjes iets verstuurt: hij laat eerst
+         zien wát er meegaat, en jij kiest hoe je het verstuurt.
+
+         WAAROM GEEN ECHTE MAIL UIT DE APP. Deze app draait in de browser met
+         een lokaal servertje ernaast; er is geen mailserver. Een maildienst
+         erbij zou een sleutel in de JavaScript betekenen, en die kan iedereen
+         lezen die de pagina opent. Daarom `mailto:`: dat opent JOUW
+         mailprogramma met alles al ingevuld, en jij drukt op versturen. -->
+    <dialog id="hulpDialoog">
+        <form method="dialog">
+            <h2>Hulp nodig</h2>
+            <p class="hint" style="margin-top:0">Hieronder staat alles wat
+               iemand nodig heeft om te kunnen helpen: je maten, je profielen
+               en wat er misging. Lees het door — er gaat niets weg zonder dat
+               jij het verstuurt.</p>
+            <div class="veld"><label for="hulp_waarom">wat ging er mis</label>
+                <input type="text" id="hulp_waarom" autocomplete="off"
+                       placeholder="in één zin, bijvoorbeeld: de punten staan scheef"></div>
+            <div class="veld"><label for="hulp_adres">mailadres</label>
+                <input type="email" id="hulp_adres" autocomplete="off"
+                       placeholder="naar wie de hulpvraag gaat"></div>
+            <p class="hint">Het adres blijft in deze browser bewaard, net als
+               je bedrijfsnaam. Het gaat nergens anders heen.</p>
+            <textarea id="hulp_rapport" readonly rows="14"></textarea>
+            <div class="hulp_knoppen">
+                <button type="button" id="hulp_kopieer">Kopieer</button>
+                <button type="button" id="hulp_bestand">Bewaar als bestand</button>
+                <button type="button" id="hulp_mail" class="primair">Open in e-mail</button>
+                <button value="dicht">Sluiten</button>
+            </div>
+            <p class="hint" id="hulp_melding"></p>
+        </form>
+    </dialog>
+
+    <!-- Het startscherm. Je begint met de vraag WAT je gaat maken, en de app
+         zet daarna het goede kopje open.
+         Dit zet niets vast: beide groepen blijven in het paneel staan, dus je
+         kunt altijd alsnog de andere openklappen. Het is een kortere weg naar
+         het begin, geen stand waar je in vastzit. -->
+    <dialog id="startDialoog">
+        <h2>Wat ga je maken?</h2>
+        <div class="start_keuze">
+            <button id="startTrap" type="button">
+                <span class="start_titel">Trap ontwerpen</span>
+                <span class="start_uitleg">Rechte steektrap, eventueel met een
+                    bordes en een leuning</span>
+            </button>
+            <button id="startBalustrade" type="button" class="primair">
+                <span class="start_titel">Balustrade ontwerpen</span>
+                <span class="start_uitleg">Leuning langs een rand, vlak of
+                    hellend</span>
+            </button>
+        </div>
+    </dialog>
+
+    <!-- De profielkiezer. Leeg in de HTML: de boom wordt getekend door
+         profielkiezer.js, en alleen de opengeklapte takken komen in de DOM.
+         Alle 1742 profielen hier neerzetten zou het typen in het zoekveld
+         merkbaar vertragen. -->
+    <dialog id="profielDialoog">
+        <form method="dialog">
+            <div class="pz_kop">
+                <h2>Kies een profiel</h2>
+                <div class="pz_regel" style="margin-bottom:7px">
+                    <select id="pz_categorie" title="Soort profiel">
+                        <option value="alle">alle soorten profiel</option>
+                    </select>
+                    <span id="pz_aantal"></span>
+                </div>
+                <div class="pz_regel">
+                    <input type="search" id="pz_zoek" autocomplete="off"
+                           placeholder="Zoek, bijvoorbeeld 40x40x3 of 48.3">
+                    <select id="pz_vorm" title="Warm- of koudgevormd">
+                        <option value="alle">alle vormgeving</option>
+                        <option value="hot">hot-rolled / hot-finished</option>
+                        <option value="cold">cold-formed / bright</option>
+                    </select>
+                    <select id="pz_soort" title="Staalsoort">
+                        <option value="alle">alle staalsoorten</option>
+                    </select>
+                </div>
+                <!-- Wat je voor DIT onderdeel het vaakst koos. Staat er alleen
+                     als er iets te tonen valt; een lege balk die belooft dat
+                     hij ooit iets gaat doen is erger dan geen balk. Apart per
+                     onderdeel: een spijlprofiel is zelden een goede staander. -->
+                <div id="pz_vaak" class="pz_vaak" hidden></div>
+            </div>
+            <div class="pz_romp">
+                <div id="pz_boom"></div>
+                <!-- De tekst wordt bij elke keuze opnieuw geschreven; het
+                     voorbeeldvenster niet. Zat het canvas in hetzelfde stuk,
+                     dan gooide elke klik de WebGL-context weg en bouwde hem
+                     opnieuw op - en browsers staan maar een beperkt aantal
+                     contexten toe. -->
+                <div id="pz_detail">
+                    <div id="pz_tekst"></div>
+                    <div id="pz_voorbeeld"></div>
+                </div>
+            </div>
+            <div class="pz_voet">
+                <button value="annuleer">Annuleren</button>
+                <button id="pz_ok" value="ok" class="primair">Kiezen</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
