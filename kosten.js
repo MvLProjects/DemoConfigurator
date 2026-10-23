@@ -207,6 +207,53 @@ export function berekenKosten(onderdelen, opties = {}) {
     };
 }
 
+/**
+ * Een PRIJSINDICATIE voor een offerte aan de klant.
+ *
+ * NIET DE KOSTENRAMING HIERBOVEN. Die telt staal als grondstof (een euro per
+ * kilo) en laat arbeid weg; dat is een materiaalbegroting, en op een offerte
+ * zou dat een fractie van de echte prijs zijn. Hier rekent het staal met de
+ * prijs van een AFGEWERKTE constructie - maken inbegrepen, montage niet - uit
+ * het blok `controle` in tarieven.json. Daarbij het coaten en wat er besteld
+ * wordt. Wat geen tarief heeft komt NIET stil op nul: het staat in `ontbreekt`
+ * en de offerte zegt erbij dat het nog niet in de prijs zit.
+ *
+ * @returns { regels: [{ naam, laag, hoog }], laag, hoog, ontbreekt: [], staalKg }
+ */
+export function prijsIndicatie(onderdelen) {
+    if (!TARIEVEN) throw new Error('De tarieven zijn nog niet ingelezen.');
+    const h = hoeveelheden(onderdelen, TARIEVEN.dichtheid.staal);
+    const regels = [];
+    const ontbreekt = [];
+    const voeg = (naam, post, hoeveelheid) => {
+        if (!(hoeveelheid > 0)) return;
+        const bereik = bereikVan(post);
+        if (!bereik) { ontbreekt.push(naam); return; }
+        regels.push({ naam, laag: rond(hoeveelheid * bereik.laag),
+                      hoog: rond(hoeveelheid * bereik.hoog) });
+    };
+
+    voeg(`Staalconstructie, gemaakt (${Math.round(h.staalKg)} kg)`,
+        TARIEVEN.controle, h.staalKg);
+    voeg(`Poedercoaten (${h.coatM2.toFixed(1).replace('.', ',')} m²)`,
+        TARIEVEN.posten.coating, h.coatM2);
+    for (const [soort, aantal] of Object.entries(h.besteld)) {
+        const post = TARIEVEN.besteld[soort];
+        const naam = post ? post.naam : soort;
+        const hoeveel = post && post.eenheid === 'm2' ? (h.m2[soort] || 0) : aantal;
+        voeg(post && post.eenheid === 'm2'
+            ? `${naam} (${hoeveel.toFixed(1).replace('.', ',')} m²)` : `${naam} (${aantal}×)`,
+            post, hoeveel);
+    }
+    return {
+        regels,
+        laag: rond(regels.reduce((s, r) => s + r.laag, 0)),
+        hoog: rond(regels.reduce((s, r) => s + r.hoog, 0)),
+        ontbreekt: [...new Set(ontbreekt)],
+        staalKg: rond(h.staalKg),
+    };
+}
+
 /** Een bedrag zoals het op het scherm hoort: "€ 1.234,50". */
 export function euro(v) {
     return '€ ' + Number(v).toLocaleString('nl-NL',

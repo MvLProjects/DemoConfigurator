@@ -64,6 +64,12 @@ export function plaatVorm(deel) {
             dikte: deel.dikte ?? deel.dy,
         };
     }
+    // Een plaat met een eigen omtrek, zoals de taartpunttrede van een
+    // wenteltrap: de doorsnede IS de vorm die gesneden wordt, de lengte (dx)
+    // is de plaatdikte.
+    if (deel.plaat && deel.doorsnede && deel.doorsnede.length >= 3) {
+        return { omtrek: deel.doorsnede.map(([v, w]) => [v, w]), gaten: [], dikte: deel.dx };
+    }
     if (deel.gaten && deel.gaten.length) {
         return {
             omtrek: [[0, 0], [deel.dx, 0], [deel.dx, deel.dy], [0, deel.dy]],

@@ -35,6 +35,8 @@ export const mm = (w) => w * 72 / 25.4;
 export const BLADMATEN = {
     A4: { breedte: mm(297), hoogte: mm(210) },     // liggend
     A3: { breedte: mm(420), hoogte: mm(297) },
+    // Staand, voor een brief zoals de offerte. Een tekening ligt; een brief niet.
+    A4staand: { breedte: mm(210), hoogte: mm(297) },
 };
 
 // De tekens die WinAnsiEncoding wél heeft maar Latin-1 niet, op hun plek in de

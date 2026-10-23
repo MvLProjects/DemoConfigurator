@@ -705,7 +705,11 @@ export function controleerWentel(p) {
     if (p.soort !== 'wentel') return [];
     const W = ONDERDELEN.wentel;
     const m = wentelMaten(p);
-    if (m.doorloop < W.minDoorloop) {
+    // ALLEEN ALS ER EEN TREDE BOVEN EEN ANDERE KOMT. Een trap van een meter
+    // draait 124 graden en loopt nergens onder zichzelf door; die werd hier
+    // geweigerd om een hoofdruimte die er niet toe doet.
+    const draaitRond = m.t.treden * m.hoek > 2 * Math.PI;
+    if (draaitRond && m.doorloop < W.minDoorloop) {
         return [`Doorloophoogte ${Math.round(m.doorloop)} mm, minder dan ${W.minDoorloop}: `
             + 'na een volle slag stoot je je hoofd. Maak de diameter groter.'];
     }
@@ -770,6 +774,8 @@ function wentelDelen(p, balustradeMaten, leuning) {
             oorsprong: [hoekpunt[0], hoekpunt[1], k * t.optrede - p.tredeDikte],
             xAs: [0, 0, 1], yAs: draaiZ([1, 0, 0], a0), zAs: draaiZ([0, 1, 0], a0),
             dx: p.tredeDikte, dy: breed, dz: diep, lengteAs: 'y',
+            // Een plaat die gesneden wordt: DXF van de taartpunt, geen zaaghoeken.
+            plaat: true,
             omschrijving: `taartpunt R${Math.round(Ro)}, ${(hoek * 180 / Math.PI).toFixed(1)}°`,
             materiaal: tredeMateriaal,
             ...tredeBestel,
@@ -825,6 +831,7 @@ function wentelDelen(p, balustradeMaten, leuning) {
                     oorsprong: [x - spijl / 2, y - spijl / 2, voet],
                     xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
                     dx: spijl, dy: spijl, dz: top - voet, lengteAs: 'z',
+                    omschrijving: `Ø ${spijl}`,
                 });
             }
         }

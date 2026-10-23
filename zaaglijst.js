@@ -271,7 +271,11 @@ export function maakZaaglijst(unieken, zaag = ZAAG) {
  * uitvoer van de app - dat is wat Excel in het Nederlands verwacht.
  */
 export function zaaglijstAlsCsv(lijst) {
-    const komma = (v) => String(v).replace('.', ',');
+    // Op een tiende millimeter: zo staat het ook in de BOM. Er stonden hier
+    // dertien decimalen ("1117,2470653569903"), want een schuine trap levert
+    // lengtes die geen hele getallen zijn - en een zaag haalt die nooit.
+    const komma = (v) => (typeof v === 'number' && !Number.isInteger(v)
+        ? String(Math.round(v * 10) / 10) : String(v)).replace('.', ',');
     const regels = [['profiel', 'norm', 'stang', 'stuk', 'positie',
                      'lengte', 'zaaghoeken', 'rest in stang'].join(';')];
 

@@ -7206,7 +7206,8 @@ try {
     // was nog zichtbaar. Alleen stond hij onder de verkeerde kop. Een controle
     // op bestaan alleen vangt dat niet - die op PLAATS wel.
     const ahHoort = {
-        onderdelenVak: ['onderdelenAlles', 'bomCsv', 'productie'],
+        // De offerte naast het productiepakket: allebei "wat er uitkomt".
+        onderdelenVak: ['onderdelenAlles', 'bomCsv', 'productie', 'offerte'],
         zaaglijstVak: ['zaaglijstCsv'],
         stuklijstVak: ['stuklijstCsv'],
     };
@@ -10720,6 +10721,11 @@ try {
         catch (e) { krap = e.message; }
         check('bij 1400 mm wordt hij geweigerd: je stoot je hoofd', /Doorloophoogte/.test(krap),
             krap.split('\n')[1] || 'bouwde gewoon');
+        // Maar alleen als hij onder zichzelf door loopt. Een trap van een meter
+        // draait 124 graden en werd om hoofdruimte geweigerd.
+        check('een lage wenteltrap die geen volle slag maakt wordt niet geweigerd',
+            trapBouw.controleerWentel({ ...bbTrap, soort: 'wentel', hoogte: 1000,
+                                        diameter: 1400 }).length === 0);
         check('een wandleuning kan alleen bij een rechte trap',
             /alleen bij een rechte trap/.test(
                 trapBouw.wandleuningFout('links', 'geen', 'kwartslag') || ''));
@@ -10737,6 +10743,86 @@ try {
             g2.params && g2.params.soort === 'wentel' && g2.params.diameter === 2000
             && g2.params.draai === 'rechts' && g2.params.hoogte === 3000
             && g2.params.tredeMateriaal === 'eiken', g2.fout || g2.uitleg);
+    }
+
+    log('\n--- het productiepakket van een trap ---');
+    // HET PAKKET WERKTE BIJ GEEN ENKELE TRAP. De maatvoering levert bij een
+    // trap ook de helling, als getal zonder begin en eind, en de
+    // werkplaatstekening liep daar op vast. Deel AG maakt het pakket alleen
+    // van een balustrade en zag het dus nooit. Nu via de echte knop, per soort.
+    {
+        const bcStatus = doc.getElementById('status');
+        const bcPdf = (p) => new TextDecoder('latin1').decode(
+            p.find(b => b.naam === 'productieblad.pdf').data);
+        const bcTekst = (p, naam) => {
+            const d = p.find(b => b.naam === naam).data;
+            return typeof d === 'string' ? d : new TextDecoder().decode(d);
+        };
+        for (const [soort, naam] of [['recht', 'Trap'], ['kwartslag', 'Kwartslagtrap'],
+                                     ['wentel', 'Wenteltrap']]) {
+            doc.getElementById('t_soort').value = soort;
+            doc.getElementById('t_leuning').value = 'rechts';
+            doc.getElementById('k_omschrijving').value = '';
+            // Eerst leeg: anders staat de tekst van de VORIGE bouw er nog, past
+            // de wachtlus meteen, en wordt het pakket van de vorige trap getest.
+            bcStatus.textContent = '';
+            doc.getElementById('genereerTrap').click();
+            await sleep(50);
+            // Ruim wachten: een wenteltrap heeft dertig handregelstukken met
+            // verstek, en 100 s virtuele tijd was daar te kort voor - dan werd
+            // het pakket van de vorige trap getest.
+            for (let i = 0; i < 40000 && !/Trap \d+ mm hoog|mislukt/.test(bcStatus.textContent); i++) {
+                await sleep(25);
+            }
+            let pakket = null, fout = '';
+            try { pakket = await mainMod.maakProductiepakket(() => {}); }
+            catch (e) { fout = e.message; }
+            check(`${naam}: het productiepakket wordt gemaakt`, pakket && !fout, fout);
+            check(`${naam}: en het is echt deze trap`,
+                doc.getElementById('t_soort').value === soort
+                && /Trap \d+ mm hoog/.test(bcStatus.textContent), bcStatus.textContent);
+            if (!pakket) continue;
+            check(`${naam}: het titelblok noemt de trap, niet "Balustrade"`,
+                bcPdf(pakket).includes(`(${naam})`));
+            const zaag = bcTekst(pakket, 'zaaglijst.csv');
+            check(`${naam}: de zaaglijst rekent op een tiende millimeter`,
+                !/;\d+,\d{2,};/.test(zaag), (zaag.match(/;\d+,\d{2,};/) || [''])[0]);
+            if (soort === 'wentel') {
+                const bom = bcTekst(pakket, 'bom.csv');
+                const trede = (bom.split('\n').find(r => r.includes(';trede;')) || '').trim();
+                check('wenteltrap: de taartpunt is een plaat - geen zaaghoeken, wel een DXF',
+                    trede.split(';')[7] === '' && pakket.some(b =>
+                        b.naam === 'dxf/' + trede.split(';')[9].replace('.stp', '.dxf')), trede);
+                // Welke dikte maakt niet uit - die staat in het paneel - wel dat
+                // er Ø staat en geen "20 × 20".
+                check('wenteltrap: ronde spijlen heten Ø, niet 20 × 20',
+                    /;spijl;[^;]*;Ø \d/.test(bom) && !/;spijl;[^;]*;\d+ ?[×x] ?\d+;/.test(bom));
+            }
+        }
+        // DE OFFERTE van de laatst gebouwde trap (de wenteltrap hierboven):
+        // één staand blad, met een prijsindicatie die zegt dat hij dat is.
+        let of = null, ofFout = '';
+        try { of = await mainMod.maakOfferteBlad(); } catch (e) { ofFout = e.message; }
+        const ofT = of ? new TextDecoder('latin1').decode(of) : '';
+        check('de offerte wordt gemaakt, op één blad', of && /\/Count 1\b/.test(ofT), ofFout);
+        check('met de trap, de keuzes en een prijsindicatie',
+            ofT.includes('Betreft: Wenteltrap') && ofT.includes('(Uw ontwerp)')
+            && ofT.includes('(Prijsindicatie)') && /indicatie/i.test(ofT));
+        check('met het beeld van het model erin', /\/Subtype \/Image/.test(ofT));
+        doc.getElementById('t_soort').value = 'recht';
+
+        // GEEN ONDERDEEL ONDER HET TITELBLOK. Gelijk verdelen op aantal zette
+        // drie hoge stroken op één blad; het derde liep over de rand.
+        const td = await win.eval("import('/tekening2d.js')");
+        const bk = await win.eval("import('/bladkader.js')");
+        const w = await trapBouw.bouwTrap({ ...bbTrap, soort: 'wentel' }, bbBal, 'rechts');
+        const bladen = td.onderdelenbladen(ocN, w.onderdelen, { formaat: 'A3' });
+        const grens = 297 - bk.RAND - bk.TITELHOOGTE;
+        const teLaag = bladen.flatMap(b => b.tekeningen)
+            .filter(t => t.soort === 'rechthoek' && /^onderdeel /.test(t.vak || '')
+                         && t.y + t.h > grens + 0.01);
+        check('elk onderdeelvak blijft boven het titelblok', teLaag.length === 0,
+            teLaag.map(t => `${t.vak} tot ${(t.y + t.h).toFixed(1)} mm`).join(', '));
     }
 
     log('\n' + (failures === 0

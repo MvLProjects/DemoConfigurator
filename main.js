@@ -19,6 +19,7 @@ import { parseer, noemtProfiel } from './command-parser.js';
 import { bouwTrap, trapDelen, wandleuningFout, controleerWentel } from './build-trap.js';
 import { maakVoorbeeld, ruimVoorbeeldOp } from './preview.js';
 import { TREDESOORTEN, tredeSoortVan } from './treden.js';
+import { maakOfferte } from './offerte.js';
 import { STANDAARD as TRAP_STANDAARD, berekenTrap, beoordeelTrap,
     valideer as valideerTrap, controleerBordes } from './trap-regels.js';
 import { laadCatalogus } from './profielen.js';
@@ -1259,7 +1260,10 @@ function metAandacht(uiterlijk, delen, bevindingen) {
     for (const b of bevindingen) {
         const i = verschuiving + b.hoofddeel;
         if (i >= 0 && i < kopie.length) {
-            kopie[i] = { sleutel: 'aandacht', kleur: 0xe8710a, ruwheid: 0.55 };
+            // `onder` is de eigen kleur, voor een beeld waar de keuring niet
+            // op hoort - de offerte aan een klant. Zie rendersAanzicht.
+            kopie[i] = { sleutel: 'aandacht', kleur: 0xe8710a, ruwheid: 0.55,
+                         onder: uiterlijk[i] };
         }
     }
     return kopie;
@@ -2130,6 +2134,115 @@ document.getElementById('productie').addEventListener('click', async () => {
     }
 });
 
+// --- de offerte voor de klant ----------------------------------------------
+//
+// Eén staand blad: het model, de keuzes, de onderdelen en een prijsindicatie.
+// Zie offerte.js voor de opmaak en prijsIndicatie in kosten.js voor de prijs.
+
+document.getElementById('offerte').addEventListener('click', async () => {
+    if (!laatsteOnderdelen || !laatsteOnderdelen.length) {
+        statusEl.textContent =
+            'Genereer eerst een balustrade of een trap; dan is er iets aan te bieden.';
+        return;
+    }
+    try {
+        const pdf = await maakOfferteBlad();
+        const naam = 'offerte_' + (kaderGegevens().nummer || 'concept')
+            .replace(/[^\w.-]+/g, '_') + '.pdf';
+        downloadBestand(pdf, naam);
+        statusEl.textContent = `${naam} opgeslagen.`;
+    } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Offerte maken mislukt: ' + err.message;
+    }
+});
+
+/**
+ * De offerte als PDF-bytes. Apart van de knop, zodat de zelftest hem kan
+ * maken zonder dat er een download start.
+ */
+export async function maakOfferteBlad() {
+    await kosten.laadTarieven();
+    const k = kaderGegevens();
+    const iso = AANZICHTEN.find(a => /isometr/i.test(a.naam));
+    const beeld = iso ? rendersAanzicht(iso.richting, 1400, 800, { voorKlant: true }) : null;
+
+    // Per soort onderdeel hoeveel stuks. Geen zaaglengtes: dat is voor de
+    // werkplaats, niet voor de klant.
+    const telling = new Map();
+    for (const u of laatsteOnderdelen) {
+        telling.set(u.deel.soort, (telling.get(u.deel.soort) || 0) + u.aantal);
+    }
+    return maakOfferte({
+        titel: { bedrijf: k.bedrijf, opdracht: k.opdracht, nummer: k.nummer,
+                 omschrijving: k.omschrijving, datum: k.datum },
+        beeld,
+        keuzes: offerteKeuzes(),
+        onderdelen: [...telling].map(([s, n]) => [s, n]),
+        prijs: kosten.prijsIndicatie(laatsteOnderdelen),
+        geldig: 30,
+    });
+}
+
+/**
+ * De keuzes zoals een klant ze leest: wat het is, hoe groot, van wat. Uit het
+ * paneel, dus dezelfde waarden waarmee net gebouwd is.
+ */
+function offerteKeuzes() {
+    const afwerking = afwerkingEl.value ? ralNaam(afwerkingEl.value) : 'blank staal';
+    const b = huidigeMaten();
+    const vulling = { spijlen: 'verticale spijlen', horizontaal: 'liggende regels',
+                      glas: 'glazen panelen', geen: 'zonder vulling' }[b.vulling]
+        || b.vulling;
+    const mm = (v) => `${Math.round(v)} mm`;
+    // Een komma, zoals een Nederlandse klant een maat leest.
+    const komma1 = (v) => `${(Math.round(v * 10) / 10).toString().replace('.', ',')} mm`;
+    const profielNaam = (p, terug) => (p ? p.englishLabel || p.label : terug);
+
+    if (laatsteNaam !== 'trap') {
+        return [
+            ['Soort', 'Balustrade'],
+            ['Lengte', mm(b.lengte)], ['Hoogte', mm(b.hoogte)],
+            ['Vulling', vulling],
+            ['Staanders', profielNaam(b.staanderProfiel, `${b.staanderBreedte} × ${b.staanderBreedte}`)],
+            ['Handregel', profielNaam(b.handregelProfiel, `${b.handregelHoogte} mm`)],
+            // Alleen als er spijlen ZIJN: bij glas stond hier "20 × 20".
+            ...(b.vulling === 'spijlen' || !b.vulling
+                ? [['Spijlen', profielNaam(b.spijlProfiel, `${b.spijlBreedte} × ${b.spijlBreedte}`)]]
+                : []),
+            ['Afwerking', afwerking],
+        ];
+    }
+
+    const p = huidigeTrapMaten();
+    const t = berekenTrap(p);
+    const soort = { recht: 'Rechte trap', kwartslag: 'Kwartslagtrap',
+                    halfslag: 'Halfslagtrap', wentel: 'Wenteltrap' }[p.soort] || 'Trap';
+    const leuning = document.getElementById('t_leuning').value;
+    const uit = [
+        ['Soort', p.soort === 'recht' ? soort : `${soort}, draait naar ${p.draai}`],
+        ['Hoogte', mm(p.hoogte)],
+        p.soort === 'wentel' ? ['Diameter', mm(p.diameter)] : ['Breedte', mm(p.breedte)],
+        ['Treden', `${t.treden} × ${komma1(t.optrede)} hoog, ${komma1(t.aantrede)} diep`],
+        ['Treden van', `${tredeSoortVan(p.tredeMateriaal).naam}, ${p.tredeDikte} mm`],
+    ];
+    if (p.soort !== 'wentel') {
+        uit.push(['Trapbomen', p.boomProfiel ? profielNaam(p.boomProfiel)
+            : `plaat ${p.boomDikte} × ${p.boomHoogte} mm`]);
+    }
+    if (p.bordesNa > 0 || p.soort === 'kwartslag' || p.soort === 'halfslag') {
+        uit.push(['Bordes', p.bordesNa > 0 ? `na stap ${p.bordesNa}` : 'halverwege']);
+    }
+    uit.push(['Leuning', leuning === 'geen' ? 'geen'
+        : `${{ links: 'links', rechts: 'rechts', beide: 'aan beide kanten' }[leuning]}, `
+          + (p.soort === 'wentel' ? 'spijlen' : vulling)]);
+    if (p.wandleuning && p.wandleuning !== 'geen') uit.push(['Wandleuning', p.wandleuning]);
+    if (p.stootborden) uit.push(['Stootborden', 'ja']);
+    if (p.platen) uit.push(['Voet- en kopplaten', 'ja']);
+    uit.push(['Afwerking', afwerking]);
+    return uit;
+}
+
 /**
  * Verzamelt alle bestanden van het pakket.
  *
@@ -2882,6 +2995,13 @@ document.getElementById('k_maak').addEventListener('click', () => {
     }
 });
 
+/** De naam van wat er in beeld staat, voor een titelblok zonder omschrijving. */
+function standaardOmschrijving() {
+    if (laatsteNaam !== 'trap') return 'Balustrade';
+    return { recht: 'Trap', kwartslag: 'Kwartslagtrap', halfslag: 'Halfslagtrap',
+             wentel: 'Wenteltrap' }[document.getElementById('t_soort').value] || 'Trap';
+}
+
 /** Alles wat er op het blad komt, bij elkaar. */
 function kaderGegevens() {
     const bom = (laatsteOnderdelen || []).map(bomRegel);
@@ -2892,7 +3012,10 @@ function kaderGegevens() {
         logo: logoData,
         opdracht: document.getElementById('k_opdracht').value,
         nummer: document.getElementById('k_nummer').value,
-        omschrijving: document.getElementById('k_omschrijving').value,
+        // Leeg gelaten: dan wat er gebouwd is. Hier viel het terug op
+        // "Balustrade", ook op het blad van een wenteltrap.
+        omschrijving: document.getElementById('k_omschrijving').value
+            || standaardOmschrijving(),
         getekend: document.getElementById('k_getekend').value,
         datum: new Date().toLocaleDateString('nl'),
         afbeelding: aanzichtAlsAfbeelding(),
@@ -2948,7 +3071,21 @@ export const AANZICHTEN = [
  * en zichtbaarheid - want anders staat het beeld na het exporteren ineens
  * ergens anders en lijkt het alsof de knop het model heeft verzet.
  */
-export function rendersAanzicht(richting, breedtePx, hoogtePx) {
+export function rendersAanzicht(richting, breedtePx, hoogtePx, opties = {}) {
+    // VOOR DE KLANT: zonder maatlijnen en zonder de oranje markering van de
+    // keuring. Die zijn er voor wie de leuning maakt, niet voor wie hem koopt.
+    const klant = Boolean(opties.voorKlant);
+    const aandacht = [];
+    if (klant) {
+        modelRoot.traverse((o) => {
+            for (const m of [].concat(o.material || [])) {
+                if (m.userData && m.userData.onder && !aandacht.some(a => a.m === m)) {
+                    aandacht.push({ m, kleur: m.color.getHex() });
+                    m.color.setHex(m.userData.onder.kleur);
+                }
+            }
+        });
+    }
     const was = {
         positie: camera.position.clone(),
         doel: controls.target.clone(),
@@ -2962,7 +3099,7 @@ export function rendersAanzicht(richting, breedtePx, hoogtePx) {
     renderer.getSize(was.formaat);
 
     try {
-        if (matenGroep) matenGroep.visible = true;
+        if (matenGroep) matenGroep.visible = !klant;
         renderer.setSize(breedtePx, hoogtePx, false);
         camera.aspect = breedtePx / hoogtePx;
         camera.updateProjectionMatrix();
@@ -2990,6 +3127,7 @@ export function rendersAanzicht(richting, breedtePx, hoogtePx) {
         controls.target.copy(was.doel);
         controls.update();
         if (matenGroep && was.maten !== null) matenGroep.visible = was.maten;
+        for (const a of aandacht) a.m.color.setHex(a.kleur);
     }
 }
 
@@ -3346,8 +3484,11 @@ async function toonVorm(shape, naam, materialen = null, delen = null) {
 
     await initOcct();
     laatsteDelen = delen;
+    laatsteNaam = naam;
     toonGeladen(await laadVorm(shape), naam, materialen);
 }
+// 'trap' of 'balustrade': wat er het laatst gebouwd is. Zie standaardOmschrijving.
+let laatsteNaam = null;
 
 /**
  * Het voorbeeld naar beeld: de onderdelenlijst als doosjes, zonder OCCT.
@@ -3553,6 +3694,7 @@ function buildMesh(resultMesh, materialen = null) {
                 depthWrite: false,
             } : {}),
         });
+        if (uit.onder) materials[i].userData.onder = uit.onder;
         indexVanMateriaal.set(uit.sleutel, i);
         return i;
     };

@@ -110,8 +110,14 @@ export function werkplaatsblad(oc, vorm, gegevens = {}) {
     // anders zeggen dan het papier. `weg` is hier 0: hoe ver een maatlijn naast
     // de tekening komt is een keuze op het PAPIER, niet op het model, want
     // anders hangt die afstand van de schaal af.
+    //
+    // ALLEEN MAATLIJNEN. De maatvoering levert bij een trap ook de helling, als
+    // los getal zonder begin en eind. Daar viel het hele productiepakket op om
+    // - bij ELKE trap - want hier wordt van elke maat de ware lengte gemeten.
+    // Een hoek heeft geen lengte; hij staat in het 3D-beeld, niet op dit blad.
     const maten = metMaten
-        ? maatDefinities(gegevens.delen || [], ...omvattingVan(oc, vorm), 0) : [];
+        ? maatDefinities(gegevens.delen || [], ...omvattingVan(oc, vorm), 0)
+            .filter(m => m.van && m.naar) : [];
     const gedaan = new Set();
 
     // Een kader om het blad, zoals op elke werkplaatstekening. Het zegt ook
@@ -354,15 +360,27 @@ export function onderdelenbladen(oc, onderdelen, gegevens = {}) {
         }
         gebruikt += s.hoogte + 3;
     }
-    const perBlad = Math.ceil(stroken.length / nodigBladen);
-
     // De onderdelen eerst over de bladen verdelen, dan pas tekenen. Daardoor is
     // per blad bekend hoeveel ruimte er overblijft, en kan die over de tussen-
     // ruimtes verdeeld worden in plaats van onderaan op te hopen. Een blad dat
     // bovenaan vol staat en onderaan leeg is ziet eruit alsof er iets mist.
-    const groepen = [];
-    for (let i = 0; i < stroken.length; i += perBlad) {
-        groepen.push(stroken.slice(i, i + perBlad));
+    //
+    // EN NAGEREKEND OF HET PAST. Gelijk verdelen op AANTAL kon drie hoge
+    // stroken op één blad zetten, terwijl de telling hierboven op volgorde
+    // stapelde. Dan liep het derde onderdeel door het titelblok heen en over
+    // de rand van het blad. Past een blad niet, dan komt er een blad bij.
+    const ruimte = onderkant - bovenkant;
+    let groepen;
+    for (;;) {
+        const perBlad = Math.ceil(stroken.length / nodigBladen);
+        groepen = [];
+        for (let i = 0; i < stroken.length; i += perBlad) {
+            groepen.push(stroken.slice(i, i + perBlad));
+        }
+        const past = groepen.every(g =>
+            g.reduce((n, x) => n + x.s.hoogte, 0) + 3 * (g.length + 1) <= ruimte);
+        if (past || perBlad === 1) break;
+        nodigBladen++;
     }
 
     for (const groep of groepen) {
@@ -504,11 +522,18 @@ function tekenStrook(t, u, s, v) {
 
         const vlak = vlakVan(a.richting, a.omhoog);
         const midden = [x0 + breedP / 2, y0 + hoogP / 2];
-        let stapel = 0;
+        // LIGGENDE EN STAANDE MATEN APART STAPELEN. Ze liggen aan verschillende
+        // kanten van de tekening en zitten elkaar dus niet in de weg. Met één
+        // teller kwam de lengtemaat een plek verder naar buiten zodra er eerst
+        // een staande maat was getekend - en dan viel hij onder de strook uit,
+        // in het vak van het volgende onderdeel.
+        let liggend = 0, staand = 0;
         for (const m of maten) {
             if (gedaan.has(m) || !opWareLengte(m, vlak)) continue;
             gedaan.add(m);
-            maatOps(t, m, vlak, punt2D, midden, stapel++);
+            const pa = vlak.naar2D(m.van), pb = vlak.naar2D(m.naar);
+            const isLiggend = Math.abs(pb[0] - pa[0]) >= Math.abs(pb[1] - pa[1]);
+            maatOps(t, m, vlak, punt2D, midden, isLiggend ? liggend++ : staand++);
         }
         op += vakb;
     }

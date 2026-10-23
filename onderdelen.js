@@ -247,7 +247,9 @@ export function groepeerVormen(oc, lokaal) {
     // De zaaghoeken pas NA het groeperen meten: één keer per uniek onderdeel in
     // plaats van één keer per exemplaar. Bij 58 spijlen scheelt dat 57 metingen
     // die allemaal hetzelfde antwoord geven.
-    for (const u of uniek) u.zaaghoeken = zaaghoeken(oc, u.vorm);
+    // Een PLAAT wordt gesneden, niet gezaagd: een taartpunttrede leverde hier
+    // dertien "zaaghoeken" op, één per hoekpunt van zijn omtrek.
+    for (const u of uniek) u.zaaghoeken = u.deel.plaat ? [] : zaaghoeken(oc, u.vorm);
     return uniek;
 }
 
