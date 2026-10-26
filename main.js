@@ -3738,6 +3738,33 @@ renderer.setAnimationLoop(() => {
     navigatie.teken(); // assenkruis en navigatiekubus over het beeld heen
 });
 
+/**
+ * Het beeld opslaan als afbeelding.
+ *
+ * Even op twee keer de schermresolutie tekenen, zodat het op een telefoon of
+ * in een mail niet korrelig wordt, en daarna terug. Alleen de scène: de
+ * kijkkubus en het assenkruis worden door de navigatie er los overheen
+ * getekend en horen niet op een plaatje voor een klant.
+ */
+document.getElementById('fotoKnop').addEventListener('click', () => {
+    const was = renderer.getPixelRatio();
+    const w = viewportEl.clientWidth, h = viewportEl.clientHeight;
+    renderer.setPixelRatio(Math.max(2, was));
+    renderer.setSize(w, h, false);
+    renderer.render(scene, camera);
+    renderer.domElement.toBlob((blob) => {
+        renderer.setPixelRatio(was);
+        renderer.setSize(w, h, false);
+        if (!blob) {
+            statusEl.textContent = 'De afbeelding kon niet gemaakt worden.';
+            return;
+        }
+        const naam = `${laatsteNaam || 'ontwerp'}.png`;
+        downloadBestand(blob, naam);
+        statusEl.textContent = `Afbeelding opgeslagen als ${naam}.`;
+    }, 'image/png');
+});
+
 function resize() {
     const w = viewportEl.clientWidth;
     const h = viewportEl.clientHeight;

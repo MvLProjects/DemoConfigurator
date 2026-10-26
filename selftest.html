@@ -11221,6 +11221,17 @@ try {
         }
         check('elke voorbeeldzin staat als knop in de chat',
             doc.querySelectorAll('#chatLog .chatVoorbeeld').length === mainMod.CHATVOORBEELDEN.length);
+
+        // De knop Afbeelding: het beeld als PNG. Het downloaden zelf is hier
+        // niet te zien, de statusregel wel - en die komt pas na toBlob.
+        const biStatus = doc.getElementById('status');
+        biStatus.textContent = '';
+        doc.getElementById('fotoKnop').click();
+        for (let i = 0; i < 200 && !/Afbeelding|afbeelding/.test(biStatus.textContent); i++) {
+            await sleep(25);
+        }
+        check('de knop Afbeelding slaat het beeld op als PNG',
+            /Afbeelding opgeslagen als \w+\.png/.test(biStatus.textContent), biStatus.textContent);
     }
 
     log('\n' + (failures === 0

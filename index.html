@@ -726,6 +726,10 @@
             <rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/>
             <rect x="9" y="9" width="4.5" height="4.5" rx="1"/>
         </symbol>
+        <symbol id="ic-foto" viewBox="0 0 16 16">
+            <path d="M2 5.5a1 1 0 0 1 1-1h2l1-1.5h4l1 1.5h2a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/>
+            <circle cx="8" cy="8.5" r="2.4"/>
+        </symbol>
         <symbol id="ic-open" viewBox="0 0 16 16">
             <path d="M8 10.5V2.5M5 5.5 8 2.5l3 3M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10"/>
         </symbol>
@@ -786,6 +790,11 @@
              knoppen voor hetzelfde bestand, waarvan de ene minder geeft, is
              een keuze die niemand hoeft te maken. -->
         <div id="kijk">
+            <!-- Het beeld zoals het nu staat, als PNG: om te delen in een app
+                 of mail. Zonder kijkkubus en assenkruis, en scherper dan het
+                 scherm. -->
+            <button id="fotoKnop" type="button" title="Het beeld opslaan als afbeelding">
+                <svg aria-hidden="true"><use href="#ic-foto"></use></svg>Afbeelding</button>
             <label><input type="checkbox" id="showEdges" checked> randen</label>
             <label><input type="checkbox" id="showMaten"> maten</label>
             <span class="scheiding"></span>
