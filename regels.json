@@ -100,7 +100,8 @@
                        "houderAfstand": 1000, "rozet": 70, "rozetDikte": 6, "arm": 12 },
       "halfslag":    { "oog": 350 },
       "wentel":      { "spilDiameter": 168.3, "spilWand": 5, "minDoorloop": 2100,
-                       "leuningInspring": 15 },
+                       "leuningInspring": 15, "muurSpeling": 20,
+                       "voetplaat": { "maat": 250, "dikte": 12, "gat": 18, "rand": 35 } },
       "houtenBoom":  { "dikte": 60, "hoogte": 300, "inlaat": 15, "speling": 0.5 }
     },
     "_houtenBoom": [

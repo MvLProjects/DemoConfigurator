@@ -1556,7 +1556,7 @@ function werkTrapBij() {
     const fouten = [...valideerTrap(maten), ...controleerBordes(maten),
                     ...controleerWentel(maten), ...controleerHoutBoom(maten)];
     const wandFout = wandleuningFout(maten.wandleuning,
-        document.getElementById('t_leuning').value, maten.soort);
+        document.getElementById('t_leuning').value, maten.soort, maten.draai);
     if (wandFout) fouten.push(wandFout);
 
     if (fouten.length) {

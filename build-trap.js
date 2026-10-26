@@ -653,8 +653,8 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
      * eindstaanders tegen elkaar in de hoek staan. Bij een halfslag maakt de
      * leuning een korte bocht om het oog, over het bordes.
      */
-    const draaiPaden = (zijde) => {
-        const s = draaiKant, hb = halveBreedte, off = stBreedte / 2;
+    const draaiPaden = (zijde, off = stBreedte / 2) => {
+        const s = draaiKant, hb = halveBreedte;
         const a = t.aantrede, opt = t.optrede, tan = opt / a;
         const L1 = t.vluchten[0].treden * a, L2 = t.vluchten[1].treden * a;
         const bZ = t.bordes.hoogte, H = p.hoogte, xo = L1 + p.breedte + off;
@@ -698,14 +698,26 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
     }
 
     // --- wandleuning --------------------------------------------------------
-    const wandFout = wandleuningFout(p.wandleuning, leuning, soort);
+    const wandFout = wandleuningFout(p.wandleuning, leuning, soort, p.draai);
     if (wandFout) throw new Error(wandFout);
     const wandZijde = { links: -1, rechts: 1 }[p.wandleuning];
     if (wandZijde) {
         // Met voet- en kopplaten steken die aan de buitenkant uit; de muur
         // staat dan zoveel verder weg, anders zat de flap in de muur.
         const speling = platen ? Math.max(2 * O.voetplaat.rand, O.kopplaat.flap) : 0;
-        wandleuningDelen(delen, t, p, wandZijde * (halveBreedte + speling), wandZijde);
+        const W = O.wandleuning;
+        const R = W.diameter / 2;
+        if (draaiend) {
+            // DE MUUR STAAT BUITEN, en de regel loopt in één stuk om het bordes
+            // heen: hetzelfde pad als de buitenleuning, maar dan op de afstand
+            // van de muur. `off` is hoever het hart van de regel buiten de rand
+            // van de trap ligt; negatief, want hij hangt binnen de muur.
+            const punten = draaiPaden(-draaiKant, speling - W.afstand - R)[0]
+                .map(([x, y, z]) => [x, y, z + W.hoogte - R]);
+            wandleuningLangs(delen, punten, -draaiKant);
+        } else {
+            wandleuningDelen(delen, t, p, wandZijde * (halveBreedte + speling), wandZijde);
+        }
     }
 
     // Zie padDelen: de afwerking geldt voor het hele werk, dus ook voor de
@@ -744,7 +756,6 @@ export function wentelMaten(p) {
              draaiing: hoek * t.treden * 180 / Math.PI };
 }
 
-/** Fouten in een wenteltrap, als lijst meldingen; leeg is goed. */
 /**
  * Kan deze trap houten bomen krijgen? Zie regels.json onder _houtenBoom.
  */
@@ -762,6 +773,7 @@ export function controleerHoutBoom(p) {
     return fouten;
 }
 
+/** Fouten in een wenteltrap, als lijst meldingen; leeg is goed. */
 export function controleerWentel(p) {
     if (p.soort !== 'wentel') return [];
     const W = ONDERDELEN.wentel;
@@ -796,11 +808,26 @@ function wentelDelen(p, balustradeMaten, leuning) {
     const delen = [];
     const opmerkingen = [...beoordeelTrap(t)];
 
+    // De VOETPLAAT onder de spil, als er platen gevraagd zijn: vierkant, met
+    // een ankergat in elke hoek. De spil staat erop en is zoveel korter.
+    const V = W.voetplaat;
+    const plaat = p.platen ? V.dikte : 0;
+    if (p.platen) {
+        const g = [V.rand, V.maat - V.rand];
+        delen.push({
+            soort: 'voetplaat',
+            oorsprong: [-V.maat / 2, -V.maat / 2, 0],
+            xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
+            dx: V.maat, dy: V.maat, dz: V.dikte, profiel: null, lengteAs: 'x',
+            gaten: g.flatMap(x => g.map(y => ({ x, y, diameter: V.gat }))),
+        });
+    }
+
     // De spil: een holle buis van vloer tot vloer.
     delen.push({
         soort: 'spil', buis: { wand: W.spilWand }, rond: true,
-        oorsprong: [-Rs, -Rs, 0], xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
-        dx: 2 * Rs, dy: 2 * Rs, dz: p.hoogte, lengteAs: 'z',
+        oorsprong: [-Rs, -Rs, plaat], xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
+        dx: 2 * Rs, dy: 2 * Rs, dz: p.hoogte - plaat, lengteAs: 'z',
         omschrijving: `Ø ${W.spilDiameter}×${W.spilWand}`,
     });
 
@@ -844,7 +871,7 @@ function wentelDelen(p, balustradeMaten, leuning) {
     }
 
     // Wat een wenteltrap (nog) niet heeft, zeggen in plaats van stil weglaten.
-    const nietHier = [p.stootborden && 'stootborden', p.platen && 'voet- en kopplaten',
+    const nietHier = [p.stootborden && 'stootborden',
                       tredeSoort.opHoeken && 'steunhoeken'].filter(Boolean);
     if (nietHier.length) {
         opmerkingen.push(`Bij een wenteltrap zijn ${nietHier.join(', ')} nog niet `
@@ -896,6 +923,25 @@ function wentelDelen(p, balustradeMaten, leuning) {
                 });
             }
         }
+    }
+
+    // --- de wandleuning langs de ronde muur ---------------------------------
+    //
+    // De muur staat een speling buiten de treden. De regel draait in korte
+    // rechte stukken mee, net als de handregel hierboven, en hangt aan
+    // houders tegen de muur. De muur ligt BUITEN de looprichting.
+    const wandFout = wandleuningFout(p.wandleuning, leuning, 'wentel');
+    if (wandFout) throw new Error(wandFout);
+    if (p.wandleuning && p.wandleuning !== 'geen') {
+        const WL = ONDERDELEN.wandleuning;
+        const Rw = Ro + W.muurSpeling - WL.afstand - WL.diameter / 2;
+        const punten = [];
+        for (let i = 0; i <= 2 * t.treden; i++) {
+            const u = i / 2;
+            const [x, y] = punt(Rw, s * hoek * u);
+            punten.push([x, y, t.optrede * (1 + u) + WL.hoogte - WL.diameter / 2]);
+        }
+        wandleuningLangs(delen, punten, -s);
     }
 
     stempelWerk(delen, p);
@@ -968,12 +1014,24 @@ function rondeRegel(delen, punten, diameter, soort) {
  * muurhouders in de lucht naast de balustrade. Apart zodat het paneel het al
  * kan zeggen terwijl je kiest, en niet pas bij het bouwen.
  */
-export function wandleuningFout(wand, leuning, soort = 'recht') {
+export function wandleuningFout(wand, leuning, soort = 'recht', draai = 'rechts') {
     const zijde = { links: -1, rechts: 1 }[wand];
     if (!zijde) return null;
-    if (soort !== 'recht') {
-        return 'Een wandleuning kan nu alleen bij een rechte trap. Zet hem op '
-            + '"geen", of kies een leuning.';
+    // Een wenteltrap heeft één buitenkant: daar komt de leuning óf de muur.
+    if (soort === 'wentel') {
+        return leuning !== 'geen'
+            ? 'Een wenteltrap heeft één buitenkant: daar staat een leuning óf een '
+              + 'muur met een wandleuning. Zet de leuning op "geen" of de wandleuning.'
+            : null;
+    }
+    // Bij een kwartslag of halfslag staat de muur aan de BUITENkant van de
+    // draai; binnen is de hoek of het oog.
+    if (soort === 'kwartslag' || soort === 'halfslag') {
+        const buiten = draai === 'links' ? 'rechts' : 'links';
+        if (wand !== buiten) {
+            return `Deze ${soort}trap draait naar ${draai}; de muur staat dan aan de `
+                + `buitenkant, ${buiten}. Kies de wandleuning ${buiten}.`;
+        }
     }
     if (zijdenVan(leuning).includes(zijde)) {
         return `Aan de ${wand}kant staat al een leuning. Een wandleuning hoort `
@@ -1003,43 +1061,84 @@ function wandleuningDelen(delen, t, p, muurY, zijde) {
     // bovenkant, dus het hart ligt een straal lager.
     const punten = leuningPad(t, p, regelY).map(([x, y, z]) => [x, y, z + W.hoogte - R]);
 
-    const richtingen = rondeRegel(delen, punten, W.diameter, 'wandleuning');
+    wandleuningLangs(delen, punten, zijde);
+}
 
-    // De hoogte van het hart van de regel boven x, en hoe schuin hij daar ligt.
-    const regelOp = (x) => {
-        for (let i = 0; i < richtingen.length; i++) {
-            const a = punten[i], b = punten[i + 1];
-            if (x <= b[0] + 1e-9 || i === richtingen.length - 1) {
-                const f = (x - a[0]) / (b[0] - a[0]);
-                return { z: a[2] + f * (b[2] - a[2]), cos: richtingen[i][0] };
-            }
-        }
-        return null;
-    };
-    const onderkant = (x) => { const r = regelOp(x); return r.z - R / r.cos; };
+/**
+ * Een wandleuning langs een willekeurig pad: de regel, en muurhouders met een
+ * rozet, gelijk verdeeld over de lengte.
+ *
+ * `punten` is het hart van de regel. `kant` zegt aan welke kant van de
+ * looprichting de muur staat: +1 links, -1 rechts. Bij een rechte trap is dat
+ * gewoon de y-kant; om een bordes of langs een wenteltrap draait de
+ * looprichting mee en blijft de muur aan dezelfde kant.
+ *
+ * GEEN HOUDER OP EEN KNIK. Daar komen twee stukken op verstek samen en ligt de
+ * onderkant van de regel anders dan op elk stuk apart. Een houder die daar
+ * valt schuift het stuk in, tot hij een arm plus een straal van de knik af
+ * staat; past dat niet, dan vervalt hij.
+ */
+function wandleuningLangs(delen, punten, kant) {
+    const W = ONDERDELEN.wandleuning;
+    const R = W.diameter / 2;
+    rondeRegel(delen, punten, W.diameter, 'wandleuning');
 
-    // De houders: gelijk verdeeld, een stuk van de einden af.
-    const xBegin = punten[0][0] + 150;
-    const xEind = punten[punten.length - 1][0] - 150;
-    const aantal = Math.max(2, Math.ceil((xEind - xBegin) / W.houderAfstand) + 1);
-    const rozetY = muurY - zijde * W.rozetDikte;
+    // De stukken in bovenaanzicht: waar ze beginnen langs het pad, hoe lang,
+    // welke kant op en hoe steil.
+    let langsPad = 0;
+    const stukken = punten.slice(1).map((q, i) => {
+        const a = punten[i];
+        const lh = Math.hypot(q[0] - a[0], q[1] - a[1]);
+        const st = { a, lh, s0: langsPad,
+                     h: [(q[0] - a[0]) / lh, (q[1] - a[1]) / lh, 0],
+                     helling: (q[2] - a[2]) / lh };
+        langsPad += lh;
+        return st;
+    });
+
+    const vrij = W.arm / 2 + R + 5;
+    const begin = 150, eind = langsPad - 150;
+    const aantal = Math.max(2, Math.ceil((eind - begin) / W.houderAfstand) + 1);
+    const gezet = new Set();
     for (let j = 0; j < aantal; j++) {
-        const x = xBegin + (xEind - xBegin) * j / (aantal - 1);
-        const armBoven = Math.min(onderkant(x - W.arm / 2), onderkant(x + W.arm / 2));
+        const sPad = begin + (eind - begin) * j / (aantal - 1);
+        let g = stukken.findIndex(st => sPad < st.s0 + st.lh);
+        if (g < 0) g = stukken.length - 1;
+        const st = stukken[g];
+        if (st.lh < 2 * vrij) continue;
+        const u = Math.min(Math.max(sPad - st.s0, vrij), st.lh - vrij);
+        // Twee houders op dezelfde plek van een kort stuk: één is genoeg.
+        const sleutel = `${g}:${Math.round(u)}`;
+        if (gezet.has(sleutel)) continue;
+        gezet.add(sleutel);
+
+        const hart = [st.a[0] + st.h[0] * u, st.a[1] + st.h[1] * u];
+        const cos = 1 / Math.hypot(1, st.helling);
+        const onder = (du) => st.a[2] + st.helling * (u + du) - R / cos;
+        const armBoven = Math.min(onder(-W.arm / 2), onder(W.arm / 2));
         const zArm = armBoven - W.arm / 2;
+
+        // Naar de muur, horizontaal en haaks op de regel.
+        const m = [-kant * st.h[1], kant * st.h[0], 0];
+        // Rechtsdraaiend: xAs x yAs moet omhoog wijzen.
+        const xAs = kant > 0 ? st.h : [-st.h[0], -st.h[1], 0];
         delen.push({
             soort: 'muurhouder',
-            oorsprong: [x - W.arm / 2, Math.min(rozetY, regelY), armBoven - W.arm],
-            xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
-            dx: W.arm, dy: Math.abs(regelY - rozetY), dz: W.arm,
+            oorsprong: [hart[0] - xAs[0] * W.arm / 2, hart[1] - xAs[1] * W.arm / 2,
+                        armBoven - W.arm],
+            xAs, yAs: m, zAs: [0, 0, 1],
+            dx: W.arm, dy: W.afstand + R - W.rozetDikte, dz: W.arm,
             lengteAs: 'y',
         });
         // De rozet: een schijf tegen de muur, met zijn as van de muur af.
         const r = W.rozet / 2;
+        const muur = [hart[0] + m[0] * (W.afstand + R), hart[1] + m[1] * (W.afstand + R), zArm];
+        const zAs = [-m[0], -m[1], 0];
+        const yAs = kruis3(zAs, st.h);
         delen.push({
             soort: 'rozet',
-            oorsprong: [x - r, muurY, zArm - zijde * r],
-            xAs: [1, 0, 0], yAs: [0, 0, zijde], zAs: [0, -zijde, 0],
+            oorsprong: muur.map((c, k) => c - st.h[k] * r - yAs[k] * r),
+            xAs: st.h, yAs, zAs,
             dx: W.rozet, dy: W.rozet, dz: W.rozetDikte,
             lengteAs: 'z', rond: true,
         });

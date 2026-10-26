@@ -10727,9 +10727,11 @@ try {
         check('een lage wenteltrap die geen volle slag maakt wordt niet geweigerd',
             trapBouw.controleerWentel({ ...bbTrap, soort: 'wentel', hoogte: 1000,
                                         diameter: 1400 }).length === 0);
-        check('een wandleuning kan alleen bij een rechte trap',
-            /alleen bij een rechte trap/.test(
-                trapBouw.wandleuningFout('links', 'geen', 'kwartslag') || ''));
+        // Sinds deel BG kan een wandleuning ook om een bordes heen, maar
+        // alleen aan de buitenkant: binnen is de hoek.
+        check('een wandleuning aan de binnenkant van een kwartslag wordt geweigerd',
+            /buitenkant, links/.test(
+                trapBouw.wandleuningFout('rechts', 'geen', 'kwartslag', 'rechts') || ''));
 
         const zin = await win.eval("import('/command-parser.js')");
         const bcCat = { profielen: cat.alleProfielen(catBoom) };
@@ -11064,6 +11066,60 @@ try {
             && bfA.params.boomMateriaal === 'eiken', bfA.fout || bfA.uitleg);
         check('houten trapbomen geven geen fout in de console',
             errors.length === bfVoor, errors.slice(bfVoor).join(' | '));
+    }
+
+    // ============ DEEL BG: wandleuning om het bordes en langs de spil ======
+    log('\n\n======== DEEL BG: wandleuning bij elke trap, spilvoet ========\n');
+    {
+        const bgVoor = errors.length;
+        const bgP = { ...trapRegels.STANDAARD };
+        const bgBal = { ...regelsNu.STANDAARD };
+        const tel = (delen, soort) => delen.filter(d => d.soort === soort).length;
+
+        log('--- 1. waar de muur mag staan ---');
+        const fout = (...a) => trapBouw.wandleuningFout(...a) || '';
+        check('kwartslag naar rechts: de muur staat links, buiten',
+            fout('links', 'rechts', 'kwartslag', 'rechts') === ''
+            && /links/.test(fout('rechts', 'geen', 'kwartslag', 'rechts')));
+        check('halfslag naar links: de muur staat rechts',
+            fout('rechts', 'links', 'halfslag', 'links') === ''
+            && /rechts/.test(fout('links', 'geen', 'halfslag', 'links')));
+        check('wenteltrap: leuning óf wandleuning',
+            fout('rechts', 'geen', 'wentel') === ''
+            && /één buitenkant/.test(fout('rechts', 'rechts', 'wentel')));
+
+        log('\n--- 2. de regel loopt om het bordes heen ---');
+        const { delen: bgK } = trapBouw.trapDelen(
+            { ...bgP, soort: 'kwartslag', draai: 'rechts', wandleuning: 'links' }, bgBal, 'rechts');
+        check('kwartslag: vier stukken met verstek, en houders met een rozet',
+            tel(bgK, 'wandleuning') === 4 && tel(bgK, 'muurhouder') >= 4
+            && tel(bgK, 'muurhouder') === tel(bgK, 'rozet'),
+            `${tel(bgK, 'wandleuning')} stukken, ${tel(bgK, 'muurhouder')} houders`);
+        adMeet('kwartslag + wandleuning', await trapBouw.bouwTrap(
+            { ...bgP, soort: 'kwartslag', draai: 'rechts', wandleuning: 'links' }, bgBal, 'rechts'));
+        adMeet('halfslag + wandleuning', await trapBouw.bouwTrap(
+            { ...bgP, soort: 'halfslag', draai: 'links', wandleuning: 'rechts' }, bgBal, 'links'));
+        adMeet('rechte trap + bordes + wandleuning', await trapBouw.bouwTrap(
+            { ...bgP, bordesNa: 7, bordesLengte: 1000, wandleuning: 'links' }, bgBal, 'rechts'));
+
+        log('\n--- 3. wenteltrap: langs de muur, op een voetplaat ---');
+        const bgW = { ...bgP, soort: 'wentel', diameter: 1800, wandleuning: 'rechts', platen: true };
+        const { delen: bgWd } = trapBouw.trapDelen(bgW, bgBal, 'geen');
+        const bgSpil = bgWd.find(d => d.soort === 'spil');
+        const bgVoet = bgWd.find(d => d.soort === 'voetplaat');
+        check('een voetplaat met vier ankergaten, en de spil staat erop',
+            bgVoet && bgVoet.gaten.length === 4 && bgSpil.oorsprong[2] === bgVoet.dz
+            && Math.abs(bgSpil.dz + bgVoet.dz - bgP.hoogte) < 1e-9);
+        check('de wandleuning draait mee in korte stukken',
+            tel(bgWd, 'wandleuning') > 10 && tel(bgWd, 'muurhouder') >= 2,
+            `${tel(bgWd, 'wandleuning')} stukken`);
+        check('zonder platen geen voetplaat en een spil van vloer tot vloer',
+            (() => { const d = trapBouw.trapDelen({ ...bgW, platen: false }, bgBal, 'geen').delen;
+                     return tel(d, 'voetplaat') === 0
+                         && d.find(x => x.soort === 'spil').dz === bgP.hoogte; })());
+        adMeet('wentel + wandleuning + voet', await trapBouw.bouwTrap(bgW, bgBal, 'geen'));
+        check('wandleuning en spilvoet geven geen fout in de console',
+            errors.length === bgVoor, errors.slice(bgVoor).join(' | '));
     }
 
     log('\n' + (failures === 0
