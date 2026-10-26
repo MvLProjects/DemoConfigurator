@@ -23,7 +23,8 @@ import { TREDESOORTEN, tredeSoortVan } from './treden.js';
 import { maakOfferte } from './offerte.js';
 import { VOORBEELDEN } from './voorbeelden.js';
 import { STANDAARD as TRAP_STANDAARD, berekenTrap, beoordeelTrap,
-    valideer as valideerTrap, controleerBordes, trapgat } from './trap-regels.js';
+    valideer as valideerTrap, controleerBordes, trapgat,
+    ONDERDELEN as TRAP_ONDERDELEN } from './trap-regels.js';
 import { laadCatalogus } from './profielen.js';
 import * as cfg from './configuraties.js';
 import * as gewoonten from './gewoonten.js';
@@ -3880,9 +3881,10 @@ async function toonVorm(shape, naam, materialen = null, delen = null) {
 // het juist voor: laten zien waar de trap uitkomt en hoe groot het gat in de
 // vloer wordt. Doorzichtig, zodat je de trap eronder blijft zien.
 //
-// Voorlopig bij een RECHTE trap (met of zonder bordes): daar ligt het gat
-// recht boven de bovenste vlucht. Bij een draaiende trap ligt het gat om een
-// hoek en bij een wenteltrap is het rond; die krijgen nog geen vloer.
+// Het gat ligt boven de BOVENSTE VLUCHT, in zijn richting: bij een rechte
+// trap langs x, bij een kwartslag langs y en bij een halfslag terug langs -x -
+// zelfde plek als waar build-trap.js vlucht 2 neerzet. Een wenteltrap krijgt
+// een rond gat zo groot als de trap.
 // `var` en geen `let`: het voorbeeld in het paneel wordt al tijdens het laden
 // getekend, en dan roept toonVoorbeeld dit aan voordat het script hier is.
 // Met `let` gaf dat een fout; met `var` is het dan gewoon nog leeg.
@@ -3898,35 +3900,82 @@ function toonVloer(naam) {
         vloerRoot = null;
     }
     if (naam !== 'trap') return;
-    const p = huidigeTrapMaten();
+    let p = huidigeTrapMaten();
     const d = Number(p.vloerdikte) || 0;
-    if ((p.soort || 'recht') !== 'recht' || !(d > 0)) return;
-
+    if (!(d > 0)) return;
+    const soort = p.soort || 'recht';
+    // Een draaiende trap heeft altijd een bordes, zo diep als de trap breed
+    // is; zie trapDelen in build-trap.js.
+    if (soort === 'kwartslag' || soort === 'halfslag') {
+        p = { ...p, bordesLengte: p.breedte,
+              bordesNa: p.bordesNa > 0 ? p.bordesNa
+                  : Math.round(berekenTrap({ hoogte: p.hoogte }).optreden / 2) };
+    }
     const t = berekenTrap(p);
     const gat = trapgat(t, p);
-    const L = gat.lengte;
-    // hb is hier de halve breedte van het GAT: de trap plus de speling.
-    const H = p.hoogte, hb = gat.breedte / 2, rand = 600;
-    const x1 = t.aanzet, x0 = x1 - L;
+    const H = p.hoogte, rand = 600;
 
     vloerRoot = new THREE.Group();
     vloerRoot.userData.vloer = true;
     const stof = new THREE.MeshStandardMaterial({ color: 0xb9c0c7, roughness: 0.95,
         transparent: true, opacity: 0.35, depthWrite: false });
     const lijn = new THREE.LineBasicMaterial({ color: 0x7d8790 });
-    const plaat = (xa, xb, ya, yb) => {
-        const g = new THREE.BoxGeometry(xb - xa, yb - ya, d);
+    const zet = (g, x, y, hoek = 0) => {
         const m = new THREE.Mesh(g, stof);
-        m.position.set((xa + xb) / 2, (ya + yb) / 2, H - d / 2);
+        m.position.set(x, y, H - d / 2);
+        m.rotation.z = hoek;
         vloerRoot.add(m);
-        const r = new THREE.LineSegments(new THREE.EdgesGeometry(g), lijn);
+        const r = new THREE.LineSegments(new THREE.EdgesGeometry(g, 30), lijn);
         r.position.copy(m.position);
+        r.rotation.z = hoek;
         vloerRoot.add(r);
     };
-    plaat(x1, x1 + 2 * rand, -hb - rand, hb + rand);    // de overloop boven
-    plaat(x0 - rand, x0, -hb - rand, hb + rand);        // voor het gat
-    plaat(x0, x1, -hb - rand, -hb);                     // naast het gat
-    plaat(x0, x1, hb, hb + rand);
+
+    if (soort === 'wentel') {
+        // Een vierkante vloer met een rond gat, de spil in het midden.
+        const R = gat.lengte / 2, B = R + rand;
+        const vorm = new THREE.Shape();
+        vorm.moveTo(-B, -B); vorm.lineTo(B, -B); vorm.lineTo(B, B); vorm.lineTo(-B, B);
+        vorm.lineTo(-B, -B);
+        const gatVorm = new THREE.Path();
+        gatVorm.absarc(0, 0, R, 0, 2 * Math.PI, true);
+        vorm.holes.push(gatVorm);
+        const g = new THREE.ExtrudeGeometry(vorm, { depth: d, bevelEnabled: false,
+                                                    curveSegments: 48 });
+        g.translate(0, 0, -d / 2);
+        zet(g, 0, 0);
+    } else {
+        // Het einde van de bovenste vlucht en de richting waarin hij oploopt.
+        const s = p.draai === 'links' ? -1 : 1;
+        const hbTrap = p.breedte / 2;
+        let eind = [t.aanzet, 0], richting = [1, 0];
+        if (soort === 'kwartslag') {
+            const L1 = t.vluchten[0].treden * t.aantrede;
+            const L2 = t.vluchten[1].treden * t.aantrede;
+            eind = [L1 + hbTrap, s * (hbTrap + L2)];
+            richting = [0, s];
+        } else if (soort === 'halfslag') {
+            const L1 = t.vluchten[0].treden * t.aantrede;
+            const L2 = t.vluchten[1].treden * t.aantrede;
+            eind = [L1 - L2, s * (p.breedte + TRAP_ONDERDELEN.halfslag.oog)];
+            richting = [-1, 0];
+        }
+        const hoek = Math.atan2(richting[1], richting[0]);
+        // Een plaat in de maten van de vlucht: u langs de looprichting vanaf
+        // het einde (negatief = terug, boven de trap), v er dwars op.
+        const plaat = (ua, ub, va, vb) => {
+            const u = (ua + ub) / 2, v = (va + vb) / 2;
+            zet(new THREE.BoxGeometry(ub - ua, vb - va, d),
+                eind[0] + u * richting[0] - v * richting[1],
+                eind[1] + u * richting[1] + v * richting[0], hoek);
+        };
+        // hb is hier de halve breedte van het GAT: de trap plus de speling.
+        const L = gat.lengte, hb = gat.breedte / 2;
+        plaat(0, 2 * rand, -hb - rand, hb + rand);       // de overloop boven
+        plaat(-L - rand, -L, -hb - rand, hb + rand);     // voor het gat
+        plaat(-L, 0, -hb - rand, -hb);                   // naast het gat
+        plaat(-L, 0, hb, hb + rand);
+    }
     vloerRoot.visible = document.getElementById('showVloer').checked;
     scene.add(vloerRoot);
 }
