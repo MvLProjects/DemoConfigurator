@@ -11247,6 +11247,10 @@ try {
             bjGat.lengte.toFixed(1));
         check('een dikkere vloer vraagt een langer gat',
             tr.trapgat(bjT, { ...bjP, vloerdikte: 400 }).lengte > bjGat.lengte);
+        const bjZin = await win.eval("import('/command-parser.js')");
+        const bjA = bjZin.parseer('trap van 3 meter hoog met een vloer van 30 cm dik', null, {});
+        check('"vloer van 30 cm dik" wordt een vloerdikte van 300',
+            bjA.actie === 'trap' && bjA.params.vloerdikte === 300, bjA.fout || bjA.uitleg);
         check('een wenteltrap krijgt een rond gat zo groot als de trap',
             (() => { const g = tr.trapgat(bjT, { ...bjP, soort: 'wentel', diameter: 1600 });
                      return g.rond && g.lengte === 1600; })());

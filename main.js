@@ -1462,7 +1462,7 @@ genereerKnop.addEventListener('click', async () => {
             `Balustrade ${maten.lengte}×${maten.hoogte} mm — ${vullingTekst}, ` +
             `${gebouwd.aantalDelen} delen. ` +
             (gekozen.length ? gekozen.join(', ') + '. ' : '') +
-            'Exporteren kan met de knop rechts.';
+            'Downloaden kan bij Resultaat.';
     } catch (err) {
         console.error(err);
         paneelFoutEl.textContent = err.message;
@@ -3168,7 +3168,7 @@ async function voerOpdrachtKern(tekst) {
             await toonVorm(shape, 'blok');
             const p = gelezen.params;
             statusEl.textContent =
-                `Blok ${p.breedte}×${p.diepte}×${p.hoogte} mm. Exporteren kan met de knop rechts.`;
+                `Blok ${p.breedte}×${p.diepte}×${p.hoogte} mm. Downloaden kan bij Resultaat.`;
             schrijfChat('uit', 'Klaar. Staat in beeld.');
             return;
         }

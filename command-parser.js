@@ -687,6 +687,9 @@ const TREDEDIKTE = [
 
 const BORDES_LENGTE = new RegExp(`\\bbordes(?:\\s?lengte)?\\s+(?:van\\s+)?${NUM}`
     + `(?:\\s+(?:lang|diep))?`, 'gi');
+// De bovenvloer, voor het trapgat: "vloer van 300 mm dik", "vloerdikte 250",
+// "een vloer van 30 cm".
+const VLOERDIKTE = new RegExp(`\\b(?:vloer\\s?dikte|vloer)\\s+(?:van\\s+)?${NUM}(?:\\s+dik)?`, 'gi');
 const BORDES_NA = /\bbordes\s+(?:na|bij|op)\s+(?:de\s+)?(?:stap|trede|optrede)?\s*(\d+)(?:e|de|ste)?(?:\s+(?:stap|stappen|trede|treden|optreden))?\b/gi;
 
 // De soort trap, de draairichting en de diameter van een wenteltrap.
@@ -792,6 +795,11 @@ function leesTrapExtras(tekst) {
 
     // Het bordes. EERST de lengte, en daarbij blijft het woord "bordes" staan:
     // "een bordes van 1200 na stap 8" heeft het nog nodig voor de stap.
+    for (const m of [...rest.matchAll(VLOERDIKTE)]) {
+        maten.vloerdikte = naarMillimeter(m[1], m[2]);
+        gevonden.push(`vloer ${maten.vloerdikte} mm dik`);
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
     for (const m of [...rest.matchAll(BORDES_LENGTE)]) {
         maten.bordesLengte = naarMillimeter(m[1], m[2]);
         gevonden.push(`bordes ${maten.bordesLengte} mm lang`);
