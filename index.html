@@ -387,7 +387,7 @@
                   font-size: 12px; white-space: pre-line; }
     /* Geen fout, wel het vermelden waard: een trap die net buiten het
        comfortbereik valt is veilig maar loopt vervelend. */
-    #trapLet { margin-top: 10px; padding: 8px 10px; border-radius: 4px;
+    #trapLet, #metaalLet { margin-top: 10px; padding: 8px 10px; border-radius: 4px;
                background: #fff6e5; border: 1px solid #f0dcb4; color: #7a5a1e;
                font-size: 12px; white-space: pre-line; }
     /* --- samenstellingsboom --- */
@@ -1083,6 +1083,26 @@
 
     <details class="groep" data-icoon="afwerking">
         <summary>Afwerking</summary>
+        <!-- Het metaal van het frame. Eén keuze voor balustrade én trap; zie
+             FRAMEMETALEN in materialen.js. Treden, glas en steen houden hun
+             eigen materiaal. -->
+        <div class="veld"><label for="p_metaal">metaal</label>
+            <select id="p_metaal">
+                <option value="staal">Staal</option>
+                <option value="rvs">RVS 316</option>
+                <option value="aluminium">Aluminium</option>
+            </select></div>
+        <p class="hint" id="metaalHint">Voor staanders, regels, spijlen, bomen en
+           platen. Dezelfde profielmaten, een ander metaal.</p>
+        <p id="metaalLet" style="display:none; margin:0 0 12px; white-space:normal">Aluminium is ongeveer
+           drie keer zo slap als staal: hetzelfde profiel buigt drie keer zo ver
+           door. De app rekent geen sterkte - laat de maten narekenen of kies
+           zwaardere profielen.</p>
+        <div class="veld"><label for="p_verzinken">thermisch verzinken</label>
+            <input type="checkbox" id="p_verzinken"></div>
+        <p class="hint">Alleen voor staal; RVS en aluminium roesten niet. Met
+           een poedercoat erbij wordt het <b>duplex</b>: verzinkt én gecoat, de
+           gangbare keuze voor buiten.</p>
         <div class="veld"><label for="p_afwerking">poedercoat</label>
             <select id="p_afwerking"></select></div>
         <p class="hint">Geldt voor alle metalen onderdelen, van de balustrade én

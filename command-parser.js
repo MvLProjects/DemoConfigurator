@@ -217,6 +217,15 @@ const KLEURWOORDEN = [
 ].sort((a, b) => b[0].length - a[0].length);
 const ONGECOAT = /\b(?:blank|ongecoat|niet\s+gecoat|zonder\s+coating)\b/gi;
 
+// HET METAAL van het frame. Staal staat er bewust niet bij: "stalen treden"
+// gaat over de treden, en staal is toch al wat er staat als niets anders
+// genoemd wordt.
+const METAALZINNEN = [
+    [/\b(?:rvs|inox|roestvrij(?:\s+staal)?|roestvast(?:\s+staal)?)\b/gi, 'rvs'],
+    [/\b(?:aluminium|alu)\b/gi, 'aluminium'],
+];
+const VERZINKZIN = /\b(?:(?:thermisch\s+)?verzinkte?|verzinken|duplex)\b/gi;
+
 // DE VULLING van de leuning. Bewust alleen hele uitdrukkingen: "glazen treden"
 // gaat over de treden en mag hier NIET als glazen vulling gelezen worden.
 const VULLINGZINNEN = [
@@ -323,7 +332,25 @@ function leesExtras(tekst, voorraad) {
         sierpunt: undefined, spijlSierpunt: undefined,
     };
 
-    // --- 0. coatkleur en vulling -------------------------------------------
+    // --- 0. metaal, verzinken, coatkleur en vulling ------------------------
+    for (const [re, metaal] of METAALZINNEN) {
+        for (const m of [...rest.matchAll(re)]) {
+            if (!uit.metaal) {
+                uit.metaal = metaal;
+                gevonden.push(metaal === 'rvs' ? 'frame van RVS 316' : 'frame van aluminium');
+            }
+            rest = poets(rest, m.index, m.index + m[0].length);
+        }
+    }
+    for (const m of [...rest.matchAll(VERZINKZIN)]) {
+        if (uit.verzinken === undefined) gevonden.push('thermisch verzinkt');
+        uit.verzinken = true;
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+    if (uit.verzinken && uit.metaal) {
+        genegeerd.push('Verzinken kan alleen bij staal; RVS en aluminium roesten niet.');
+        uit.verzinken = undefined;
+    }
     for (const m of [...rest.matchAll(RALZIN)]) {
         if (RAL[m[1]]) {
             uit.afwerking = m[1];
@@ -908,6 +935,10 @@ export function parseer(invoer, vorige = null, opties = {}) {
         // De coatkleur geldt voor het hele werk, net als in het paneel:
         // undefined = niet genoemd, '' = blank, anders een RAL-nummer.
         afwerking: extra.afwerking,
+        // Het metaal en verzinken, ook voor het hele werk. undefined = niet
+        // genoemd.
+        metaal: extra.metaal,
+        verzinken: extra.verzinken,
         sierpunt: extra.sierpunt,
         spijlSierpunt: extra.spijlSierpunt,
         genegeerd: extra.genegeerd,

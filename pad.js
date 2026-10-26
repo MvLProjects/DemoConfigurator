@@ -75,6 +75,7 @@ import { modelVan, hoogteVoor, GEEN as SIERPUNT_GEEN } from './sierpunten.js';
 // zijn en op een koker vierkant. profielen.js importeert zelf niets, dus hier
 // ontstaat geen kringetje.
 import { isRond } from './profielen.js';
+import { stempelWerk } from './materialen.js';
 
 // Hier vandaan doorgegeven: build-balustrade.js haalt hem bij pad.js, en dat
 // hoeft niet te veranderen nu hij bij de regels staat.
@@ -2214,11 +2215,12 @@ export function padDelen(punten, gesloten, p) {
                 punten[stukken[k].eind], stukken[k].eindNormaal);
     }
 
-    // De afwerking in één keer op alles stempelen in plaats van bij elk
-    // onderdeel apart. Het is één keuze voor het hele werk - een leuning wordt
-    // in één kleur gepoedercoat - en zo kan er geen onderdeel vergeten worden.
+    // De afwerking en het metaal in één keer op alles stempelen in plaats van
+    // bij elk onderdeel apart. Het is één keuze voor het hele werk - een
+    // leuning wordt in één kleur gepoedercoat - en zo kan er geen onderdeel
+    // vergeten worden.
     // materialen.js haalt hem er weer af waar hij niet kan, zoals op hout.
-    if (p.afwerking) for (const d of delen) d.afwerking = p.afwerking;
+    stempelWerk(delen, p);
 
     return { delen, velden, staanders, verbindingen };
 }

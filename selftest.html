@@ -10871,6 +10871,85 @@ try {
             teLaag.map(t => `${t.vak} tot ${(t.y + t.h).toFixed(1)} mm`).join(', '));
     }
 
+    // ============ DEEL BD: RVS, aluminium en verzinken =====================
+    log('\n\n======== DEEL BD: RVS, aluminium en verzinken ========\n');
+    {
+        const bdVoor = errors.length;
+        log('--- 1. het metaal komt op het frame, niet op de rest ---');
+        const bdDelen = mat.stempelWerk([
+            { soort: 'staander' }, { soort: 'trede', materiaal: 'eiken' },
+            { soort: 'ruit', materiaal: 'glas' }, { soort: 'trede', materiaal: 'traanplaat' },
+        ], { metaal: 'rvs' });
+        check('staal wordt RVS; hout, glas en traanplaat blijven wat ze zijn',
+            bdDelen.map(d => d.materiaal).join(',') === 'rvs,eiken,glas,traanplaat',
+            bdDelen.map(d => d.materiaal).join(','));
+        const bdVz = mat.stempelWerk([{ soort: 'staander' }, { soort: 'staander', materiaal: 'aluminium' }],
+            { verzinken: true, afwerking: '7016' });
+        check('verzinken alleen op staal, en met een kleur heet het duplex',
+            mat.afwerkingTekst(bdVz[0]) === 'duplex: verzinkt + RAL 7016 — Antracietgrijs'
+            && mat.afwerkingTekst(bdVz[1]) === 'RAL 7016 — Antracietgrijs',
+            mat.afwerkingTekst(bdVz[0]) + ' / ' + mat.afwerkingTekst(bdVz[1]));
+        check('verzinkt zonder kleur is in beeld zink, niet blank staal',
+            mat.uiterlijkVanDeel(mat.stempelWerk([{ soort: 'staander' }], { verzinken: true })[0]).sleutel
+            === 'verzinkt');
+        // De staalsoort uit de catalogus hoort niet bij een RVS-staander.
+        const bdB = ond.beschrijf({ soort: 'staander', materiaal: 'rvs', dx: 40, dy: 40, dz: 900,
+            lengteAs: 'z', profiel: { label: 'CHS 48.3x2.6', items: [{ material: 'S235JRH' }] } });
+        check('een RVS-staander heet in de stuklijst RVS 316, niet S235JRH',
+            bdB.materiaal === 'RVS 316', bdB.materiaal);
+
+        log('\n--- 2. het gewicht volgt het metaal ---');
+        const bdMaten = { ...regelsNu.STANDAARD, lengte: 2400, hoogte: 1000 };
+        const bdStaal = ks.hoeveelheden((await bouwMod.bouwBalustrade(bdMaten)).onderdelen);
+        const bdAlu = ks.hoeveelheden((await bouwMod.bouwBalustrade({ ...bdMaten, metaal: 'aluminium' })).onderdelen);
+        const bdRvs = ks.hoeveelheden((await bouwMod.bouwBalustrade({ ...bdMaten, metaal: 'rvs' })).onderdelen);
+        check('aluminium weegt 2700/7850 van staal',
+            bdAlu.staalKg === 0 && Math.abs(bdAlu.aluminiumKg / bdStaal.staalKg - 2700 / 7850) < 1e-6,
+            `${bdAlu.aluminiumKg.toFixed(1)} tegen ${bdStaal.staalKg.toFixed(1)} kg`);
+        check('RVS weegt 8000/7850 van staal',
+            bdRvs.staalKg === 0 && Math.abs(bdRvs.rvsKg / bdStaal.staalKg - 8000 / 7850) < 1e-6,
+            `${bdRvs.rvsKg.toFixed(1)} kg`);
+        const bdZink = ks.hoeveelheden((await bouwMod.bouwBalustrade({ ...bdMaten, verzinken: true })).onderdelen);
+        check('verzinken gaat over al het staal dat het bad in gaat',
+            bdZink.verzinkKg > 0 && Math.abs(bdZink.verzinkKg - bdZink.staalKg) < 1e-6,
+            `${bdZink.verzinkKg.toFixed(1)} van ${bdZink.staalKg.toFixed(1)} kg`);
+
+        log('\n--- 3. de prijs zet geen staalprijs op RVS ---');
+        const bdTrap = await trapBouw.bouwTrap({ ...trapRegels.STANDAARD, metaal: 'rvs' });
+        const bdPrijs = ks.prijsIndicatie(bdTrap.onderdelen);
+        check('een RVS-trap staat zonder tarief in "nog niet in de prijs"',
+            bdPrijs.staalKg === 0 && bdPrijs.rvsKg > 0
+            && bdPrijs.ontbreekt.some(n => /^RVS-constructie/.test(n)),
+            bdPrijs.ontbreekt.join(', '));
+        const bdRaming = ks.berekenKosten(
+            (await bouwMod.bouwBalustrade({ ...bdMaten, verzinken: true })).onderdelen);
+        check('verzinken staat als eigen post in de raming, met een bron',
+            bdRaming.regels.some(r => r.sleutel === 'verzinken' && r.laag > 0 && r.bron),
+            bdRaming.regels.map(r => r.sleutel).join(','));
+
+        log('\n--- 4. in woorden en in het paneel ---');
+        const bdZin = await win.eval("import('/command-parser.js')");
+        const bdA = bdZin.parseer('maak een balustrade van 3 meter in rvs', null, {});
+        const bdV = bdZin.parseer('verzinkte trap van 3 meter hoog in antraciet', null, {});
+        check('"in rvs" maakt het frame RVS', bdA.metaal === 'rvs', bdA.fout || bdA.uitleg);
+        check('"verzinkte trap ... antraciet" is duplex',
+            bdV.actie === 'trap' && bdV.verzinken === true && bdV.afwerking === '7016',
+            bdV.fout || bdV.uitleg);
+        const bdM = doc.getElementById('p_metaal');
+        bdM.value = 'aluminium';
+        bdM.dispatchEvent(new Event('change'));
+        check('bij aluminium staat de waarschuwing over sterkte, en kan verzinken niet',
+            doc.getElementById('metaalLet').style.display === 'block'
+            && doc.getElementById('p_verzinken').disabled);
+        const bdLink = await mainMod.codeAlsOntwerp((await mainMod.linkNaarOntwerp()).split('#ontwerp=')[1]);
+        check('en het metaal reist mee in een gedeelde link', bdLink.b.metaal === 'aluminium',
+            bdLink.b.metaal);
+        bdM.value = 'staal';
+        bdM.dispatchEvent(new Event('change'));
+        check('RVS, aluminium en verzinken geven geen fout in de console',
+            errors.length === bdVoor, errors.slice(bdVoor).join(' | '));
+    }
+
     log('\n' + (failures === 0
         ? '*** ALLE CONTROLES GESLAAGD ***'
         : `*** ${failures} CONTROLE(S) MISLUKT ***`));

@@ -17,7 +17,7 @@
 // totaal zonder arbeid is een MATERIAALBEGROTING en geen kostprijs, en dat
 // zegt deze code er ook bij - zie `volledig`.
 
-import { materiaalVanDeel, magCoaten, materiaalVan } from './materialen.js';
+import { materiaalVanDeel, magCoaten, dichtheidVan, isVerzinkt } from './materialen.js';
 // DEZELFDE REGEL ALS DE ZAAGLIJST voor "wordt dit gekocht of gemaakt?". Hier
 // stond eerst `deel.besteld`, en dat is net iets anders: een ruit draagt geen
 // vlaggetje maar is besteld OMDAT hij van glas is. Het gevolg was dat de ruit
@@ -71,11 +71,17 @@ export function bereikVan(post) {
  * niet in. Zo telt alles mee wat er echt staat.
  *
  * @param onderdelen  wat groepeerVormen teruggeeft: [{ deel, aantal, kenmerken }]
- * @returns { staalKg, coatM2, besteld: {soort: aantal}, m2: {soort: m2},
- *            glasM2, onbekend: [] }
+ * RVS en aluminium apart van staal: ze kosten per kilo iets heel anders, en
+ * een aluminium staander weegt een derde van een stalen. De dichtheid komt uit
+ * materialen.js; `dichtheidStaal` blijft voor wie hem uit tarieven.json wil
+ * doorgeven.
+ *
+ * @returns { staalKg, rvsKg, aluminiumKg, verzinkKg, coatM2,
+ *            besteld: {soort: aantal}, m2: {soort: m2}, glasM2, onbekend: [] }
  */
 export function hoeveelheden(onderdelen, dichtheidStaal = 7850) {
-    const uit = { staalKg: 0, coatM2: 0, besteld: {}, m2: {}, glasM2: 0, onbekend: [] };
+    const uit = { staalKg: 0, rvsKg: 0, aluminiumKg: 0, verzinkKg: 0, coatM2: 0,
+                  besteld: {}, m2: {}, glasM2: 0, onbekend: [] };
 
     for (const o of onderdelen) {
         const aantal = o.aantal || 1;
@@ -106,8 +112,14 @@ export function hoeveelheden(onderdelen, dichtheidStaal = 7850) {
         }
 
         // Traanplaat is ook staal; hij weegt gewoon mee.
-        if (materiaalVan(materiaal).soort === 'metaal') {
-            uit.staalKg += k.volume / 1e9 * dichtheidStaal * aantal;
+        if (materiaal === 'rvs' || materiaal === 'aluminium') {
+            uit[materiaal + 'Kg'] += k.volume / 1e9 * dichtheidVan(materiaal) * aantal;
+        } else if (dichtheidVan(materiaal)) {
+            const kg = k.volume / 1e9 * dichtheidStaal * aantal;
+            uit.staalKg += kg;
+            // Een verzinkerij rekent per kilo, en het zink zelf telt daar niet
+            // in mee: het is het gewicht van het staal dat het bad in gaat.
+            if (isVerzinkt(o.deel)) uit.verzinkKg += kg;
         }
         // COATEN GEBEURT ALLEEN ALS ER EEN KLEUR GEKOZEN IS. Zonder afwerking
         // is er niets te coaten en hoort er ook niets voor gerekend te worden.
@@ -161,6 +173,9 @@ export function berekenKosten(onderdelen, opties = {}) {
 
     const p = TARIEVEN.posten;
     voeg('staal', p.staal, h.staalKg, 'kg');
+    voeg('rvs', p.rvs, h.rvsKg, 'kg');
+    voeg('aluminium', p.aluminium, h.aluminiumKg, 'kg');
+    voeg('verzinken', p.verzinken, h.verzinkKg, 'kg');
     voeg('coating', p.coating, h.coatM2, 'm2');
     if (opties.stralen) voeg('stralen', p.stralen, h.coatM2, 'm2');
 
@@ -199,7 +214,9 @@ export function berekenKosten(onderdelen, opties = {}) {
         ontbreekt: [...new Set(ontbreekt)],
         controle,
         hoeveelheden: {
-            staalKg: rond(h.staalKg), coatM2: rond(h.coatM2),
+            staalKg: rond(h.staalKg), rvsKg: rond(h.rvsKg),
+            aluminiumKg: rond(h.aluminiumKg), verzinkKg: rond(h.verzinkKg),
+            coatM2: rond(h.coatM2),
             glasM2: rond(h.glasM2), besteld: h.besteld,
             onbekend: [...new Set(h.onbekend)],
         },
@@ -235,6 +252,15 @@ export function prijsIndicatie(onderdelen) {
 
     voeg(`Staalconstructie, gemaakt (${Math.round(h.staalKg)} kg)`,
         TARIEVEN.controle, h.staalKg);
+    // RVS en aluminium hebben een eigen prijs per kilo voor een afgewerkte
+    // constructie. Zolang die er niet is staan ze in `ontbreekt`, en zegt de
+    // offerte dat ze nog niet in de prijs zitten - geen stalen prijs op RVS.
+    voeg(`RVS-constructie, gemaakt (${Math.round(h.rvsKg)} kg)`,
+        TARIEVEN.controleRvs, h.rvsKg);
+    voeg(`Aluminium constructie, gemaakt (${Math.round(h.aluminiumKg)} kg)`,
+        TARIEVEN.controleAluminium, h.aluminiumKg);
+    voeg(`Thermisch verzinken (${Math.round(h.verzinkKg)} kg)`,
+        TARIEVEN.posten.verzinken, h.verzinkKg);
     voeg(`Poedercoaten (${h.coatM2.toFixed(1).replace('.', ',')} m²)`,
         TARIEVEN.posten.coating, h.coatM2);
     for (const [soort, aantal] of Object.entries(h.besteld)) {
@@ -251,6 +277,8 @@ export function prijsIndicatie(onderdelen) {
         hoog: rond(regels.reduce((s, r) => s + r.hoog, 0)),
         ontbreekt: [...new Set(ontbreekt)],
         staalKg: rond(h.staalKg),
+        rvsKg: rond(h.rvsKg),
+        aluminiumKg: rond(h.aluminiumKg),
     };
 }
 

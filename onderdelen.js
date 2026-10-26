@@ -24,7 +24,7 @@
 // twee zit zeven ordes van grootte, en 1e-7 ligt daar met een factor 10.000
 // marge aan beide kanten tussenin.
 import { materiaalVanDeel, materiaalNaam,
-         afwerkingVanDeel, ralNaam } from './materialen.js';
+         afwerkingVanDeel, afwerkingTekst } from './materialen.js';
 
 export const TOLERANTIE = 1e-7;
 
@@ -402,11 +402,15 @@ export function beschrijf(deel) {
         profiel: pr ? (pr.englishLabel || pr.label || 'profiel')
                     : deel.omschrijving || `${rond(maten[0])} × ${rond(maten[1])}`,
         norm: pr ? (pr.standardLabel || '') : '',
-        materiaal: uitProfiel || materiaalNaam(sleutel),
+        // De staalsoort uit de catalogus geldt alleen voor STAAL. Is het frame
+        // RVS of aluminium, dan zou "S235JRH" bij een RVS-staander een
+        // verkeerde bestelling opleveren.
+        materiaal: (sleutel === 'staal' && uitProfiel) || materiaalNaam(sleutel),
         materiaalSleutel: sleutel,
         // De afwerking is een EIGEN gegeven naast het materiaal: een staander
         // is van staal én gepoedercoat. Leeg betekent blank.
-        afwerking: afwerkingVanDeel(deel) ? ralNaam(afwerkingVanDeel(deel)) : '',
+        // Met verzinken erbij: "thermisch verzinkt" of duplex.
+        afwerking: afwerkingTekst(deel),
         afwerkingNummer: afwerkingVanDeel(deel) || '',
         // Blijft staan voor wie er al op leunde; het is hetzelfde als
         // `materiaal` zodra het om staal uit de catalogus gaat.

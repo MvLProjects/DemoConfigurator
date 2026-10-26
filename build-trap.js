@@ -33,7 +33,7 @@ import { stuklijst, maakDeel, eigenVorm, materialenVan,
          uiterlijkVan, metProfielMaten } from './build-balustrade.js';
 import { valideer as valideerLeuning } from './balustrade-rules.js';
 import { tredeSoortVan } from './treden.js';
-import { isHout } from './materialen.js';
+import { isHout, stempelWerk } from './materialen.js';
 import { padDelen, profielDoos } from './pad.js';
 import { groepeerVormen } from './onderdelen.js';
 import { maakBoom } from './samenstelling.js';
@@ -666,7 +666,7 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
 
     // Zie padDelen: de afwerking geldt voor het hele werk, dus ook voor de
     // leuning die hierboven uit padDelen kwam.
-    if (p.afwerking) for (const d of delen) d.afwerking = p.afwerking;
+    stempelWerk(delen, p);
 
     return { delen, verbindingen, trap: t, opmerkingen: beoordeelTrap(t) };
 }
@@ -837,7 +837,7 @@ function wentelDelen(p, balustradeMaten, leuning) {
         }
     }
 
-    if (p.afwerking) for (const d of delen) d.afwerking = p.afwerking;
+    stempelWerk(delen, p);
     return {
         delen, verbindingen: [], opmerkingen,
         trap: { ...t, aanzet: 2 * Ro, wentel: m },

@@ -23,7 +23,16 @@
  * kiezen - hout komt op een plank, niet op een buis.
  */
 export const MATERIALEN = {
-    staal:  { naam: 'Staal',  soort: 'metaal', kleur: 0xc8ccd0 },
+    staal:  { naam: 'Staal',  soort: 'metaal', kleur: 0xc8ccd0, dichtheid: 7850 },
+    // RVS EN ALUMINIUM in plaats van staal, voor het hele frame tegelijk; zie
+    // FRAMEMETALEN. Dezelfde profielmaten, een ander metaal. RVS is lichter
+    // van tint en blinkt meer, aluminium is matter en weegt een derde.
+    //
+    // `dichtheid` in kg per kubieke meter. Het gewicht komt uit het gemeten
+    // volume, dus een aluminium staander weegt vanzelf een derde van een
+    // stalen - zonder een tweede tabel met gewichten per meter.
+    rvs:    { naam: 'RVS 316', soort: 'metaal', kleur: 0xe1e4e7, dichtheid: 8000 },
+    aluminium: { naam: 'Aluminium', soort: 'metaal', kleur: 0xd2d5d8, dichtheid: 2700 },
     // GLAS is de eerste die niet massief in beeld hoort. Zonder doorzichtigheid
     // zie je een grijze plaat tussen de staanders en is er van de leuning niets
     // meer te zien - precies het tegenovergestelde van waarom iemand glas kiest.
@@ -40,7 +49,7 @@ export const MATERIALEN = {
     // De drie hieronder bestaan alleen als TREDE of bordes; zie `mag`.
     // Traanplaat is gewoon staal met ribbels erop, dus hij weegt mee als
     // staal. Een rooster en een betonnen trede koop je kant-en-klaar.
-    traanplaat: { naam: 'Traanplaat', soort: 'metaal', kleur: 0xb3b8bd },
+    traanplaat: { naam: 'Traanplaat', soort: 'metaal', kleur: 0xb3b8bd, dichtheid: 7850 },
     rooster: { naam: 'Rooster (verzinkt)', soort: 'metaal', kleur: 0x8f979c },
     beton:  { naam: 'Beton',  soort: 'steen',  kleur: 0xb1afa8 },
     eiken:  { naam: 'Eiken',  soort: 'hout',   kleur: 0xb5844a },
@@ -60,6 +69,42 @@ export function materiaalNaam(sleutel) {
 }
 
 export const isHout = (sleutel) => materiaalVan(sleutel).soort === 'hout';
+
+/**
+ * Waar het frame van gemaakt kan worden: staanders, regels, spijlen, bomen,
+ * platen. EEN keuze voor het hele werk, net als de coatkleur - een leuning
+ * waarvan de staanders RVS zijn en de handregel staal bestaat niet, want die
+ * twee las je niet aan elkaar.
+ *
+ * LET OP: de app rekent geen sterkte. Aluminium is ongeveer drie keer zo slap
+ * als staal; hetzelfde profiel buigt dus drie keer zo ver door. Dat staat bij
+ * de keuze in het paneel.
+ */
+export const FRAMEMETALEN = ['staal', 'rvs', 'aluminium'];
+
+/**
+ * Het frame van een gekozen metaal maken, en de afwerking erop zetten.
+ *
+ * Alleen wat nu STAAL is gaat mee: een houten trede, een glazen ruit, een
+ * gietstenen baluster en traanplaat blijven wat ze zijn. Eén plek voor alle
+ * bouwers, zodat er geen onderdeel vergeten wordt.
+ *
+ * @param p  { afwerking, metaal, verzinken }
+ */
+export function stempelWerk(delen, p) {
+    const metaal = p.metaal && p.metaal !== 'staal' && MATERIALEN[p.metaal] ? p.metaal : null;
+    for (const d of delen) {
+        if (p.afwerking) d.afwerking = p.afwerking;
+        if (metaal && (!d.materiaal || d.materiaal === 'staal')) d.materiaal = metaal;
+        if (p.verzinken) d.verzinkt = true;
+    }
+    return delen;
+}
+
+/** De dichtheid in kg/m³; null voor wat niet gewogen wordt (glas, hout, steen). */
+export function dichtheidVan(sleutel) {
+    return materiaalVan(sleutel).dichtheid || null;
+}
 
 /** De sleutels van één soort, voor een keuzelijst. */
 export function materiaalSleutels(soort = null) {
@@ -131,6 +176,33 @@ export function magCoaten(deel) {
 }
 
 /**
+ * Mag dit onderdeel thermisch verzinkt worden?
+ *
+ * Alleen gewoon staal - ook traanplaat, dat is staal met ribbels. RVS en
+ * aluminium roesten niet en worden niet verzinkt; een rooster komt al verzinkt
+ * van de leverancier.
+ */
+export function magVerzinken(deel) {
+    const m = materiaalVanDeel(deel);
+    return m === 'staal' || m === 'traanplaat';
+}
+
+/** Of een onderdeel verzinkt wordt: gevraagd én mogelijk. */
+export const isVerzinkt = (deel) => Boolean(deel && deel.verzinkt) && magVerzinken(deel);
+
+/**
+ * De afwerking zoals de werkplaats hem leest, met verzinken erbij:
+ * "thermisch verzinkt", "RAL 7016 — Antracietgrijs", of allebei als duplex.
+ * Leeg betekent blank.
+ */
+export function afwerkingTekst(deel) {
+    const nummer = afwerkingVanDeel(deel);
+    const ral = nummer ? ralNaam(nummer) : '';
+    if (!isVerzinkt(deel)) return ral;
+    return ral ? `duplex: verzinkt + ${ral}` : 'thermisch verzinkt';
+}
+
+/**
  * De afwerking van een onderdeel: een RAL-nummer, of null voor blank.
  *
  * Staat er een afwerking op iets dat niet gecoat kan worden, dan is het
@@ -159,6 +231,9 @@ export function uiterlijkVanDeel(deel) {
             ruwheid: 0.8,
         };
     }
+    // Verzinkt en niet gecoat: dan zie je het zink, doffer en grijzer dan
+    // blank staal.
+    if (isVerzinkt(deel)) return { sleutel: 'verzinkt', kleur: 0x9fa7ac, ruwheid: 0.9 };
     const m = materiaalVan(materiaalVanDeel(deel));
     return {
         sleutel: materiaalVanDeel(deel),

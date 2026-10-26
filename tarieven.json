@@ -37,6 +37,7 @@
     "een getal dat niemand nodig heeft."
   ],
   "dichtheid": { "staal": 7850 },
+  "_dichtheid_metalen": "RVS (8000) en aluminium (2700) staan in materialen.js, bij het materiaal zelf.",
 
   "posten": {
     "staal": {
@@ -65,6 +66,33 @@
       "eigen": null,
       "bron": "werkspot.nl",
       "toelichting": "Alleen als het los berekend wordt. Sommige coaterijen hebben het in hun prijs zitten; dan telt dit dubbel."
+    },
+    "rvs": {
+      "naam": "RVS 316, grondstof",
+      "eenheid": "kg",
+      "laag": 0,
+      "hoog": 0,
+      "eigen": null,
+      "bron": "",
+      "toelichting": "GEEN BETROUWBAAR GETAL GEVONDEN (gezocht 2026-10-26). Handels geven RVS per meter of per stuk, niet per kilo, en de prijs volgt de nikkelprijs. Vul de eigen inkoopprijs in."
+    },
+    "aluminium": {
+      "naam": "Aluminium, grondstof",
+      "eenheid": "kg",
+      "laag": 0,
+      "hoog": 0,
+      "eigen": null,
+      "bron": "",
+      "toelichting": "GEEN BETROUWBAAR GETAL GEVONDEN (gezocht 2026-10-26). Wat er te vinden was, waren schrootprijzen en Aziatische B2B-prijzen; die zeggen niets over een Nederlandse inkoop. Vul de eigen inkoopprijs in."
+    },
+    "verzinken": {
+      "naam": "Thermisch verzinken",
+      "eenheid": "kg",
+      "laag": 0.95,
+      "hoog": 2.30,
+      "eigen": null,
+      "bron": "clean-invoice.com/galvanik/kosten-und-kalkulation-galvanik (Duits overzicht 2026, incl. btw)",
+      "toelichting": "Per kilo staal dat het bad in gaat. Een Duitse bron, niet Nederlands, en verzinkerijen rekenen toeslagen voor lange of grote stukken. Vraag een offerte bij de eigen verzinkerij."
     },
     "arbeid": {
       "naam": "Arbeid werkplaats",
@@ -112,6 +140,28 @@
     "heeft arbeid er juist in zitten. Lopen ze ver uiteen, dan zegt dat iets",
     "over wat er in de aanname mist - en dat is precies waarvoor het er staat."
   ],
+  "_controleMetalen": [
+    "Dezelfde controle voor RVS en aluminium. Daar is geen prijs per kilo",
+    "voor een afgewerkte constructie gevonden. Ze staan op nul: de offerte",
+    "zegt dan dat RVS of aluminium nog niet in de prijs zit, in plaats van",
+    "er de staalprijs op te zetten."
+  ],
+  "controleRvs": {
+    "naam": "Afgewerkte RVS-constructie",
+    "eenheid": "kg",
+    "laag": 0,
+    "hoog": 0,
+    "eigen": null,
+    "bron": ""
+  },
+  "controleAluminium": {
+    "naam": "Afgewerkte aluminium constructie",
+    "eenheid": "kg",
+    "laag": 0,
+    "hoog": 0,
+    "eigen": null,
+    "bron": ""
+  },
   "controle": {
     "naam": "Afgewerkte staalconstructie",
     "eenheid": "kg",

@@ -357,6 +357,24 @@ const afwerkingEl = document.getElementById('p_afwerking');
 }
 afwerkingEl.addEventListener('change', () => { werkAfgeleideBij(); werkTrapBij(); });
 
+// Het METAAL van het frame, en of het verzinkt wordt. Net als de coatkleur één
+// keuze voor het hele werk; zie FRAMEMETALEN in materialen.js.
+const metaalEl = document.getElementById('p_metaal');
+const verzinkenEl = document.getElementById('p_verzinken');
+
+/** Waarschuwing bij aluminium; verzinken alleen bij staal. */
+function toonMetaal() {
+    const staal = metaalEl.value === 'staal';
+    if (!staal) verzinkenEl.checked = false;
+    verzinkenEl.disabled = !staal;
+    document.getElementById('metaalLet').style.display =
+        metaalEl.value === 'aluminium' ? 'block' : 'none';
+}
+for (const el of [metaalEl, verzinkenEl]) {
+    el.addEventListener('change', () => { toonMetaal(); werkAfgeleideBij(); werkTrapBij(); });
+}
+toonMetaal();
+
 /**
  * De ingevulde maten, met de gekozen profielen erbij.
  *
@@ -372,6 +390,8 @@ function huidigeMaten() {
         handregelProfiel: profielen.handregel,
         spijlProfiel: profielen.spijl,
         afwerking: afwerkingEl.value || null,
+        metaal: metaalEl.value,
+        verzinken: verzinkenEl.checked,
         // Het sierpunt is een keuze uit een bibliotheek, net als een profiel,
         // en staat daarom niet in een invulveld.
         sierpunt: sierpuntKeuze,
@@ -1498,6 +1518,8 @@ function huidigeTrapMaten() {
         // de knop.
         boomProfiel: profielen.boom,
         afwerking: afwerkingEl.value || null,
+        metaal: metaalEl.value,
+        verzinken: verzinkenEl.checked,
         soort: document.getElementById('t_soort').value,
         draai: document.getElementById('t_draai').value,
         // De losse trapdelen; zie regels.json onder trap.onderdelen.
@@ -2190,7 +2212,12 @@ export async function maakOfferteBlad() {
  * paneel, dus dezelfde waarden waarmee net gebouwd is.
  */
 function offerteKeuzes() {
-    const afwerking = afwerkingEl.value ? ralNaam(afwerkingEl.value) : 'blank staal';
+    // Het metaal, en wat erop komt: verzinkt, gecoat, allebei (duplex) of blank.
+    const metaal = materiaalNaam(metaalEl.value);
+    const ral = afwerkingEl.value ? ralNaam(afwerkingEl.value) : '';
+    const afwerking = verzinkenEl.checked
+        ? (ral ? `duplex: thermisch verzinkt + ${ral}` : 'thermisch verzinkt')
+        : ral || 'blank';
     const b = huidigeMaten();
     const vulling = { spijlen: 'verticale spijlen', horizontaal: 'liggende regels',
                       glas: 'glazen panelen', geen: 'zonder vulling' }[b.vulling]
@@ -2211,6 +2238,7 @@ function offerteKeuzes() {
             ...(b.vulling === 'spijlen' || !b.vulling
                 ? [['Spijlen', profielNaam(b.spijlProfiel, `${b.spijlBreedte} × ${b.spijlBreedte}`)]]
                 : []),
+            ['Materiaal', metaal],
             ['Afwerking', afwerking],
         ];
     }
@@ -2240,6 +2268,7 @@ function offerteKeuzes() {
     if (p.wandleuning && p.wandleuning !== 'geen') uit.push(['Wandleuning', p.wandleuning]);
     if (p.stootborden) uit.push(['Stootborden', 'ja']);
     if (p.platen) uit.push(['Voet- en kopplaten', 'ja']);
+    uit.push(['Materiaal', metaal]);
     uit.push(['Afwerking', afwerking]);
     return uit;
 }
@@ -2610,6 +2639,12 @@ async function pasInstellingenToe(inhoud) {
     if (inhoud.balustrade && 'afwerking' in inhoud.balustrade) {
         afwerkingEl.value = inhoud.balustrade.afwerking || '';
     }
+    // Het metaal net zo. Een ouder bestand kent het niet: dat was staal.
+    if (inhoud.balustrade) {
+        metaalEl.value = inhoud.balustrade.metaal || 'staal';
+        verzinkenEl.checked = Boolean(inhoud.balustrade.verzinken);
+        toonMetaal();
+    }
     // De SIERPUNTEN. Die gingen ook al mee het bestand in en werden bij het
     // laden nooit teruggezet - zelfde gat als bij de profielen hieronder.
     if (inhoud.balustrade && inhoud.balustrade.sierpunt) {
@@ -2787,7 +2822,8 @@ export async function openVoorbeeld(id) {
     spijlPuntKeuze = SIERPUNT_GEEN;
     toonSierpunt();
     toonSpijlPunt();
-    const balustrade = { ...STANDAARD, afwerking: '', ...(v.b || {}) };
+    const balustrade = { ...STANDAARD, afwerking: '', metaal: 'staal', verzinken: false,
+                         ...(v.b || {}) };
     const trap = { ...TRAP_STANDAARD, soort: 'recht', draai: 'rechts', tredeMateriaal: 'staal',
                    wandleuning: 'geen', stootborden: false, platen: false, ...(v.t || {}) };
     openGroep(v.wat === 'trap' ? 'Trap' : 'Balustrade');
@@ -2941,6 +2977,11 @@ async function voerOpdrachtKern(tekst) {
     // De coatkleur geldt voor het hele werk, dus net als in het paneel één
     // keuze. Niet genoemd = laten staan wat er stond; '' = blank.
     if (gelezen.afwerking !== undefined) afwerkingEl.value = gelezen.afwerking;
+    // Het metaal en verzinken: ook voor het hele werk, en ook alleen als de zin
+    // het noemt.
+    if (gelezen.metaal) metaalEl.value = gelezen.metaal;
+    if (gelezen.verzinken !== undefined) verzinkenEl.checked = gelezen.verzinken;
+    toonMetaal();
 
     // Laten zien wat eruit kwam. Dat is niet alleen aardig voor de gebruiker:
     // het maakt zichtbaar dat er parameters tussen de zin en het model zitten.
@@ -3361,6 +3402,8 @@ function huidigeConfiguratie() {
         boom: cfg.uitProfiel(profielen.boom),
         tredeMateriaal: tredeMateriaalEl.value,
         afwerking: afwerkingEl.value || null,
+        metaal: metaalEl.value,
+        verzinken: verzinkenEl.checked,
         // Het sierpunt hoort er net zo goed bij: ook dat is een keuze die bij
         // een werkplaats vastligt. Alleen het MODEL-ID gaat mee - de vorm zelf
         // komt uit sierpunten.js, dus een bewaarde configuratie blijft werken
@@ -3397,6 +3440,9 @@ async function pasConfiguratieToe(naam) {
     }
     if (c.tredeMateriaal) tredeMateriaalEl.value = c.tredeMateriaal;
     afwerkingEl.value = c.afwerking || '';
+    metaalEl.value = c.metaal || 'staal';
+    verzinkenEl.checked = Boolean(c.verzinken);
+    toonMetaal();
     // Een model dat niet meer bestaat valt terug op geen sierpunt, in plaats
     // van de bouw te laten vastlopen op een onbekend id.
     sierpuntKeuze = c.sierpunt && modelVan(c.sierpunt) ? c.sierpunt : SIERPUNT_GEEN;
@@ -3526,6 +3572,8 @@ for (const onderdeel of ['staander', 'handregel', 'spijl', 'boom']) {
                 sierpunt: sierpuntKeuze,
                 spijlSierpunt: spijlPuntKeuze,
                 afwerking: afwerkingEl.value || null,
+                metaal: metaalEl.value,
+                verzinken: verzinkenEl.checked,
             },
             status: statusEl.textContent,
             melding: fout && fout.style.display !== 'none'
