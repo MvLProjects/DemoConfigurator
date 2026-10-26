@@ -18,6 +18,22 @@ const MARGE_PX = 12;
 // beginnen; anders valt de bovenkant erachter weg.
 const MARGE_BOVEN_PX = 56;
 
+/**
+ * De maten op DIT scherm. Op een telefoon is het beeld een halve schermhoogte
+ * hoog en 390 breed; een kubus van 116 px nam daar een derde van de breedte in
+ * en lag over het model heen. Hij schaalt mee met de kleinste zijde van het
+ * beeld, tot zijn gewone maat op een gewoon scherm.
+ */
+function maten(b) {
+    const klein = Math.min(b.width, b.height);
+    const kubus = Math.min(KUBUS_PX, Math.round(klein * 0.2));
+    return {
+        kubus,
+        assen: Math.min(ASSEN_PX, Math.round(klein * 0.18)),
+        boven: klein < 500 ? MARGE_PX : MARGE_BOVEN_PX,
+    };
+}
+
 // Welke kant is wat, met Z omhoog.
 const VLAKKEN = [
     { as: 'x', teken: +1, label: 'RECHTS' },
@@ -94,10 +110,11 @@ export function maakNavigatie({ renderer, camera, controls, viewportEl }) {
     function kubusVak() {
         // Waar staat de kubus op het scherm? (CSS-pixels, oorsprong linksboven)
         const b = renderer.domElement.getBoundingClientRect();
+        const m = maten(b);
         return {
-            links: b.width - MARGE_PX - KUBUS_PX,
-            boven: MARGE_BOVEN_PX,
-            maat: KUBUS_PX,
+            links: b.width - MARGE_PX - m.kubus,
+            boven: m.boven,
+            maat: m.kubus,
             rect: b,
         };
     }
@@ -258,11 +275,12 @@ export function maakNavigatie({ renderer, camera, controls, viewportEl }) {
         renderer.setScissorTest(true);
 
         // WebGL rekent vanaf LINKSONDER, de CSS-plaatsing vanaf linksboven.
+        const m = maten(b);
         tekenHoek(renderer, kubusScene, kubusCamera,
-            b.width - MARGE_PX - KUBUS_PX, b.height - MARGE_BOVEN_PX - KUBUS_PX,
-            KUBUS_PX, b.height);
+            b.width - MARGE_PX - m.kubus, b.height - m.boven - m.kubus,
+            m.kubus, b.height);
         tekenHoek(renderer, assenScene, assenCamera,
-            MARGE_PX, MARGE_PX, ASSEN_PX, b.height);
+            MARGE_PX, MARGE_PX, m.assen, b.height);
 
         renderer.setScissorTest(false);
         renderer.setViewport(0, 0, b.width, b.height);

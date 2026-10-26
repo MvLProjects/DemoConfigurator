@@ -621,6 +621,27 @@
     .pz_voet button.primair { background: #2f6f4f; border-color: #2f6f4f;
                               color: #fff; }
     .pz_voet button:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* --- op een telefoon ----------------------------------------------------
+       Naast elkaar bleef er van het beeld een strook van 130 px over, de
+       statusregel viel weg en het startscherm liep rechts van het scherm af.
+       Onder de 700 px staat het beeld daarom BOVEN, het paneel eronder, en
+       loopt de bovenbalk door over twee regels. Kiezen met randen van een
+       STEP-model is muiswerk; die melding valt hier weg. */
+    @media (max-width: 700px) {
+        #bar { flex-wrap: wrap; gap: 8px 10px; }
+        #bar .scheiding, #edgeStatus { display: none; }
+        #zoek { width: 150px; }
+        #status { order: 10; flex: 1 0 100%; white-space: normal;
+                  font-size: 12px; }
+        #main { flex-direction: column; }
+        #viewport { order: -1; flex: 0 0 44vh; }
+        #panel { flex: 1 1 auto; border-right: 0; border-top: 1px solid #dde3ea; }
+        #startDialoog { max-width: calc(100vw - 32px); box-sizing: border-box;
+                        padding: 18px 16px 18px; }
+        .start_keuze { flex-direction: column; }
+        .start_keuze button { width: auto; }
+    }
 </style>
 
 <!-- three.js en OrbitControls zijn ES-modules. De importmap koppelt de bare
