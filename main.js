@@ -3869,9 +3869,63 @@ async function toonVorm(shape, naam, materialen = null, delen = null) {
     laatsteDelen = delen;
     laatsteNaam = naam;
     toonGeladen(await laadVorm(shape), naam, materialen);
+    if (naam === 'trap' || naam === 'balustrade') onthoudOntwerp(naam);
 }
 // 'trap' of 'balustrade': wat er het laatst gebouwd is. Zie standaardOmschrijving.
 let laatsteNaam = null;
+
+// --- terug naar het vorige ontwerp -------------------------------------------
+//
+// Na elke bouw van een trap of balustrade gaat wat er gebouwd is op een
+// stapel: de instellingen uit het paneel, zoals bij Opslaan. "Terug" haalt het
+// bovenste eraf en bouwt het ontwerp eronder opnieuw. Zo maakt een misklik op
+// een voorbeeld - dat alles terugzet naar de standaard - niets kapot.
+//
+// Alleen wat GEBOUWD is, niet elke toetsaanslag: terug gaat naar een model dat
+// je gezien hebt, niet naar een half ingetypt getal.
+const MAX_TERUG = 20;
+const ontwerpen = [];
+let terugBezig = false;
+const terugKnopEl = document.getElementById('terugKnop');
+
+function onthoudOntwerp(wat) {
+    // Zonder het tijdstip van opslaan: anders is elke stand nieuw, ook
+    // dezelfde trap die net teruggezet is.
+    const { opgeslagen, ...inst } = huidigeInstellingen();
+    const stand = JSON.stringify({ wat, inst });
+    // Dezelfde bouw twee keer (of het terugzetten zelf) is geen nieuwe stap.
+    if (ontwerpen[ontwerpen.length - 1] !== stand) ontwerpen.push(stand);
+    while (ontwerpen.length > MAX_TERUG) ontwerpen.shift();
+    terugBezig = false;
+    terugKnopEl.disabled = ontwerpen.length < 2;
+}
+
+async function gaTerug() {
+    if (ontwerpen.length < 2 || terugBezig) return;
+    terugBezig = true;
+    ontwerpen.pop();
+    const { wat, inst } = JSON.parse(ontwerpen[ontwerpen.length - 1]);
+    terugKnopEl.disabled = true;
+    openGroep(wat === 'trap' ? 'Trap' : 'Balustrade');
+    await pasInstellingenToe(inst);
+    statusEl.textContent = 'Terug naar het vorige ontwerp; het wordt opgebouwd…';
+    (wat === 'trap' ? trapKnop : genereerKnop).click();
+    // Lukt die bouw niet, dan komt onthoudOntwerp nooit en zat de knop
+    // voorgoed op slot. Na een minuut gaat hij in elk geval weer open.
+    setTimeout(() => {
+        terugBezig = false;
+        terugKnopEl.disabled = ontwerpen.length < 2;
+    }, 60_000);
+}
+terugKnopEl.addEventListener('click', gaTerug);
+// Ctrl+Z, behalve in een invulveld: daar hoort hij bij de tekst.
+document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z' || e.shiftKey) return;
+    const el = document.activeElement;
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+    e.preventDefault();
+    gaTerug();
+});
 
 /**
  * Het voorbeeld naar beeld: de onderdelenlijst als doosjes, zonder OCCT.

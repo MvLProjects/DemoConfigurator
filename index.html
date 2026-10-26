@@ -726,6 +726,9 @@
             <rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/>
             <rect x="9" y="9" width="4.5" height="4.5" rx="1"/>
         </symbol>
+        <symbol id="ic-terug" viewBox="0 0 16 16">
+            <path d="M5.5 3.5 2.5 6.5l3 3M2.5 6.5h7a4 4 0 0 1 0 8H7"/>
+        </symbol>
         <symbol id="ic-delen" viewBox="0 0 16 16">
             <circle cx="12" cy="3.5" r="1.8"/><circle cx="4" cy="8" r="1.8"/>
             <circle cx="12" cy="12.5" r="1.8"/>
@@ -798,6 +801,12 @@
             <!-- Het beeld zoals het nu staat, als PNG: om te delen in een app
                  of mail. Zonder kijkkubus en assenkruis, en scherper dan het
                  scherm. -->
+            <!-- Terug naar het vorige gebouwde ontwerp (ook Ctrl+Z). Een
+                 voorbeeld zet alles op de standaard; één misklik mag je
+                 ontwerp niet kosten. -->
+            <button id="terugKnop" type="button" disabled
+                    title="Terug naar het vorige ontwerp (Ctrl+Z)">
+                <svg aria-hidden="true"><use href="#ic-terug"></use></svg>Terug</button>
             <button id="fotoKnop" type="button" title="Het beeld opslaan als afbeelding">
                 <svg aria-hidden="true"><use href="#ic-foto"></use></svg>Afbeelding</button>
             <!-- Een link met het hele ontwerp erin; zie "Ontwerp delen" bij

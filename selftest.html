@@ -11262,6 +11262,20 @@ try {
             /#ontwerp=/.test(bjVeld.value)
             || /gekopieerd|gedeeld/.test(doc.getElementById('status').textContent),
             doc.getElementById('status').textContent);
+        // TERUG. Hierboven is er al heel wat gebouwd, dus de knop staat aan, en
+        // terug bouwt het vorige ontwerp opnieuw zonder fout.
+        const bjTerug = doc.getElementById('terugKnop');
+        check('de knop Terug staat aan na een paar ontwerpen', !bjTerug.disabled);
+        const bjVoor = errors.length;
+        const bjSt = doc.getElementById('status');
+        bjSt.textContent = '';
+        bjTerug.click();
+        for (let i = 0; i < 40000 && !/mm hoog|Balustrade \d|mislukt/.test(bjSt.textContent); i++) {
+            await sleep(25);
+        }
+        check('Terug bouwt het vorige ontwerp opnieuw',
+            /mm hoog|Balustrade \d/.test(bjSt.textContent) && errors.length === bjVoor,
+            bjSt.textContent.slice(0, 80) + ' ' + errors.slice(bjVoor).join(' | '));
         check('het paneel toont het trapgat',
             /^\d+ mm lang$|^rond/.test(doc.getElementById('t_a_trapgat').textContent),
             doc.getElementById('t_a_trapgat').textContent);
