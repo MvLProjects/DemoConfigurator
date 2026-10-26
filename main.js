@@ -23,7 +23,7 @@ import { TREDESOORTEN, tredeSoortVan } from './treden.js';
 import { maakOfferte } from './offerte.js';
 import { VOORBEELDEN } from './voorbeelden.js';
 import { STANDAARD as TRAP_STANDAARD, berekenTrap, beoordeelTrap,
-    valideer as valideerTrap, controleerBordes } from './trap-regels.js';
+    valideer as valideerTrap, controleerBordes, trapgat } from './trap-regels.js';
 import { laadCatalogus } from './profielen.js';
 import * as cfg from './configuraties.js';
 import * as gewoonten from './gewoonten.js';
@@ -1489,6 +1489,7 @@ const trapAfgeleid = {
     aantrede: document.getElementById('t_a_aantrede'),
     aanzet: document.getElementById('t_a_aanzet'),
     helling: document.getElementById('t_a_helling'),
+    trapgat: document.getElementById('t_a_trapgat'),
 };
 const trapFoutEl = document.getElementById('trapFout');
 const trapLetEl = document.getElementById('trapLet');
@@ -1588,6 +1589,11 @@ function werkTrapBij() {
     trapAfgeleid.aantrede.textContent = t.aantrede.toFixed(1) + ' mm';
     trapAfgeleid.aanzet.textContent = Math.round(t.aanzet) + ' mm';
     trapAfgeleid.helling.textContent = t.helling.toFixed(1) + '°';
+    // Hoe lang het gat in de bovenvloer moet zijn; zie trapgat in trap-regels.js.
+    const gat = trapgat(t, maten);
+    trapAfgeleid.trapgat.textContent = gat.rond
+        ? `rond, Ø ${Math.round(gat.lengte)} mm`
+        : `${Math.round(gat.lengte)} mm lang`;
 
     // Waarschuwingen zijn geen fouten: de trap mag wel, hij loopt alleen minder
     // prettig. Daarom geel en niet rood, en de knop blijft aan.
@@ -2303,6 +2309,12 @@ function offerteKeuzes() {
           + (p.soort === 'wentel' ? 'spijlen' : vulling)]);
     if (p.wandleuning && p.wandleuning !== 'geen') uit.push(['Wandleuning', p.wandleuning]);
     if (p.stootborden) uit.push(['Stootborden', 'ja']);
+    {
+        const gat = trapgat(t, p);
+        uit.push(['Trapgat in de vloer', gat.rond
+            ? `rond, Ø ${Math.round(gat.lengte)} mm`
+            : `minstens ${Math.round(gat.lengte)} mm lang`]);
+    }
     if (p.platen) uit.push(['Voet- en kopplaten', 'ja']);
     uit.push(['Materiaal', metaal]);
     uit.push(['Afwerking', afwerking]);

@@ -11234,6 +11234,27 @@ try {
             /Afbeelding opgeslagen als \w+\.png/.test(biStatus.textContent), biStatus.textContent);
     }
 
+    // ============ DEEL BJ: het trapgat ======================================
+    log('\n\n======== DEEL BJ: hoe lang het trapgat moet zijn ========\n');
+    {
+        const tr = trapRegels;
+        const bjP = { ...tr.STANDAARD, hoogte: 3000, vloerdikte: 250 };
+        const bjT = tr.berekenTrap(bjP);
+        const bjGat = tr.trapgat(bjT, bjP);
+        // Met de hand: (250 + 2300) x 235 / 187,5 = 3196.
+        check('standaardtrap van 3 m, vloer 250: trapgat 3196 mm',
+            Math.abs(bjGat.lengte - 3196) < 0.5 && bjGat.hoofdhoogte === 2300 && !bjGat.rond,
+            bjGat.lengte.toFixed(1));
+        check('een dikkere vloer vraagt een langer gat',
+            tr.trapgat(bjT, { ...bjP, vloerdikte: 400 }).lengte > bjGat.lengte);
+        check('een wenteltrap krijgt een rond gat zo groot als de trap',
+            (() => { const g = tr.trapgat(bjT, { ...bjP, soort: 'wentel', diameter: 1600 });
+                     return g.rond && g.lengte === 1600; })());
+        check('het paneel toont het trapgat',
+            /^\d+ mm lang$|^rond/.test(doc.getElementById('t_a_trapgat').textContent),
+            doc.getElementById('t_a_trapgat').textContent);
+    }
+
     log('\n' + (failures === 0
         ? '*** ALLE CONTROLES GESLAAGD ***'
         : `*** ${failures} CONTROLE(S) MISLUKT ***`));

@@ -49,7 +49,8 @@
       "boomDikte": 10,
       "bordesNa": 0,
       "bordesLengte": 1000,
-      "diameter": 1800
+      "diameter": 1800,
+      "vloerdikte": 250
     },
     "grenzen": {
       "hoogte": [300, 6000],
@@ -60,8 +61,26 @@
       "boomDikte": [4, 30],
       "bordesNa": [0, 40],
       "bordesLengte": [600, 3000],
-      "diameter": [1200, 3000]
+      "diameter": [1200, 3000],
+      "vloerdikte": [0, 800]
     },
+    "_hoofdhoogte": [
+      "DE VRIJE HOOFDHOOGTE boven een trap: zoveel ruimte moet er overal recht",
+      "boven de neuzenlijn zijn, anders stoot je je hoofd aan de rand van het",
+      "trapgat. 2300 mm is wat het Bouwbesluit voor een nieuwe woning vraagt;",
+      "voor een bestaand gebouw of een andere functie kan het anders zijn. Het",
+      "is een AANNAME om mee te rekenen, geen toetsing.",
+      "",
+      "Het trapgat moet daarom langs de bovenste vlucht minstens",
+      "",
+      "    (vloerdikte + hoofdhoogte) x aantrede / optrede",
+      "",
+      "lang zijn, gemeten vanaf de rand van de bovenvloer: zover terug ligt de",
+      "neuzenlijn nog hoger dan de onderkant van de vloer min de hoofdhoogte.",
+      "Een wenteltrap draait onder zichzelf door en krijgt een rond gat zo groot",
+      "als de trap."
+    ],
+    "hoofdhoogte": 2300,
     "_onderdelen": [
       "De losse onderdelen van een trap die geen trede of boom zijn. Alle maten",
       "zijn AANNAMES om mee te beginnen - gangbaar in de werkplaats, maar niet",
