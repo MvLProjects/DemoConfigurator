@@ -726,6 +726,11 @@
             <rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/>
             <rect x="9" y="9" width="4.5" height="4.5" rx="1"/>
         </symbol>
+        <symbol id="ic-delen" viewBox="0 0 16 16">
+            <circle cx="12" cy="3.5" r="1.8"/><circle cx="4" cy="8" r="1.8"/>
+            <circle cx="12" cy="12.5" r="1.8"/>
+            <path d="M5.6 7.1 10.4 4.4M5.6 8.9l4.8 2.7"/>
+        </symbol>
         <symbol id="ic-foto" viewBox="0 0 16 16">
             <path d="M2 5.5a1 1 0 0 1 1-1h2l1-1.5h4l1 1.5h2a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/>
             <circle cx="8" cy="8.5" r="2.4"/>
@@ -795,6 +800,10 @@
                  scherm. -->
             <button id="fotoKnop" type="button" title="Het beeld opslaan als afbeelding">
                 <svg aria-hidden="true"><use href="#ic-foto"></use></svg>Afbeelding</button>
+            <!-- Een link met het hele ontwerp erin; zie "Ontwerp delen" bij
+                 Instellingen. Op een telefoon het deelmenu, anders kopiëren. -->
+            <button id="deelKnop" type="button" title="Een link naar dit ontwerp delen">
+                <svg aria-hidden="true"><use href="#ic-delen"></use></svg>Delen</button>
             <label><input type="checkbox" id="showEdges" checked> randen</label>
             <label><input type="checkbox" id="showMaten"> maten</label>
             <span class="scheiding"></span>

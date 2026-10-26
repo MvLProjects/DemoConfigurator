@@ -2853,6 +2853,38 @@ document.getElementById('instelLink').addEventListener('click', async () => {
     }
 });
 
+// Dezelfde link met één tik, vanuit de bovenbalk. Op een telefoon het
+// deelmenu (WhatsApp, mail); op een computer naar het klembord - daar opent
+// het deelmenu van Windows in plaats van wat je verwacht. Weigert het
+// klembord, dan het veld bij Instellingen, waar je hem zelf kopieert.
+document.getElementById('deelKnop').addEventListener('click', async () => {
+    let link;
+    try {
+        link = await linkNaarOntwerp();
+    } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Link maken mislukt: ' + err.message;
+        return;
+    }
+    const telefoon = matchMedia('(pointer: coarse)').matches;
+    if (telefoon && navigator.share) {
+        try {
+            await navigator.share({ title: document.title, url: link });
+            statusEl.textContent = 'Ontwerp gedeeld.';
+            return;
+        } catch (err) {
+            if (err && err.name === 'AbortError') return;   // zelf weggeklikt
+        }
+    }
+    try {
+        await navigator.clipboard.writeText(link);
+        statusEl.textContent = 'Link naar dit ontwerp gekopieerd - plak hem in een mail of app.';
+    } catch {
+        openGroep('Instellingen');
+        document.getElementById('instelLink').click();
+    }
+});
+
 // --- voorbeeldontwerpen ------------------------------------------------------
 //
 // Een voorbeeld is een ontwerp in de vorm van een link; zie voorbeelden.js. Het

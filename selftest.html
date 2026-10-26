@@ -11250,6 +11250,18 @@ try {
         check('een wenteltrap krijgt een rond gat zo groot als de trap',
             (() => { const g = tr.trapgat(bjT, { ...bjP, soort: 'wentel', diameter: 1600 });
                      return g.rond && g.lengte === 1600; })());
+        // De knop Delen: zonder focus weigert het klembord, en dan hoort de
+        // link in het veld bij Instellingen te staan in plaats van nergens.
+        doc.getElementById('deelKnop').click();
+        const bjVeld = doc.getElementById('instelLinkTekst');
+        for (let i = 0; i < 200 && !/#ontwerp=/.test(bjVeld.value)
+             && !/gekopieerd|gedeeld/.test(doc.getElementById('status').textContent); i++) {
+            await sleep(25);
+        }
+        check('de knop Delen geeft een link, op het klembord of in het veld',
+            /#ontwerp=/.test(bjVeld.value)
+            || /gekopieerd|gedeeld/.test(doc.getElementById('status').textContent),
+            doc.getElementById('status').textContent);
         check('het paneel toont het trapgat',
             /^\d+ mm lang$|^rond/.test(doc.getElementById('t_a_trapgat').textContent),
             doc.getElementById('t_a_trapgat').textContent);
