@@ -190,7 +190,8 @@
     "spijlModel": "",
     "spijlMateriaal": "steen",
     "handregelModel": "",
-    "handregelMateriaal": "steen"
+    "handregelMateriaal": "steen",
+    "handregelHout": ""
   },
 
   "voetplaat": {

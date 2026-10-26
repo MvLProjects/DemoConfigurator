@@ -286,9 +286,10 @@ export function mag(soortOnderdeel, materiaalSleutel) {
     return PLANKEN.has(soortOnderdeel) || HOUTDELEN.has(soortOnderdeel);
 }
 
-// Wat er verder van hout kan zijn: de trapbomen van een houten trap en het
-// stootbord tussen houten treden. Geen buis of profiel - dat blijft staal.
-const HOUTDELEN = new Set(['trapboom', 'bordesboom', 'stootbord']);
+// Wat er verder van hout kan zijn: de trapbomen van een houten trap, het
+// stootbord tussen houten treden en een houten handregel. Geen buis of
+// profiel - dat blijft staal.
+const HOUTDELEN = new Set(['trapboom', 'bordesboom', 'stootbord', 'handregel']);
 
 const ALLEEN_TREDE = new Set(['traanplaat', 'rooster', 'beton']);
 

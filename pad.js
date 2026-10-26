@@ -529,6 +529,12 @@ export function padDelen(punten, gesloten, p) {
     // velden ertussen. Zie glasvrij.js.
     if (vullingSoort(p.vulling) === 'glasvrij') return glasvrijDelen(punten, gesloten, p);
 
+    // EEN HOUTEN HANDREGEL is een massieve lat op maat: geen profiel uit de
+    // catalogus, dus dat valt hier weg en de regel wordt een blok van de
+    // ingevulde handregelhoogte, zo breed als de paal. Een dekband gaat voor.
+    const houtRegel = p.handregelHout && !p.handregelModel ? p.handregelHout : null;
+    if (houtRegel) p = { ...p, handregelProfiel: null };
+
     const omhoog = [0, 0, 1];
 
     // Tussenstaanders erbij voordat er ook maar iets gebouwd wordt. Daarna
@@ -2201,6 +2207,9 @@ export function padDelen(punten, gesloten, p) {
                 besteld: p.handregelMateriaal === 'steen',
                 materiaal: p.handregelMateriaal || 'steen',
             } : {}),
+            // Hout komt van de timmerman, op maat en met verstek.
+            ...(houtRegel ? { materiaal: houtRegel, besteld: true,
+                              bestelSoort: 'handregel:hout' } : {}),
             lengteAs: 'x',
             verstek,
         });

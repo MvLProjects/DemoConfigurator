@@ -224,6 +224,8 @@ const METAALZINNEN = [
     [/\b(?:rvs|inox|roestvrij(?:\s+staal)?|roestvast(?:\s+staal)?)\b/gi, 'rvs'],
     [/\b(?:aluminium|alu)\b/gi, 'aluminium'],
 ];
+// "eiken handregel", "houten leuning". Niet "wandleuning": dat is iets anders.
+const HOUTREGELZIN = /\b(houten|eiken|beuken|merbau)\s+(?:hand)?(?:regel|leuning)\b/gi;
 const VERZINKZIN = /\b(?:(?:thermisch\s+)?verzinkte?|verzinken|duplex)\b/gi;
 
 // DE VULLING van de leuning. Bewust alleen hele uitdrukkingen: "glazen treden"
@@ -348,6 +350,12 @@ function leesExtras(tekst, voorraad) {
     for (const m of [...rest.matchAll(VERZINKZIN)]) {
         if (uit.verzinken === undefined) gevonden.push('thermisch verzinkt');
         uit.verzinken = true;
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+    for (const m of [...rest.matchAll(HOUTREGELZIN)]) {
+        const hout = m[1].toLowerCase();
+        uit.handregelHout = hout === 'houten' ? 'eiken' : hout;
+        gevonden.push(`handregel van ${uit.handregelHout}`);
         rest = poets(rest, m.index, m.index + m[0].length);
     }
     if (uit.verzinken && uit.metaal) {
@@ -946,6 +954,7 @@ export function parseer(invoer, vorige = null, opties = {}) {
     if (extra.handregelModel !== undefined) {
         extraMaten.handregelModel = extra.handregelModel;
     }
+    if (extra.handregelHout !== undefined) extraMaten.handregelHout = extra.handregelHout;
     // Velden die bij naam genoemd zijn gaan er zo in; ze hebben hun eigen naam
     // dus er valt niets te raden.
     Object.assign(extraMaten, extra.velden || {});

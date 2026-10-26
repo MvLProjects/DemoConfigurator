@@ -946,7 +946,15 @@ function wentelDelen(p, balustradeMaten, leuning) {
             const [x, y] = punt(Rr, s * hoek * u);
             punten.push([x, y, hart(u)]);
         }
+        const regelVanaf = delen.length;
         rondeRegel(delen, punten, regelD, 'handregel');
+        // Een houten handregel draait net zo mee, in stukken met verstek.
+        if (L.handregelHout && !L.handregelModel) {
+            for (const d of delen.slice(regelVanaf)) {
+                Object.assign(d, { materiaal: L.handregelHout, besteld: true,
+                                   bestelSoort: 'handregel:hout' });
+            }
+        }
 
         for (let k = 1; k <= t.treden; k++) {
             for (let j = 0; j < perTrede; j++) {

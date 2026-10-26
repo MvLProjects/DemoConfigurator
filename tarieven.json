@@ -231,6 +231,15 @@
       "hoog": 150,
       "bron": "schatting (2026-10-26), niet nagezocht",
       "toelichting": "SCHATTING. Een gegoten of gehouwen dekband per stuk."
+    },
+    "handregel:hout": {
+      "naam": "Houten handregel op maat",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 80,
+      "hoog": 200,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een massieve houten regel op maat, met verstek, per stuk."
     }
   },
   "_controle": [

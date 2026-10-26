@@ -3821,7 +3821,8 @@ try {
     check('hout mag op een trede', mat.mag('trede', 'eiken'));
     check('hout mag op een bordes', mat.mag('bordes', 'eiken'));
     check('hout mag NIET op een staander', !mat.mag('staander', 'eiken'));
-    check('hout mag NIET op een handregel', !mat.mag('handregel', 'eiken'));
+    // Sinds deel BH WEL: een houten handregel op stalen staanders.
+    check('hout mag op een handregel (een houten regel op staal)', mat.mag('handregel', 'eiken'));
     check('hout mag NIET op een spijl', !mat.mag('spijl', 'eiken'));
     check('staal mag overal', mat.mag('staander', 'staal') && mat.mag('trede', 'staal'));
     check('een staander met hout erop valt stil terug op staal',
@@ -11158,6 +11159,51 @@ try {
         adMeet('wentel + wandleuning + voet', await trapBouw.bouwTrap(bgW, bgBal, 'geen'));
         check('wandleuning en spilvoet geven geen fout in de console',
             errors.length === bgVoor, errors.slice(bgVoor).join(' | '));
+    }
+
+    // ============ DEEL BH: houten handregel ================================
+    log('\n\n======== DEEL BH: houten handregel ========\n');
+    {
+        const bhVoor = errors.length;
+        const bhChs = cat.alleProfielen(catBoom).find(x => /48\.3x2\.6/.test(x.englishLabel || x.label || ''));
+        const bhMaten = { ...regelsNu.STANDAARD, lengte: 2400, handregelHout: 'eiken',
+                          handregelProfiel: bhChs || null };
+        const bhDelen = bouwMod.balustradeDelen(bhMaten);
+        const bhRegel = bhDelen.find(d => d.soort === 'handregel');
+        check('de handregel is eiken, op maat besteld, zonder het stalen profiel',
+            bhRegel.materiaal === 'eiken' && bhRegel.besteld
+            && bhRegel.bestelSoort === 'handregel:hout' && !bhRegel.profiel);
+        check('en de staanders blijven gewoon staal',
+            bhDelen.filter(d => d.soort === 'staander').every(d => !d.materiaal));
+        check('de stuklijst noemt hem eiken', ond.beschrijf(bhRegel).materiaal === 'Eiken',
+            ond.beschrijf(bhRegel).materiaal);
+        check('met een dekband erbij gaat de dekband voor',
+            !bouwMod.balustradeDelen({ ...bhMaten, handregelModel: 'klassiek' })
+                .find(d => d.soort === 'handregel').bestelSoort);
+
+        const bhHoek = await bouwMod.bouwPad([[0, 0, 0], [2000, 0, 0], [2000, 1500, 0]],
+            false, { ...bhMaten, handregelProfiel: null });
+        adMeet('houten handregel in een hoek', bhHoek);
+        const ctl = await win.eval("import('/controle.js')");
+        const bhKeur = ctl.keurGeometrie(bhHoek.delen, bhHoek.verbindingen);
+        check('en de keuring vindt niets: hij is zo breed als de paal',
+            bhKeur.goed, bhKeur.bevindingen.map(b => b.titel).join('; '));
+        adMeet('trap met houten handregel', await trapBouw.bouwTrap(
+            { ...trapRegels.STANDAARD }, bhMaten, 'rechts'));
+        const bhW = trapBouw.trapDelen({ ...trapRegels.STANDAARD, soort: 'wentel', diameter: 1800 },
+            bhMaten, 'rechts').delen;
+        check('ook de meedraaiende regel van een wenteltrap is eiken',
+            bhW.filter(d => d.soort === 'handregel').every(d => d.materiaal === 'eiken'));
+        const bhH = ks.hoeveelheden((await bouwMod.bouwBalustrade(bhMaten)).onderdelen);
+        check('de regel staat als bestelde post', bhH.besteld['handregel:hout'] === 1,
+            JSON.stringify(bhH.besteld));
+
+        const bhZin = await win.eval("import('/command-parser.js')");
+        const bhA = bhZin.parseer('balustrade van 3 meter met een eiken handregel', null, {});
+        check('"met een eiken handregel" wordt een eiken handregel',
+            bhA.params && bhA.params.handregelHout === 'eiken', bhA.fout || bhA.uitleg);
+        check('houten handregel geeft geen fout in de console',
+            errors.length === bhVoor, errors.slice(bhVoor).join(' | '));
     }
 
     log('\n' + (failures === 0
