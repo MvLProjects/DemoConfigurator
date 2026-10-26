@@ -100,8 +100,9 @@ export function maakIndex(wortel = document) {
         // Knopjes zonder woorden (het kruisje bij een profiel) zijn niet te
         // zoeken en zouden alleen ruis geven.
         if (!naam || naam.length < 3) continue;
-        // De voorbeeldkaarten zijn geen instelling: "glas" hoort bij het veld
-        // vulling uit te komen, niet bij het voorbeeld "Modern glas".
+        // De voorbeeldkaarten en -zinnen zijn geen instelling: "glas" hoort
+        // bij het veld vulling uit te komen, niet bij het voorbeeld "Modern
+        // glas" of de zin "...met glas".
         if (knop.dataset.voorbeeld) continue;
         uit.push({
             soort: 'knop', titel: naam,

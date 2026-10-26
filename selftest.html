@@ -11206,6 +11206,23 @@ try {
             errors.length === bhVoor, errors.slice(bhVoor).join(' | '));
     }
 
+    // ============ DEEL BI: de voorbeeldzinnen ==============================
+    log('\n\n======== DEEL BI: de voorbeeldzinnen onder Opdracht in woorden ========\n');
+    {
+        // Een voorbeeld dat een foutmelding geeft is erger dan geen voorbeeld.
+        const biZin = await win.eval("import('/command-parser.js')");
+        const biCat = { profielen: cat.alleProfielen(catBoom) };
+        for (const zin of mainMod.CHATVOORBEELDEN) {
+            const g = biZin.parseer(zin, null, biCat);
+            check(`"${zin.slice(0, 50)}${zin.length > 50 ? '…' : ''}" wordt begrepen`,
+                !g.fout && (g.actie === 'trap' || g.actie === 'balustrade')
+                && !(g.genegeerd || []).length,
+                g.fout || (g.genegeerd || []).join(' ') || g.uitleg);
+        }
+        check('elke voorbeeldzin staat als knop in de chat',
+            doc.querySelectorAll('#chatLog .chatVoorbeeld').length === mainMod.CHATVOORBEELDEN.length);
+    }
+
     log('\n' + (failures === 0
         ? '*** ALLE CONTROLES GESLAAGD ***'
         : `*** ${failures} CONTROLE(S) MISLUKT ***`));

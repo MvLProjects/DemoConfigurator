@@ -1390,6 +1390,34 @@ async function keurEnCorrigeer(gebouwd, herbouw) {
     return { gebouwd, bevindingen: [] };
 }
 
+/**
+ * De vulling in woorden die bij de keuze passen, voor de statusregel en de
+ * chat. "0 spijlen" bij glas of liggende regels is geen uitkomst maar een
+ * leugen; dat stond er in de chat nog wel.
+ */
+function vullingTekstVan(gebouwd) {
+    const eersteVeld = (gebouwd.velden && gebouwd.velden[0]) || null;
+    if (!eersteVeld || eersteVeld.vulling === 'spijlen') {
+        return `${gebouwd.spijlen.aantal} spijlen, `
+            + `doorgang ${gebouwd.spijlen.doorgang.toFixed(1)} mm`;
+    }
+    if (eersteVeld.vulling === 'geen') return 'geen vulling';
+    if (eersteVeld.vulling === 'glasvrij') {
+        const n = gebouwd.velden.length;
+        return `glas zonder staanders, ${n} ${n === 1 ? 'ruit' : 'ruiten'} van `
+            + `${eersteVeld.glas.lengte.toFixed(0)}×${eersteVeld.glas.hoogte.toFixed(0)}`
+            + `×${eersteVeld.glas.dikte} mm`;
+    }
+    if (eersteVeld.vulling === 'glas' && eersteVeld.glas) {
+        return `glas ${eersteVeld.glas.lengte.toFixed(0)}×`
+            + `${eersteVeld.glas.hoogte.toFixed(0)}×${eersteVeld.glas.dikte} mm`;
+    }
+    return eersteVeld.liggend
+        ? `${eersteVeld.liggend.aantal} liggende regels, `
+          + `opening ${eersteVeld.liggend.doorgang.toFixed(1)} mm`
+        : 'liggende regels';
+}
+
 genereerKnop.addEventListener('click', async () => {
     let maten = werkAfgeleideBij();
     if (!maten) return;
@@ -1429,26 +1457,7 @@ genereerKnop.addEventListener('click', async () => {
         const gekozen = ['staander', 'handregel', 'spijl']
             .filter(k => profielen[k])
             .map(k => `${k} ${profielen[k].englishLabel}`);
-        // De vulling in woorden die bij de keuze passen. "0 spijlen" bij een
-        // leuning met liggende regels is geen uitkomst maar een leugen.
-        const eersteVeld = (gebouwd.velden && gebouwd.velden[0]) || null;
-        const vullingTekst =
-            !eersteVeld || eersteVeld.vulling === 'spijlen'
-                ? `${gebouwd.spijlen.aantal} spijlen, `
-                  + `doorgang ${gebouwd.spijlen.doorgang.toFixed(1)} mm`
-            : eersteVeld.vulling === 'geen' ? 'geen vulling'
-            : eersteVeld.vulling === 'glasvrij'
-                ? `glas zonder staanders, ${gebouwd.velden.length} `
-                  + `${gebouwd.velden.length === 1 ? 'ruit' : 'ruiten'} van `
-                  + `${eersteVeld.glas.lengte.toFixed(0)}×${eersteVeld.glas.hoogte.toFixed(0)}`
-                  + `×${eersteVeld.glas.dikte} mm`
-            : eersteVeld.vulling === 'glas' && eersteVeld.glas
-                ? `glas ${eersteVeld.glas.lengte.toFixed(0)}×`
-                  + `${eersteVeld.glas.hoogte.toFixed(0)}×${eersteVeld.glas.dikte} mm`
-            : eersteVeld.liggend
-                ? `${eersteVeld.liggend.aantal} liggende regels, `
-                  + `opening ${eersteVeld.liggend.doorgang.toFixed(1)} mm`
-                : 'liggende regels';
+        const vullingTekst = vullingTekstVan(gebouwd);
         statusEl.textContent =
             `Balustrade ${maten.lengte}×${maten.hoogte} mm — ${vullingTekst}, ` +
             `${gebouwd.aantalDelen} delen. ` +
@@ -2838,10 +2847,13 @@ document.getElementById('instelLink').addEventListener('click', async () => {
 // begint vanaf de standaardmaten en zonder profielen of sierpunten, zodat er
 // van wat er stond niets achterblijft.
 
-export async function openVoorbeeld(id) {
-    const v = VOORBEELDEN.find(x => x.id === id);
-    if (!v) return;
-    if (startDialoog.open) startDialoog.close();
+/**
+ * Alles terug naar de standaard, met daaroverheen wat er gevraagd is. Zonder
+ * dit hield een voorbeeld de speerpunten, profielen en kleur van wat er
+ * daarvoor stond - een houten trap kreeg zo de smeedijzeren leuning van de
+ * vorige zin.
+ */
+async function zetStandaard(b = {}, t = {}, leuning = 'geen') {
     for (const o of ['staander', 'handregel', 'spijl', 'boom']) {
         profielen[o] = null;
         toonProfiel(o);
@@ -2850,13 +2862,19 @@ export async function openVoorbeeld(id) {
     spijlPuntKeuze = SIERPUNT_GEEN;
     toonSierpunt();
     toonSpijlPunt();
-    const balustrade = { ...STANDAARD, afwerking: '', metaal: 'staal', verzinken: false,
-                         ...(v.b || {}) };
+    const balustrade = { ...STANDAARD, afwerking: '', metaal: 'staal', verzinken: false, ...b };
     const trap = { ...TRAP_STANDAARD, soort: 'recht', draai: 'rechts', tredeMateriaal: 'staal',
                    boomMateriaal: 'staal',
-                   wandleuning: 'geen', stootborden: false, platen: false, ...(v.t || {}) };
+                   wandleuning: 'geen', stootborden: false, platen: false, ...t };
+    await pasInstellingenToe({ versie: INSTEL_VERSIE, balustrade, trap, leuning });
+}
+
+export async function openVoorbeeld(id) {
+    const v = VOORBEELDEN.find(x => x.id === id);
+    if (!v) return;
+    if (startDialoog.open) startDialoog.close();
     openGroep(v.wat === 'trap' ? 'Trap' : 'Balustrade');
-    await pasInstellingenToe({ versie: INSTEL_VERSIE, balustrade, trap, leuning: v.l || 'geen' });
+    await zetStandaard(v.b || {}, v.t || {}, v.l || 'geen');
     statusEl.textContent = `Voorbeeld "${v.naam}" — het model wordt opgebouwd…`;
     (v.wat === 'trap' ? trapKnop : genereerKnop).click();
 }
@@ -3086,7 +3104,9 @@ async function voerOpdrachtKern(tekst) {
             statusEl.textContent =
                 `Trap ${maten.hoogte} mm hoog — ${t.treden} treden, optrede `
                 + `${t.optrede.toFixed(1)} mm, aantrede ${t.aantrede.toFixed(1)} mm, `
-                + `aanzet ${Math.round(t.aanzet)} mm, ${t.helling.toFixed(1)}°.`;
+                + `aanzet ${Math.round(t.aanzet)} mm, ${t.helling.toFixed(1)}°`
+                + (gelezen.leuning && gelezen.leuning !== 'geen'
+                    ? `, leuning ${gelezen.leuning}.` : '.');
 
             schrijfChat('uit', `Klaar. ${t.treden} treden van ${t.optrede.toFixed(1)} mm, `
                 + `aanzet ${Math.round(t.aanzet)} mm — berekend uit de hoogte.`
@@ -3135,11 +3155,10 @@ async function voerOpdrachtKern(tekst) {
         toonStuklijst(gebouwd.stuklijst);
         toonOnderdelen(gebouwd.onderdelen, gebouwd.boom);
         zetRing(1);
+        const vulling = vullingTekstVan(gebouwd);
         statusEl.textContent =
-            `Balustrade ${maten.lengte}×${maten.hoogte} mm — ${gebouwd.spijlen.aantal} spijlen, `
-            + `doorgang ${gebouwd.spijlen.doorgang.toFixed(1)} mm, ${gebouwd.aantalDelen} delen.`;
-        schrijfChat('uit', `Klaar. ${gebouwd.spijlen.aantal} spijlen, `
-            + `doorgang ${gebouwd.spijlen.doorgang.toFixed(1)} mm — berekend, niet door mij verzonnen.`
+            `Balustrade ${maten.lengte}×${maten.hoogte} mm — ${vulling}, ${gebouwd.aantalDelen} delen.`;
+        schrijfChat('uit', `Klaar. ${ontsnap(vulling)} — berekend, niet door mij verzonnen.`
             + '<br>Stuklijst staat in het paneel.');
     } catch (err) {
         console.error(err);
@@ -3159,16 +3178,50 @@ chatInvoer.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('chatVerstuur').click();
 });
 
-schrijfChat('uit', 'Probeer bijvoorbeeld:<br>'
-    + '<code>maak een kubus van 300 mm</code><br>'
-    + '<code>blok van 300 bij 200 bij 150</code><br>'
-    + '<code>balustrade van 2,5 meter lang en 1 meter hoog</code><br>'
-    + '<code>trap van 3 meter hoog met leuning</code><br>'
-    + 'Er mag meer in één zin:<br>'
-    + '<code>balustrade van 3 meter lang, staanders CHS 48,3x3,2, '
-    + '90 graden na 1500 mm, 80 mm spijloverstek en een speerpunt '
-    + 'op de spijlen</code><br>'
-    + 'En daarna bijstellen met <code>maak hem 200 hoger</code>');
+/**
+ * De voorbeeldzinnen onder "Opdracht in woorden". Elk is een knop: één tik
+ * voert hem uit. Geëxporteerd, zodat de zelftest kan nagaan dat elke zin ook
+ * echt begrepen wordt - een voorbeeld dat een foutmelding geeft is erger dan
+ * geen voorbeeld.
+ */
+export const CHATVOORBEELDEN = [
+    'balustrade van 2,5 meter lang en 1 meter hoog',
+    'glazen balustrade zonder staanders van 5 meter, zwart',
+    'balustrade van 3 meter in rvs met glas',
+    'balustrade van 3 meter lang, staanders CHS 48,3x3,2, 90 graden na 1500 mm, '
+        + '80 mm spijloverstek en een speerpunt op de spijlen',
+    'trap van 3 meter hoog met eiken treden, houten trapbomen, een eiken '
+        + 'handregel en leuning rechts',
+    'kwartslagtrap naar rechts, 3 meter hoog, leuning rechts en wandleuning links',
+    'wenteltrap van 3 meter hoog, diameter 1800, wandleuning rechts',
+    'verzinkte trap van 3 meter hoog in antraciet met leuning links',
+];
+
+{
+    const regel = document.createElement('div');
+    regel.className = 'uit';
+    regel.append('Tik op een voorbeeld, of typ zelf:');
+    for (const zin of CHATVOORBEELDEN) {
+        const knop = document.createElement('button');
+        knop.type = 'button';
+        knop.className = 'chatVoorbeeld';
+        // Net als de voorbeeldkaarten geen instelling: de zoekbalk slaat ze
+        // daaraan over (zie zoeken.js).
+        knop.dataset.voorbeeld = 'zin';
+        knop.textContent = zin;
+        // Een voorbeeld begint schoon, en is geen vervolg op wat er stond.
+        knop.addEventListener('click', async () => {
+            await zetStandaard();
+            laatsteOpdracht = null;
+            voerOpdrachtUit(zin);
+        });
+        regel.append(knop);
+    }
+    const daarna = document.createElement('div');
+    daarna.innerHTML = 'En daarna bijstellen met <code>maak hem 200 hoger</code>.';
+    regel.append(daarna);
+    chatLog.appendChild(regel);
+}
 
 // --- het tekeningkader -----------------------------------------------------
 //
