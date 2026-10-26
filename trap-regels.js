@@ -45,21 +45,23 @@ const OMSCHRIJVING = {
 };
 
 export const HOOFDHOOGTE = regels.trap.hoofdhoogte;
+const GAT_SPELING = regels.trap.gatSpeling;
 
 /**
  * Hoe lang het trapgat in de bovenvloer moet zijn. Zie regels.json onder
  * _hoofdhoogte voor de formule en waar de 2300 vandaan komt.
  *
- * @returns { lengte, hoofdhoogte, rond } - `rond` bij een wenteltrap: dan is
- *          `lengte` de diameter van het gat.
+ * @returns { lengte, breedte, hoofdhoogte, rond } - `rond` bij een wenteltrap:
+ *          dan is `lengte` de diameter van het gat.
  */
 export function trapgat(t, p) {
     if (p.soort === 'wentel') {
-        return { lengte: p.diameter, hoofdhoogte: HOOFDHOOGTE, rond: true };
+        return { lengte: p.diameter, breedte: p.diameter, hoofdhoogte: HOOFDHOOGTE, rond: true };
     }
     const vloer = Number(p.vloerdikte) || 0;
     return {
         lengte: (vloer + HOOFDHOOGTE) * t.aantrede / t.optrede,
+        breedte: p.breedte + 2 * GAT_SPELING,
         hoofdhoogte: HOOFDHOOGTE,
         rond: false,
     };

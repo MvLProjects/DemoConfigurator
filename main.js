@@ -1593,7 +1593,7 @@ function werkTrapBij() {
     const gat = trapgat(t, maten);
     trapAfgeleid.trapgat.textContent = gat.rond
         ? `rond, Ø ${Math.round(gat.lengte)} mm`
-        : `${Math.round(gat.lengte)} mm lang`;
+        : `${Math.round(gat.lengte)} × ${Math.round(gat.breedte)} mm`;
 
     // Waarschuwingen zijn geen fouten: de trap mag wel, hij loopt alleen minder
     // prettig. Daarom geel en niet rood, en de knop blijft aan.
@@ -2313,7 +2313,7 @@ function offerteKeuzes() {
         const gat = trapgat(t, p);
         uit.push(['Trapgat in de vloer', gat.rond
             ? `rond, Ø ${Math.round(gat.lengte)} mm`
-            : `minstens ${Math.round(gat.lengte)} mm lang`]);
+            : `minstens ${Math.round(gat.lengte)} × ${Math.round(gat.breedte)} mm`]);
     }
     if (p.platen) uit.push(['Voet- en kopplaten', 'ja']);
     uit.push(['Materiaal', metaal]);
@@ -3869,7 +3869,66 @@ async function toonVorm(shape, naam, materialen = null, delen = null) {
     laatsteDelen = delen;
     laatsteNaam = naam;
     toonGeladen(await laadVorm(shape), naam, materialen);
+    toonVloer(naam);
     if (naam === 'trap' || naam === 'balustrade') onthoudOntwerp(naam);
+}
+
+// --- de bovenvloer met het trapgat ----------------------------------------
+//
+// Alleen in beeld, niet in het model: geen onderdeel, niet in de stuklijst,
+// niet aan te klikken. Wel op een plaatje van de knop Afbeelding - daar is
+// het juist voor: laten zien waar de trap uitkomt en hoe groot het gat in de
+// vloer wordt. Doorzichtig, zodat je de trap eronder blijft zien.
+//
+// Voorlopig bij een RECHTE trap (met of zonder bordes): daar ligt het gat
+// recht boven de bovenste vlucht. Bij een draaiende trap ligt het gat om een
+// hoek en bij een wenteltrap is het rond; die krijgen nog geen vloer.
+// `var` en geen `let`: het voorbeeld in het paneel wordt al tijdens het laden
+// getekend, en dan roept toonVoorbeeld dit aan voordat het script hier is.
+// Met `let` gaf dat een fout; met `var` is het dan gewoon nog leeg.
+var vloerRoot = null;
+document.getElementById('showVloer').addEventListener('change', (e) => {
+    if (vloerRoot) vloerRoot.visible = e.target.checked;
+});
+
+function toonVloer(naam) {
+    if (vloerRoot) {
+        scene.remove(vloerRoot);
+        vloerRoot.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+        vloerRoot = null;
+    }
+    if (naam !== 'trap') return;
+    const p = huidigeTrapMaten();
+    const d = Number(p.vloerdikte) || 0;
+    if ((p.soort || 'recht') !== 'recht' || !(d > 0)) return;
+
+    const t = berekenTrap(p);
+    const gat = trapgat(t, p);
+    const L = gat.lengte;
+    // hb is hier de halve breedte van het GAT: de trap plus de speling.
+    const H = p.hoogte, hb = gat.breedte / 2, rand = 600;
+    const x1 = t.aanzet, x0 = x1 - L;
+
+    vloerRoot = new THREE.Group();
+    vloerRoot.userData.vloer = true;
+    const stof = new THREE.MeshStandardMaterial({ color: 0xb9c0c7, roughness: 0.95,
+        transparent: true, opacity: 0.35, depthWrite: false });
+    const lijn = new THREE.LineBasicMaterial({ color: 0x7d8790 });
+    const plaat = (xa, xb, ya, yb) => {
+        const g = new THREE.BoxGeometry(xb - xa, yb - ya, d);
+        const m = new THREE.Mesh(g, stof);
+        m.position.set((xa + xb) / 2, (ya + yb) / 2, H - d / 2);
+        vloerRoot.add(m);
+        const r = new THREE.LineSegments(new THREE.EdgesGeometry(g), lijn);
+        r.position.copy(m.position);
+        vloerRoot.add(r);
+    };
+    plaat(x1, x1 + 2 * rand, -hb - rand, hb + rand);    // de overloop boven
+    plaat(x0 - rand, x0, -hb - rand, hb + rand);        // voor het gat
+    plaat(x0, x1, -hb - rand, -hb);                     // naast het gat
+    plaat(x0, x1, hb, hb + rand);
+    vloerRoot.visible = document.getElementById('showVloer').checked;
+    scene.add(vloerRoot);
 }
 // 'trap' of 'balustrade': wat er het laatst gebouwd is. Zie standaardOmschrijving.
 let laatsteNaam = null;
@@ -3942,6 +4001,8 @@ document.addEventListener('keydown', (e) => {
  */
 let voorbeeldMaat = 0;
 function toonVoorbeeld(delen, naam) {
+    // De vloer van een vorige bouw klopt niet meer bij dit voorbeeld.
+    toonVloer(null);
     clearSelection();
     clearEdgeSelection();
     toonStuklijst(null);

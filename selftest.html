@@ -11245,6 +11245,8 @@ try {
         check('standaardtrap van 3 m, vloer 250: trapgat 3196 mm',
             Math.abs(bjGat.lengte - 3196) < 0.5 && bjGat.hoofdhoogte === 2300 && !bjGat.rond,
             bjGat.lengte.toFixed(1));
+        check('het gat is de trap plus 100 mm aan elke kant breed, voor de leuning',
+            bjGat.breedte === bjP.breedte + 200, bjGat.breedte);
         check('een dikkere vloer vraagt een langer gat',
             tr.trapgat(bjT, { ...bjP, vloerdikte: 400 }).lengte > bjGat.lengte);
         const bjZin = await win.eval("import('/command-parser.js')");
@@ -11281,7 +11283,7 @@ try {
             /mm hoog|Balustrade \d/.test(bjSt.textContent) && errors.length === bjVoor,
             bjSt.textContent.slice(0, 80) + ' ' + errors.slice(bjVoor).join(' | '));
         check('het paneel toont het trapgat',
-            /^\d+ mm lang$|^rond/.test(doc.getElementById('t_a_trapgat').textContent),
+            /^\d+ × \d+ mm$|^rond/.test(doc.getElementById('t_a_trapgat').textContent),
             doc.getElementById('t_a_trapgat').textContent);
     }
 

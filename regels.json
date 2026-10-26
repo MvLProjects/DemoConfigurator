@@ -78,9 +78,13 @@
       "lang zijn, gemeten vanaf de rand van de bovenvloer: zover terug ligt de",
       "neuzenlijn nog hoger dan de onderkant van de vloer min de hoofdhoogte.",
       "Een wenteltrap draait onder zichzelf door en krijgt een rond gat zo groot",
-      "als de trap."
+      "als de trap.",
+      "",
+      "DE BREEDTE is de trap plus aan elke kant 100 mm speling: de leuning staat",
+      "net buiten de trap en moet er vrij doorheen. Ook een keuze, geen norm."
     ],
     "hoofdhoogte": 2300,
+    "gatSpeling": 100,
     "_onderdelen": [
       "De losse onderdelen van een trap die geen trede of boom zijn. Alle maten",
       "zijn AANNAMES om mee te beginnen - gangbaar in de werkplaats, maar niet",
