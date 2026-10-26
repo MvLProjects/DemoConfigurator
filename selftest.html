@@ -957,15 +957,23 @@ try {
         Math.abs(hoekL[0].inzetNaarVolgende - w / 2) < 1e-9,
         hoekL[0].inzetNaarVolgende.toFixed(4));
 
-    // In een hoek van 90 graden loop je schuin door het vierkant: w/2 * sqrt(2).
-    const verwachtHoek = (w / 2) * Math.SQRT2;
-    check('hoek van 90°: inzet is w/2·√2 = 28,284 mm',
+    // In een HAAKSE hoek staat de paal recht, gelijk met de randen: dan is
+    // de inzet naar beide kanten gewoon w/2, en valt hij precies onder de
+    // verstekhoek van de handregel. (Hiervoor stond hij in de deelhoek en was
+    // het w/2·√2 - en stak zijn punt 8,3 mm buiten die verstekhoek.)
+    const verwachtHoek = w / 2;
+    check('haakse hoek: de paal staat recht, inzet w/2 = 20 mm',
         Math.abs(hoekL[1].inzetNaarVolgende - verwachtHoek) < 1e-9,
         `${hoekL[1].inzetNaarVolgende.toFixed(4)} (verwacht ${verwachtHoek.toFixed(4)})`);
     check('in een hoek is de inzet naar beide kanten gelijk',
         Math.abs(hoekL[1].inzetNaarVolgende - hoekL[1].inzetNaarVorige) < 1e-9);
-    check('een hoek kost meer dan een recht stuk',
-        hoekL[1].inzetNaarVolgende > hoekL[0].inzetNaarVolgende);
+    // Bij elke andere hoek blijft hij in de deelhoek, en kost een hoek meer
+    // dan een recht stuk: bij 135 graden w/2 / cos(22,5°).
+    const schuineHoek = pad.staanderGegevens([[0, 0, 0], [2000, 0, 0], [3000, 1000, 0]], false, w);
+    check('een schuine hoek (135°) staat in de deelhoek en kost meer dan een recht stuk',
+        Math.abs(schuineHoek[1].inzetNaarVolgende - (w / 2) / Math.cos(Math.PI / 8)) < 1e-9
+        && schuineHoek[1].inzetNaarVolgende > hoekL[0].inzetNaarVolgende,
+        schuineHoek[1].inzetNaarVolgende.toFixed(4));
 
     // Twee randen in elkaars verlengde zijn geen hoek: dan gewoon w/2.
     const recht = pad.maakPad([R(0, 0, 0, 1000, 0, 0), R(1000, 0, 0, 2500, 0, 0)]);
@@ -1030,7 +1038,7 @@ try {
     check('twee velden', resultaatL.velden.length === 2);
 
     // Beide velden hebben aan de ene kant een uiteinde (w/2 eraf) en aan de
-    // andere kant de hoek (w/2·√2 eraf). Welk veld als eerste komt hangt af van
+    // andere kant de haakse hoek (sinds de paal daar recht staat ook w/2). Welk veld als eerste komt hangt af van
     // waar het pad begint, en dat hangt weer af van de klikvolgorde - dus we
     // vergelijken de verzameling lengtes, niet de volgorde.
     const gemeten = resultaatL.velden.map(v => +v.vrijeLengte.toFixed(6)).sort((a, b) => a - b);

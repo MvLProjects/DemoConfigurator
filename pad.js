@@ -211,7 +211,8 @@ export function maakPad(randen, tolerantie = 0.05) {
  * aanliggende randen.
  *
  * In een hoek staat de staander in de DEELHOEK, zodat beide velden er
- * symmetrisch op aansluiten. De afstand van het hart tot het punt waar je de
+ * symmetrisch op aansluiten - behalve in een haakse hoek, zie hieronder. De
+ * afstand van het hart tot het punt waar je de
  * staander verlaat, gemeten langs een rand, is dan niet zomaar w/2:
  *
  *        rand
@@ -246,19 +247,35 @@ export function staanderGegevens(punten, gesloten, breedte) {
         // De deelhoek. Aan een uiteinde is er maar één rand, dan volgt de
         // staander die rand. Liggen twee randen in elkaars verlengde, dan
         // heffen ze elkaar op en nemen we ook gewoon de rand.
-        let deelhoek;
+        //
+        // BIJ EEN HAAKSE HOEK STAAT HIJ RECHT, gelijk met de randen. In de
+        // deelhoek stond een vierkante paal daar 45 graden gedraaid, en dan
+        // steekt zijn punt 8,3 mm (bij 40 mm) buiten de verstekhoek van de
+        // handregel - de keuring meldde dat bij elke haakse hoek, terecht.
+        // Recht valt hij precies onder het vierkant van die verstekhoek, en
+        // sluiten beide velden haaks op een vlak van de paal aan. Bij elke
+        // andere hoek past een vierkant nergens precies; daar blijft de
+        // deelhoek, zodat beide velden even schuin aansluiten.
+        // `deellijn` is de echte deelhoek, ook in een haakse hoek: daar raken
+        // twee ruiten elkaar, hoe de paal ook staat. Zie het glas verderop.
+        let deelhoek, deellijn;
         if (naarVolgende && naarVorige) {
             const som = plus(naarVolgende, naarVorige);
-            deelhoek = lengte(som) > 1e-6 ? eenheid(som) : naarVolgende;
+            const haaks = Math.abs(punt(naarVolgende, naarVorige)) < 0.01;
+            deellijn = lengte(som) > 1e-6 ? eenheid(som) : naarVolgende;
+            deelhoek = haaks ? naarVolgende : deellijn;
         } else {
-            deelhoek = naarVolgende || naarVorige;
+            deelhoek = deellijn = naarVolgende || naarVorige;
         }
 
         const dwars = eenheid(kruis(omhoog, deelhoek));
+        const dwarsLijn = eenheid(kruis(omhoog, deellijn));
 
-        const inzetLangs = (richting) => richting === null ? 0
-            : (breedte / 2) / Math.max(Math.abs(punt(richting, deelhoek)),
-                                       Math.abs(punt(richting, dwars)));
+        const inzetVoor = (as, dw) => (richting) => richting === null ? 0
+            : (breedte / 2) / Math.max(Math.abs(punt(richting, as)),
+                                       Math.abs(punt(richting, dw)));
+        const inzetLangs = inzetVoor(deelhoek, dwars);
+        const inzetLijn = inzetVoor(deellijn, dwarsLijn);
 
         return {
             positie: V,
@@ -272,6 +289,11 @@ export function staanderGegevens(punten, gesloten, breedte) {
             naarVorige,
             inzetNaarVolgende: inzetLangs(naarVolgende),
             inzetNaarVorige: inzetLangs(naarVorige),
+            // Hoe het zou zijn met de paal in de deelhoek. Alleen het glas
+            // gebruikt dit; zie `terug` daar.
+            deellijn,
+            extraNaarVolgende: inzetLijn(naarVolgende) - inzetLangs(naarVolgende),
+            extraNaarVorige: inzetLijn(naarVorige) - inzetLangs(naarVorige),
         };
     });
 }
@@ -1764,14 +1786,22 @@ export function padDelen(punten, gesloten, p) {
             // deelhoek) - bij 90 graden is die hoek 45 en dus precies
             // glasVanaf, en aan een vrij uiteinde is hij 0 en verandert er
             // niets.
+            //
+            // DE DEELLIJN, NIET DE PAAL. Sinds een paal in een haakse hoek
+            // recht staat, is zijn stand niet meer het vlak waar twee ruiten
+            // elkaar raken; dat blijft de deelhoek. En de paal kost daar minder
+            // ruimte dan een gedraaide, dus komt dat verschil (`extra…`) er
+            // ook bij: zo ligt het glas precies waar het lag, zonder overlap.
             const terug = (staander, richting) => {
                 if (!staander || !richting) return 0;
-                const c = Math.abs(punt(richting, staander.deelhoek));
+                const c = Math.abs(punt(richting, staander.deellijn));
                 if (!(c > 1e-9)) return 0;
                 return glasVanaf * Math.sqrt(Math.max(0, 1 - c * c)) / c;
             };
-            const terugA = terug(staanders[a], staanders[a].naarVorige);
-            const terugB = terug(staanders[b], staanders[b].naarVolgende);
+            const terugA = terug(staanders[a], staanders[a].naarVorige)
+                + staanders[a].extraNaarVolgende;
+            const terugB = terug(staanders[b], staanders[b].naarVolgende)
+                + staanders[b].extraNaarVorige;
             const ruitLengte = v.vrijeLengte / v.cos
                 - 2 * GLAS.speling - terugA - terugB;
 
