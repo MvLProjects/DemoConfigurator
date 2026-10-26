@@ -666,6 +666,9 @@ const MATERIAAL = '(traanplaat|roosters?|grating|glazen|glas|natuurstenen|natuur
 const TREDE_VOOR = new RegExp(`\\b${MATERIAAL}\\s?-?\\s?(?:trede|treden)\\b`
     + `(?:\\s+(?:van\\s+)?${NUM}\\s*dik\\w*)?`, 'gi');
 // "treden van eiken", "treden uit beton".
+// "houten trapbomen", "eiken bomen", "trapbomen van hout". Alleen met het
+// woord boom of wang erbij: "eiken treden" gaat over de treden.
+const BOOMHOUT = /\b(?:(houten|eiken|beuken|vuren|merbau)\s+(?:trap)?(?:bomen|boom|wangen)|(?:trap)?(?:bomen|boom|wangen)\s+(?:van|in|uit)\s+(hout|eiken|beuken|vuren|merbau))\b/gi;
 const TREDE_NA = new RegExp(`\\b(?:trede|treden)\\s+(?:van|in|uit)\\s+(?:een\\s+|het\\s+)?`
     + `${MATERIAAL}\\b`, 'gi');
 const TREDEDIKTE = [
@@ -732,6 +735,14 @@ function leesTrapExtras(tekst) {
     }
     if (maten.diameter !== undefined) gevonden.push(`diameter ${maten.diameter} mm`);
 
+    // De trapbomen van hout. VOOR de treden, zodat "eiken trapbomen" niet als
+    // eiken treden gelezen wordt.
+    let boomWoord;
+    for (const m of [...rest.matchAll(BOOMHOUT)]) {
+        boomWoord = (m[1] || m[2]).toLowerCase();
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+
     // De treden.
     let materiaalWoord, dikte;
     for (const re of [TREDE_VOOR, TREDE_NA]) {
@@ -761,6 +772,14 @@ function leesTrapExtras(tekst) {
     if (dikte !== undefined) {
         maten.tredeDikte = dikte;
         gevonden.push(`trededikte ${dikte} mm`);
+    }
+    // "Houten" zonder soort: dan dezelfde houtsoort als de treden, en anders
+    // eiken.
+    if (boomWoord !== undefined) {
+        const houtTrede = ['eiken', 'beuken', 'vuren', 'merbau'].includes(keuzes.tredeMateriaal)
+            ? keuzes.tredeMateriaal : 'eiken';
+        keuzes.boomMateriaal = /^hout/.test(boomWoord) ? houtTrede : boomWoord;
+        gevonden.push(`trapbomen van ${keuzes.boomMateriaal}`);
     }
 
     // Het bordes. EERST de lengte, en daarbij blijft het woord "bordes" staan:
@@ -1063,6 +1082,7 @@ export function parseer(invoer, vorige = null, opties = {}) {
                     soort: keuzes.soort || 'recht',
                     draai: keuzes.draai || 'rechts',
                     tredeMateriaal: keuzes.tredeMateriaal || 'staal',
+                    boomMateriaal: keuzes.boomMateriaal || 'staal',
                     stootborden: Boolean(keuzes.stootborden),
                     platen: Boolean(keuzes.platen),
                     wandleuning,

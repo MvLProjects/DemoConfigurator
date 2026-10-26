@@ -89,6 +89,14 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
               bordesNa: p.bordesNa > 0 ? p.bordesNa
                   : Math.round(berekenTrap({ hoogte: p.hoogte }).optreden / 2) };
     }
+    // HOUTEN TRAPBOMEN: dikke planken waar de treden in een sleuf in liggen.
+    // Hun maten komen uit regels.json en niet uit de velden voor een stalen
+    // plaat, en een gekozen profiel telt dan niet. Zie controleerHoutBoom.
+    const houtBoom = isHout(p.boomMateriaal);
+    const HB = ONDERDELEN.houtenBoom;
+    if (houtBoom) p = { ...p, boomProfiel: null, boomDikte: HB.dikte, boomHoogte: HB.hoogte };
+    const inlaat = houtBoom ? HB.inlaat : 0;
+
     const t = berekenTrap(p);
     if (draaiend && !t.bordes) {
         throw new Error(`Een ${soort}trap draait op een bordes, en daarvoor is deze `
@@ -114,6 +122,8 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
     // de kostenraming in en niet de zaaglijst. Zie treden.js.
     const tredeMateriaal = p.tredeMateriaal || 'staal';
     const tredeSoort = tredeSoortVan(tredeMateriaal);
+    // In een houten boom ligt de trede in een sleuf; dan geen steunhoeken.
+    const opHoeken = tredeSoort.opHoeken && !houtBoom;
     const tredeBestel = tredeSoort.besteld ? {
         besteld: true,
         bestelSoort: 'trede:' + (isHout(tredeMateriaal) ? 'hout' : tredeMateriaal),
@@ -249,26 +259,32 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
     const vlucht = (x0, z0, m, bijBordes = null) => {
         const onderVloer = bijBordes !== 'onder';
         const bovenVloer = bijBordes !== 'boven';
+        // De treden in het zijaanzicht, als [x van, z van, x tot, z tot]: daar
+        // komen bij een houten boom de sleuven.
+        const sleuven = [];
         for (let k = 1; k <= m; k++) {
             const xVoor = x0 + (k - 1) * t.aantrede;      // neus zonder overstek
             const zBoven = z0 + k * t.optrede;            // bovenkant trede
-            if (tredeSoort.opHoeken) {
+            if (opHoeken) {
                 hoeken(xVoor, xVoor + t.aantrede, zBoven - p.tredeDikte);
             }
             if (p.stootborden) {
                 stootbord(xVoor, z0 + (k - 1) * t.optrede,
                     p.tredeOverstek > 0 ? zBoven - p.tredeDikte : zBoven);
             }
+            sleuven.push([xVoor - p.tredeOverstek, zBoven - p.tredeDikte,
+                          xVoor + t.aantrede, zBoven]);
             delen.push({
                 soort: 'trede',
                 oorsprong: [
                     x0 + (k - 1) * t.aantrede - p.tredeOverstek,
-                    -binnen,
+                    -binnen - inlaat,
                     z0 + k * t.optrede - p.tredeDikte,
                 ],
                 xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
                 dx: t.aantrede + p.tredeOverstek,
-                dy: 2 * binnen,
+                // In een houten boom aan elke kant een inlaat breder.
+                dy: 2 * binnen + 2 * inlaat,
                 dz: p.tredeDikte,
                 // Een trede is een plank, dus hier mag hout. Zie materialen.js.
                 materiaal: tredeMateriaal,
@@ -416,9 +432,22 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
                 // Voor de stuklijst: de maat van het ruwe plat staal waar hij
                 // uit gezaagd wordt. Dat is wat je bestelt.
                 dx: ruw, dy: p.boomDikte, dz: p.boomHoogte,
+                ...houtBoomDeel(y, sleuven),
             });
         }
     };
+
+    /**
+     * Wat een plaatboom van HOUT extra heeft: zijn houtsoort, dat hij besteld
+     * wordt bij de timmerman, en de sleuven waar de treden in liggen. De
+     * sleuf zit aan de BINNENkant: bij de linker boom (y = -halve breedte) is
+     * dat de kant van zijn grootste y, bij de rechter de kleinste.
+     */
+    const houtBoomDeel = (y, sleuven) => (houtBoom ? {
+        materiaal: p.boomMateriaal, besteld: true, bestelSoort: 'trapboom:hout',
+        sleuven, sleufDiepte: inlaat, sleufSpeling: HB.speling,
+        sleufBinnen: y < 0 ? 'max' : 'min',
+    } : {});
 
     // De ruimte tussen de twee vluchten van een halfslagtrap. Zie regels.json.
     const oog = O.halfslag.oog;
@@ -456,7 +485,7 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
             materiaal: tredeMateriaal,
             ...tredeBestel,
         });
-        if (tredeSoort.opHoeken) {
+        if (opHoeken) {
             hoeken(L1, L1 + B - tb, bZ - p.tredeDikte,
                 halfslag ? [[yA, -s], [yC, s]] : [[yA, -s]]);
         }
@@ -506,16 +535,16 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
         } else {
             delen.push({
                 soort: 'bordes',
-                oorsprong: [bordesX, -binnen, bordesZ - p.tredeDikte],
+                oorsprong: [bordesX, -binnen - inlaat, bordesZ - p.tredeDikte],
                 xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
-                dx: t.bordes.lengte, dy: 2 * binnen, dz: p.tredeDikte,
+                dx: t.bordes.lengte, dy: 2 * binnen + 2 * inlaat, dz: p.tredeDikte,
                 // Het bordes is net zo goed een plank als een trede, en je
                 // maakt hem van hetzelfde materiaal - anders staat er een
                 // stalen vlak midden in een houten trap.
                 materiaal: tredeMateriaal,
                 ...tredeBestel,
             });
-            if (tredeSoort.opHoeken) {
+            if (opHoeken) {
                 hoeken(bordesX, bordesX + t.bordes.lengte, bordesZ - p.tredeDikte);
             }
 
@@ -542,6 +571,21 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
                 }
             }
             for (const y of boomDoos ? [] : [-halveBreedte, halveBreedte - p.boomDikte]) {
+                if (houtBoom) {
+                    // Hout: een plank met een sleuf over de hele lengte, waar
+                    // het bordes in ligt. Als plaat met een omtrek, zodat de
+                    // sleuf er net zo in komt als bij de trapbomen.
+                    const [xa, xb] = [bordesX, bordesX + t.bordes.lengte];
+                    delen.push({
+                        soort: 'bordesboom',
+                        omtrek: [[xa, bordesZ - p.boomHoogte], [xb, bordesZ - p.boomHoogte],
+                                 [xb, bordesZ], [xa, bordesZ]],
+                        y, dikte: p.boomDikte,
+                        dx: t.bordes.lengte, dy: p.boomDikte, dz: p.boomHoogte,
+                        ...houtBoomDeel(y, [[xa, bordesZ - p.tredeDikte, xb, bordesZ]]),
+                    });
+                    continue;
+                }
                 delen.push({
                     soort: 'bordesboom',
                     oorsprong: [bordesX, y, bordesZ - p.boomHoogte],
@@ -701,6 +745,23 @@ export function wentelMaten(p) {
 }
 
 /** Fouten in een wenteltrap, als lijst meldingen; leeg is goed. */
+/**
+ * Kan deze trap houten bomen krijgen? Zie regels.json onder _houtenBoom.
+ */
+export function controleerHoutBoom(p) {
+    if (!isHout(p.boomMateriaal)) return [];
+    const fouten = [];
+    if ((p.soort || 'recht') !== 'recht') {
+        fouten.push('Houten trapbomen kan de app nu alleen bij een rechte trap maken, '
+            + 'met of zonder bordes. Kies een stalen boom of een rechte trap.');
+    }
+    if (p.platen) {
+        fouten.push('Voet- en kopplaten zijn er voor stalen trapbomen. Zet ze uit bij '
+            + 'een houten boom.');
+    }
+    return fouten;
+}
+
 export function controleerWentel(p) {
     if (p.soort !== 'wentel') return [];
     const W = ONDERDELEN.wentel;
@@ -1090,7 +1151,24 @@ function maakPlaat(oc, d, opruimen) {
     const vlak = new oc.BRepBuilderAPI_MakeFace_15(lijn.Wire(), true);
     const richting = new oc.gp_Vec_4(0, d.dikte, 0);
     const prisma = new oc.BRepPrimAPI_MakePrism_1(vlak.Shape(), richting, false, true);
-    const lokaal = eigenVorm(oc, prisma.Shape());
+
+    // DE SLEUVEN van een houten boom: per trede een blok uit de binnenkant,
+    // een speling ruimer dan de trede en een millimeter voorbij het vlak, zodat
+    // er geen vlak precies op een vlak van de plaat valt.
+    let vorm = prisma.Shape();
+    for (const [xa, za, xb, zb] of d.sleuven || []) {
+        const sp = d.sleufSpeling || 0;
+        const y0 = d.sleufBinnen === 'max' ? d.dikte - d.sleufDiepte : -1;
+        const hoek = new oc.gp_Pnt_3(xa - x0 - sp, y0, za - z0 - sp);
+        const blok = new oc.BRepPrimAPI_MakeBox_3(hoek, xb - xa + 2 * sp,
+            d.sleufDiepte + 1, zb - za + 2 * sp);
+        const snede = new oc.BRepAlgoAPI_Cut_3(vorm, blok.Shape(),
+            new oc.Message_ProgressRange_1());
+        snede.Build(new oc.Message_ProgressRange_1());
+        vorm = snede.Shape();
+        opruimen.push(hoek, blok, snede);
+    }
+    const lokaal = eigenVorm(oc, vorm);
 
     // Een plaat ligt al in het goede vlak en wordt alleen verschoven - tenzij
     // hij bij een vlucht hoort die gedraaid op zijn plek staat, zie
@@ -1102,7 +1180,7 @@ function maakPlaat(oc, d, opruimen) {
     tr.SetValues(ex[0], ey[0], 0, t0[0],
                  ex[1], ey[1], 0, t0[1],
                  0,     0,     1, t0[2]);
-    const verplaatser = new oc.BRepBuilderAPI_Transform_2(prisma.Shape(), tr, true);
+    const verplaatser = new oc.BRepBuilderAPI_Transform_2(vorm, tr, true);
 
     opruimen.push(lijn, vlak, richting, prisma, tr, verplaatser);
     return { geplaatst: verplaatser.Shape(), lokaal };
@@ -1179,7 +1257,8 @@ function maakPrisma(oc, d, opruimen) {
  */
 export async function bouwTrap(p, balustradeMaten = null, leuning = 'geen',
                                bestaandeShape = null) {
-    const fouten = [...valideer(p), ...controleerBordes(p), ...controleerWentel(p)];
+    const fouten = [...valideer(p), ...controleerBordes(p), ...controleerWentel(p),
+                    ...controleerHoutBoom(p)];
     if (fouten.length) throw new Error('Ongeldige maten:\n- ' + fouten.join('\n- '));
 
     // DE LEUNING WORDT NET ZO STRENG GEKEURD ALS EEN LOSSE BALUSTRADE. Dat

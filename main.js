@@ -16,7 +16,8 @@ import { bouwBalustrade, bouwBlok, bouwBalustradeOpRanden, beoordeelRanden,
     voorspelBalustrade } from './build-balustrade.js';
 import { STANDAARD, valideer, VULLING, GLAS, GLASVRIJ, vullingSoort } from './balustrade-rules.js';
 import { parseer, noemtProfiel } from './command-parser.js';
-import { bouwTrap, trapDelen, wandleuningFout, controleerWentel } from './build-trap.js';
+import { bouwTrap, trapDelen, wandleuningFout, controleerWentel,
+         controleerHoutBoom } from './build-trap.js';
 import { maakVoorbeeld, ruimVoorbeeldOp } from './preview.js';
 import { TREDESOORTEN, tredeSoortVan } from './treden.js';
 import { maakOfferte } from './offerte.js';
@@ -1514,7 +1515,9 @@ document.getElementById('t_leuning').addEventListener('change', trapGewijzigd);
 const wandleuningEl = document.getElementById('t_wandleuning');
 const stootbordenEl = document.getElementById('t_stootborden');
 const platenEl = document.getElementById('t_platen');
-for (const el of [wandleuningEl, stootbordenEl, platenEl,
+// Waar de trapbomen van zijn: staal (plaat of profiel) of een houtsoort.
+const boomMateriaalEl = document.getElementById('t_boomMateriaal');
+for (const el of [wandleuningEl, stootbordenEl, platenEl, boomMateriaalEl,
                   document.getElementById('t_soort'), document.getElementById('t_draai')]) {
     el.addEventListener('change', trapGewijzigd);
 }
@@ -1542,6 +1545,7 @@ function huidigeTrapMaten() {
         wandleuning: wandleuningEl.value,
         stootborden: stootbordenEl.checked,
         platen: platenEl.checked,
+        boomMateriaal: boomMateriaalEl.value,
     };
 }
 
@@ -1550,7 +1554,7 @@ function werkTrapBij() {
     // Of een bordes kan hangt af van het AANTAL optreden, en dat volgt pas uit
     // de hoogte. Die controle staat daarom los van de gewone grenzen.
     const fouten = [...valideerTrap(maten), ...controleerBordes(maten),
-                    ...controleerWentel(maten)];
+                    ...controleerWentel(maten), ...controleerHoutBoom(maten)];
     const wandFout = wandleuningFout(maten.wandleuning,
         document.getElementById('t_leuning').value, maten.soort);
     if (wandFout) fouten.push(wandFout);
@@ -2277,7 +2281,9 @@ function offerteKeuzes() {
         ['Treden van', `${tredeSoortVan(p.tredeMateriaal).naam}, ${p.tredeDikte} mm`],
     ];
     if (p.soort !== 'wentel') {
-        uit.push(['Trapbomen', p.boomProfiel ? profielNaam(p.boomProfiel)
+        uit.push(['Trapbomen', p.boomMateriaal && p.boomMateriaal !== 'staal'
+            ? `${materiaalNaam(p.boomMateriaal).toLowerCase()} 60 × 300 mm, treden ingelaten`
+            : p.boomProfiel ? profielNaam(p.boomProfiel)
             : `plaat ${p.boomDikte} × ${p.boomHoogte} mm`]);
     }
     if (p.bordesNa > 0 || p.soort === 'kwartslag' || p.soort === 'halfslag') {
@@ -2654,6 +2660,7 @@ async function pasInstellingenToe(inhoud) {
         wandleuningEl.value = inhoud.trap.wandleuning || 'geen';
         stootbordenEl.checked = Boolean(inhoud.trap.stootborden);
         platenEl.checked = Boolean(inhoud.trap.platen);
+        boomMateriaalEl.value = inhoud.trap.boomMateriaal || 'staal';
     }
     // De afwerking staat in allebei de maatsets, want het is één keuze voor
     // het hele werk. De balustrade is de bron; leeg betekent blank.
@@ -2846,6 +2853,7 @@ export async function openVoorbeeld(id) {
     const balustrade = { ...STANDAARD, afwerking: '', metaal: 'staal', verzinken: false,
                          ...(v.b || {}) };
     const trap = { ...TRAP_STANDAARD, soort: 'recht', draai: 'rechts', tredeMateriaal: 'staal',
+                   boomMateriaal: 'staal',
                    wandleuning: 'geen', stootborden: false, platen: false, ...(v.t || {}) };
     openGroep(v.wat === 'trap' ? 'Trap' : 'Balustrade');
     await pasInstellingenToe({ versie: INSTEL_VERSIE, balustrade, trap, leuning: v.l || 'geen' });
@@ -3031,6 +3039,7 @@ async function voerOpdrachtKern(tekst) {
             if (p.tredeMateriaal !== undefined) tredeMateriaalEl.value = p.tredeMateriaal;
             if (p.stootborden !== undefined) stootbordenEl.checked = p.stootborden;
             if (p.platen !== undefined) platenEl.checked = p.platen;
+            if (p.boomMateriaal !== undefined) boomMateriaalEl.value = p.boomMateriaal;
             if (p.wandleuning !== undefined) wandleuningEl.value = p.wandleuning;
             if (p.soort !== undefined) document.getElementById('t_soort').value = p.soort;
             if (p.draai !== undefined) document.getElementById('t_draai').value = p.draai;

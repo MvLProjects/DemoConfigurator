@@ -11015,6 +11015,57 @@ try {
             errors.length === beVoor, errors.slice(beVoor).join(' | '));
     }
 
+    // ============ DEEL BF: houten trapbomen ================================
+    log('\n\n======== DEEL BF: houten trapbomen ========\n');
+    {
+        const bfVoor = errors.length;
+        const bfP = { ...trapRegels.STANDAARD, soort: 'recht', tredeMateriaal: 'eiken',
+                      tredeDikte: 40, boomMateriaal: 'eiken', stootborden: true };
+        const bfBal = { ...regelsNu.STANDAARD };
+
+        log('--- 1. de opbouw ---');
+        const { delen: bfD, trap: bfT } = trapBouw.trapDelen(bfP);
+        const bfBomen = bfD.filter(d => d.soort === 'trapboom');
+        check('twee eiken bomen van 60 dik, besteld bij de timmerman',
+            bfBomen.length === 2 && bfBomen.every(b => b.materiaal === 'eiken'
+                && b.dikte === 60 && b.besteld && b.bestelSoort === 'trapboom:hout'));
+        check('in elke boom een sleuf per trede, aan de binnenkant',
+            bfBomen.every(b => b.sleuven.length === bfT.treden)
+            && bfBomen.map(b => b.sleufBinnen).sort().join(',') === 'max,min');
+        const bfTrede = bfD.find(d => d.soort === 'trede');
+        check('de trede is aan elke kant 15 mm breder: hij ligt in de sleuf',
+            Math.abs(bfTrede.dy - (bfP.breedte - 2 * 60 + 2 * 15)) < 1e-9, bfTrede.dy);
+        check('en er zijn geen stalen steunhoeken',
+            !bfD.some(d => d.soort === 'tredehoek'));
+        check('de stuklijst noemt de boom eiken',
+            ond.beschrijf(bfBomen[0]).materiaal === 'Eiken', ond.beschrijf(bfBomen[0]).materiaal);
+
+        log('\n--- 2. nergens hout op twee plekken ---');
+        adMeet('houten bomen + leuning', await trapBouw.bouwTrap(bfP, bfBal, 'rechts'));
+        adMeet('houten bomen + bordes', await trapBouw.bouwTrap(
+            { ...bfP, bordesNa: 7, bordesLengte: 1000 }, bfBal, 'rechts'));
+
+        log('\n--- 3. waar het (nog) niet kan ---');
+        const bfFout = (extra) => trapBouw.controleerHoutBoom({ ...bfP, ...extra }).join(' ');
+        check('een kwartslagtrap met houten bomen wordt geweigerd',
+            /alleen bij een rechte trap/.test(bfFout({ soort: 'kwartslag' })), bfFout({ soort: 'kwartslag' }));
+        check('en voet- en kopplaten ook', /stalen trapbomen/.test(bfFout({ platen: true })));
+        check('een stalen boom heeft er geen last van',
+            trapBouw.controleerHoutBoom({ ...bfP, boomMateriaal: 'staal', soort: 'halfslag' }).length === 0);
+
+        log('\n--- 4. kosten en woorden ---');
+        const bfH = ks.hoeveelheden((await trapBouw.bouwTrap(bfP)).onderdelen);
+        check('de bomen staan als bestelde post, niet als staal',
+            bfH.besteld['trapboom:hout'] === 2, JSON.stringify(bfH.besteld));
+        const bfZin = await win.eval("import('/command-parser.js')");
+        const bfA = bfZin.parseer('trap van 3 meter hoog met eiken treden en houten trapbomen', null, {});
+        check('"eiken treden en houten trapbomen": allebei eiken',
+            bfA.actie === 'trap' && bfA.params.tredeMateriaal === 'eiken'
+            && bfA.params.boomMateriaal === 'eiken', bfA.fout || bfA.uitleg);
+        check('houten trapbomen geven geen fout in de console',
+            errors.length === bfVoor, errors.slice(bfVoor).join(' | '));
+    }
+
     log('\n' + (failures === 0
         ? '*** ALLE CONTROLES GESLAAGD ***'
         : `*** ${failures} CONTROLE(S) MISLUKT ***`));

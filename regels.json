@@ -100,8 +100,24 @@
                        "houderAfstand": 1000, "rozet": 70, "rozetDikte": 6, "arm": 12 },
       "halfslag":    { "oog": 350 },
       "wentel":      { "spilDiameter": 168.3, "spilWand": 5, "minDoorloop": 2100,
-                       "leuningInspring": 15 }
+                       "leuningInspring": 15 },
+      "houtenBoom":  { "dikte": 60, "hoogte": 300, "inlaat": 15, "speling": 0.5 }
     },
+    "_houtenBoom": [
+      "EEN HOUTEN TRAPBOOM (wang) is een plank van 60 x 300 waar de treden in",
+      "liggen: in elke boom wordt een sleuf gefreesd van 15 mm diep, en de",
+      "trede is aan elke kant zoveel breder. Zo wordt een houten trap gemaakt;",
+      "stalen steunhoeken horen daar niet bij.",
+      "",
+      "60 x 300 is gangbaar voor een woningtrap tot een meter breed; 15 mm",
+      "inlaat ook. De sleuf is 0,5 mm ruimer dan de trede, zodat de trede er",
+      "in past en er in de tekening geen hout op twee plekken zit.",
+      "",
+      "VOORLOPIG ALLEEN EEN RECHTE TRAP, met of zonder bordes. Bij een",
+      "kwartslag- of halfslagtrap draait het bordes en moeten de sleuven langs",
+      "meerdere kanten; dat bouwt de app nog niet. Voet- en kopplaten zijn er",
+      "voor stalen bomen."
+    ],
     "optrede": [150, 188],
     "aantrede": [220, 350],
     "loopregelDoel": 610,

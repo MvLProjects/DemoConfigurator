@@ -283,8 +283,12 @@ export function mag(soortOnderdeel, materiaalSleutel) {
     // handregel kan deze app niet maken en hoort dus ook niet te kunnen.
     if (ALLEEN_TREDE.has(materiaalSleutel)) return PLANKEN.has(soortOnderdeel);
     if (!isHout(materiaalSleutel)) return true;
-    return PLANKEN.has(soortOnderdeel);
+    return PLANKEN.has(soortOnderdeel) || HOUTDELEN.has(soortOnderdeel);
 }
+
+// Wat er verder van hout kan zijn: de trapbomen van een houten trap en het
+// stootbord tussen houten treden. Geen buis of profiel - dat blijft staal.
+const HOUTDELEN = new Set(['trapboom', 'bordesboom', 'stootbord']);
 
 const ALLEEN_TREDE = new Set(['traanplaat', 'rooster', 'beton']);
 

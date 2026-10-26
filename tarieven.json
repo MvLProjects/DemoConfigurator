@@ -127,7 +127,8 @@
     "trede:glas":    { "naam": "Glazen trede",           "eenheid": "m2",   "eigen": null },
     "trede:steen":   { "naam": "Natuurstenen trede",     "eenheid": "stuk", "eigen": null },
     "trede:beton":   { "naam": "Betonnen trede (prefab)","eenheid": "stuk", "eigen": null },
-    "stootbord:hout":{ "naam": "Houten stootbord",       "eenheid": "stuk", "eigen": null }
+    "stootbord:hout":{ "naam": "Houten stootbord",       "eenheid": "stuk", "eigen": null },
+    "trapboom:hout": { "naam": "Houten trapboom met sleuven", "eenheid": "stuk", "eigen": null }
   },
 
   "_controle": [
