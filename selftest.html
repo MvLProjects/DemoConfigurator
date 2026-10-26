@@ -9826,7 +9826,14 @@ try {
     log('\n--- geen stille nullen ---');
     // EEN POST ZONDER TARIEF BLIJFT ZICHTBAAR. Hem weglaten zou het totaal te
     // laag maken zonder dat iemand het ziet; nul rekenen zou "gratis" zeggen.
+    // Met een tariefset waarin glas en klemmen LEEG zijn: tarieven.json heeft
+    // ze inmiddels als schatting, en het gaat hier om wat er gebeurt als een
+    // post geen tarief heeft.
+    const auLeeg = JSON.parse(JSON.stringify(tar));
+    for (const k of ['ruit', 'glasklem']) { auLeeg.besteld[k].laag = 0; auLeeg.besteld[k].hoog = 0; }
+    ks.zetTarieven(auLeeg);
     const auGlasRaming = ks.berekenKosten(auGlas.onderdelen, {});
+    ks.zetTarieven(tar);
     const auRuit = auGlasRaming.regels.find(r => r.sleutel === 'besteld:ruit');
     check('een post zonder tarief staat er wél, maar zonder bedrag',
         auRuit && auRuit.laag === null && auRuit.hoeveelheid > 0,
@@ -10919,10 +10926,20 @@ try {
         log('\n--- 3. de prijs zet geen staalprijs op RVS ---');
         const bdTrap = await trapBouw.bouwTrap({ ...trapRegels.STANDAARD, metaal: 'rvs' });
         const bdPrijs = ks.prijsIndicatie(bdTrap.onderdelen);
-        check('een RVS-trap staat zonder tarief in "nog niet in de prijs"',
+        check('een RVS-trap rekent met de RVS-prijs, niet met die van staal',
             bdPrijs.staalKg === 0 && bdPrijs.rvsKg > 0
-            && bdPrijs.ontbreekt.some(n => /^RVS-constructie/.test(n)),
-            bdPrijs.ontbreekt.join(', '));
+            && bdPrijs.regels.some(r => /^RVS-constructie/.test(r.naam) && r.laag > 0)
+            && !bdPrijs.regels.some(r => /^Staalconstructie/.test(r.naam)),
+            bdPrijs.regels.map(r => r.naam).join(', '));
+        // En zonder RVS-tarief komt hij in "nog niet in de prijs", niet op nul.
+        const bdTar = await (await fetch('/tarieven.json')).json();
+        const bdLeeg = JSON.parse(JSON.stringify(bdTar));
+        bdLeeg.controleRvs = { ...bdLeeg.controleRvs, laag: 0, hoog: 0, eigen: null };
+        ks.zetTarieven(bdLeeg);
+        const bdZonder = ks.prijsIndicatie(bdTrap.onderdelen);
+        ks.zetTarieven(bdTar);
+        check('zonder RVS-tarief staat hij onder "nog niet in de prijs"',
+            bdZonder.ontbreekt.some(n => /^RVS-constructie/.test(n)), bdZonder.ontbreekt.join(', '));
         const bdRaming = ks.berekenKosten(
             (await bouwMod.bouwBalustrade({ ...bdMaten, verzinken: true })).onderdelen);
         check('verzinken staat als eigen post in de raming, met een bron',

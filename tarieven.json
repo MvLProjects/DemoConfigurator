@@ -22,10 +22,8 @@
     "vandaag is over een half jaar niet meer waar; daarom staat de datum",
     "waarop het gezien is erbij, en niet alleen het getal."
   ],
-
   "versie": 1,
   "gezien": "2026-10-21",
-
   "_dichtheid": [
     "Het soortelijk gewicht van staal. Dit is GEEN richtprijs maar een",
     "natuurkundige constante die overal hetzelfde is: 7850 kg per kubieke",
@@ -36,15 +34,16 @@
     "besteld en steen per stuk; een gewicht zou daar niets toevoegen behalve",
     "een getal dat niemand nodig heeft."
   ],
-  "dichtheid": { "staal": 7850 },
+  "dichtheid": {
+    "staal": 7850
+  },
   "_dichtheid_metalen": "RVS (8000) en aluminium (2700) staan in materialen.js, bij het materiaal zelf.",
-
   "posten": {
     "staal": {
       "naam": "Staal, grondstof",
       "eenheid": "kg",
       "laag": 0.75,
-      "hoog": 1.00,
+      "hoog": 1.0,
       "eigen": null,
       "bron": "ferna.nl/blog/staalprijs",
       "toelichting": "Materiaalprijs, uitdrukkelijk exclusief bewerkingen en behandelingen."
@@ -70,26 +69,26 @@
     "rvs": {
       "naam": "RVS 316, grondstof",
       "eenheid": "kg",
-      "laag": 0,
-      "hoog": 0,
+      "laag": 4.5,
+      "hoog": 6.5,
       "eigen": null,
-      "bron": "",
-      "toelichting": "GEEN BETROUWBAAR GETAL GEVONDEN (gezocht 2026-10-26). Handels geven RVS per meter of per stuk, niet per kilo, en de prijs volgt de nikkelprijs. Vul de eigen inkoopprijs in."
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. RVS 316 kost als grondstof grofweg vijf tot zeven keer staal."
     },
     "aluminium": {
       "naam": "Aluminium, grondstof",
       "eenheid": "kg",
-      "laag": 0,
-      "hoog": 0,
+      "laag": 4.0,
+      "hoog": 6.0,
       "eigen": null,
-      "bron": "",
-      "toelichting": "GEEN BETROUWBAAR GETAL GEVONDEN (gezocht 2026-10-26). Wat er te vinden was, waren schrootprijzen en Aziatische B2B-prijzen; die zeggen niets over een Nederlandse inkoop. Vul de eigen inkoopprijs in."
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Aluminium profiel, grondstof; ongeveer vijf keer staal per kilo, maar een derde van het gewicht."
     },
     "verzinken": {
       "naam": "Thermisch verzinken",
       "eenheid": "kg",
       "laag": 0.95,
-      "hoog": 2.30,
+      "hoog": 2.3,
       "eigen": null,
       "bron": "clean-invoice.com/galvanik/kosten-und-kalkulation-galvanik (Duits overzicht 2026, incl. btw)",
       "toelichting": "Per kilo staal dat het bad in gaat. Een Duitse bron, niet Nederlands, en verzinkerijen rekenen toeslagen voor lange of grote stukken. Vraag een offerte bij de eigen verzinkerij."
@@ -97,14 +96,13 @@
     "arbeid": {
       "naam": "Arbeid werkplaats",
       "eenheid": "uur",
-      "laag": 0,
-      "hoog": 0,
+      "laag": 55,
+      "hoog": 75,
       "eigen": null,
-      "bron": "",
-      "toelichting": "GEEN GETAL GEVONDEN. Staat op nul omdat het onbekend is, niet omdat het gratis is. Vul het in of lees het totaal als materiaalbegroting."
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een uur in een kleine metaalwerkplaats, exclusief btw."
     }
   },
-
   "_besteld": [
     "Onderdelen die je koopt in plaats van maakt: glas, glasklemmen,",
     "sierpunten en gedraaide balusters. Ze staan allemaal op nul.",
@@ -117,20 +115,124 @@
     "uit als de staalprijs ernaast."
   ],
   "besteld": {
-    "ruit":      { "naam": "Gelaagd glas",      "eenheid": "m2",   "eigen": null },
-    "ruit:gehard": { "naam": "Gehard gelaagd glas 17,52 (zonder staanders)", "eenheid": "m2", "eigen": null },
-    "glasklem":  { "naam": "Glasklem",          "eenheid": "stuk", "eigen": null },
-    "sierpunt":  { "naam": "Sierpunt/paalkop",  "eenheid": "stuk", "eigen": null },
-    "spijl":     { "naam": "Gedraaide baluster","eenheid": "stuk", "eigen": null },
-    "trede:rooster": { "naam": "Roostertrede",           "eenheid": "stuk", "eigen": null },
-    "trede:hout":    { "naam": "Houten trede",           "eenheid": "stuk", "eigen": null },
-    "trede:glas":    { "naam": "Glazen trede",           "eenheid": "m2",   "eigen": null },
-    "trede:steen":   { "naam": "Natuurstenen trede",     "eenheid": "stuk", "eigen": null },
-    "trede:beton":   { "naam": "Betonnen trede (prefab)","eenheid": "stuk", "eigen": null },
-    "stootbord:hout":{ "naam": "Houten stootbord",       "eenheid": "stuk", "eigen": null },
-    "trapboom:hout": { "naam": "Houten trapboom met sleuven", "eenheid": "stuk", "eigen": null }
+    "ruit": {
+      "naam": "Gelaagd glas",
+      "eenheid": "m2",
+      "eigen": null,
+      "laag": 90,
+      "hoog": 150,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Gelaagd veiligheidsglas 10,76 op maat, per vierkante meter."
+    },
+    "ruit:gehard": {
+      "naam": "Gehard gelaagd glas 17,52 (zonder staanders)",
+      "eenheid": "m2",
+      "eigen": null,
+      "laag": 220,
+      "hoog": 350,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Gehard gelaagd 17,52 op maat: dikker, gehard en daarna gelaagd."
+    },
+    "glasklem": {
+      "naam": "Glasklem",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 12,
+      "hoog": 25,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een RVS-glasklem per stuk."
+    },
+    "sierpunt": {
+      "naam": "Sierpunt/paalkop",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 8,
+      "hoog": 25,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een gegoten sierpunt of paalkop per stuk."
+    },
+    "spijl": {
+      "naam": "Gedraaide baluster",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 25,
+      "hoog": 60,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een gedraaide of gegoten baluster per stuk."
+    },
+    "trede:rooster": {
+      "naam": "Roostertrede",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 45,
+      "hoog": 90,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een verzinkte roostertrede met zijplaten, per stuk."
+    },
+    "trede:hout": {
+      "naam": "Houten trede",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 60,
+      "hoog": 120,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een massief houten trede van 40 mm op maat, per stuk."
+    },
+    "trede:glas": {
+      "naam": "Glazen trede",
+      "eenheid": "m2",
+      "eigen": null,
+      "laag": 350,
+      "hoog": 550,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Gelaagd glas voor een trede, per vierkante meter: dik en met antislip."
+    },
+    "trede:steen": {
+      "naam": "Natuurstenen trede",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 90,
+      "hoog": 180,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een natuurstenen trede per stuk."
+    },
+    "trede:beton": {
+      "naam": "Betonnen trede (prefab)",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 70,
+      "hoog": 140,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een prefab betonnen trede per stuk."
+    },
+    "stootbord:hout": {
+      "naam": "Houten stootbord",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 25,
+      "hoog": 50,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een houten stootbord van 18 mm per stuk."
+    },
+    "trapboom:hout": {
+      "naam": "Houten trapboom met sleuven",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 250,
+      "hoog": 500,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een houten trapboom 60 x 300 met gefreesde sleuven, per stuk."
+    },
+    "handregel": {
+      "naam": "Stenen dekband",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 60,
+      "hoog": 150,
+      "bron": "schatting (2026-10-26), niet nagezocht",
+      "toelichting": "SCHATTING. Een gegoten of gehouwen dekband per stuk."
+    }
   },
-
   "_controle": [
     "Een tweede, onafhankelijke schatting om de eerste tegen af te zetten:",
     "de prijs per kilo van een AFGEWERKTE constructie, inclusief maken maar",
@@ -151,26 +253,36 @@
   "controleRvs": {
     "naam": "Afgewerkte RVS-constructie",
     "eenheid": "kg",
-    "laag": 0,
-    "hoog": 0,
+    "laag": 9,
+    "hoog": 14,
     "eigen": null,
-    "bron": ""
+    "bron": "schatting (2026-10-26), niet nagezocht",
+    "toelichting": "SCHATTING. Een afgewerkte RVS-constructie: duurder materiaal en trager te lassen en te schuren dan staal."
   },
   "controleAluminium": {
     "naam": "Afgewerkte aluminium constructie",
     "eenheid": "kg",
-    "laag": 0,
-    "hoog": 0,
+    "laag": 10,
+    "hoog": 16,
     "eigen": null,
-    "bron": ""
+    "bron": "schatting (2026-10-26), niet nagezocht",
+    "toelichting": "SCHATTING. Een afgewerkte aluminium constructie; per kilo duurder, maar er zijn veel minder kilo's."
   },
   "controle": {
     "naam": "Afgewerkte staalconstructie",
     "eenheid": "kg",
-    "laag": 2.50,
-    "hoog": 4.00,
+    "laag": 2.5,
+    "hoog": 4.0,
     "eigen": null,
     "bron": "novicon.nl/wat-kost-een-staalconstructie-per-kg",
     "toelichting": "Bandbreedte voor de hele constructie is 2,50 tot 8,00 per kg; eenvoudig werk ligt op 2,50 tot 4,00."
-  }
+  },
+  "_schattingen": [
+    "WAT 'SCHATTING' BETEKENT. Voor deze posten is geen bruikbare prijs",
+    "gevonden en ook niemand bij wie hij na te vragen is. Om toch een",
+    "totaal te kunnen tonen staat er een LOGISCH BEREIK: de orde van",
+    "grootte die je voor zo'n onderdeel verwacht, afgeleid van de staalprijs",
+    "en van wat zulke dingen in een webwinkel ongeveer doen. Het is geen",
+    "inkoopprijs. Vul 'eigen' in zodra er een echte prijs is; dan wint die."
+  ]
 }
