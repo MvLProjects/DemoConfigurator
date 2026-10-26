@@ -231,6 +231,18 @@ export async function maakDeel(oc, d, opruimen) {
         }
         return { geplaatst: plaatsVorm(oc, d, lokaal, opruimen), lokaal };
     }
+    if (d.doorsnede) {
+        // Een eigen doorsnede, zoals het bodemprofiel en de kaplijst van glas
+        // zonder staanders. Zie lokalePrismavorm.
+        const sleutel = JSON.stringify({ s: d.doorsnede, m: [d.dx, d.dy, d.dz],
+                                         v: d.verstek || [] });
+        let lokaal = lokaleVormen.get(sleutel);
+        if (!lokaal) {
+            lokaal = lokalePrismavorm(oc, d, opruimen);
+            onthoudVorm(sleutel, lokaal);
+        }
+        return { geplaatst: plaatsVorm(oc, d, lokaal, opruimen), lokaal };
+    }
     if (d.baluster) {
         // Een gedraaide baluster loopt verder gewoon mee: zijn LOKALE vorm
         // wordt hieronder op dezelfde manier hergebruikt en geplaatst als een
@@ -944,6 +956,29 @@ async function lokaleBlokvorm(oc, d, opruimen) {
     // niets uit - maar als laatste is hij het veiligst: wat er dan nog
     // uiteenvalt, valt uiteen door de gaten en door niets anders.
     return eigenVorm(oc, metDoorsteken(oc, d, geklonken, opruimen));
+}
+
+/**
+ * Een eigen doorsnede op lengte getrokken, met verstek aan de koppen.
+ *
+ * De doorsnede staat in het lokale yz-vlak, gemeten vanaf de hoek van het
+ * doosje, en loopt dx lang langs x - dus lokaal is logisch, net als bij een
+ * blok, en metVerstek kan er zonder omrekenen op. Zo komen een bodemprofiel en
+ * een kaplijst in een hoek precies op verstek bij elkaar.
+ */
+function lokalePrismavorm(oc, d, opruimen) {
+    const lijn = new oc.BRepBuilderAPI_MakePolygon_1();
+    for (const [v, w] of d.doorsnede) {
+        const q = new oc.gp_Pnt_3(0, v, w);
+        lijn.Add_1(q);
+        opruimen.push(q);
+    }
+    lijn.Close();
+    const vlak = new oc.BRepBuilderAPI_MakeFace_15(lijn.Wire(), true);
+    const richting = new oc.gp_Vec_4(d.dx, 0, 0);
+    const prisma = new oc.BRepPrimAPI_MakePrism_1(vlak.Shape(), richting, false, true);
+    opruimen.push(lijn, vlak, richting, prisma);
+    return eigenVorm(oc, metVerstek(oc, d, prisma.Shape(), opruimen));
 }
 
 /**

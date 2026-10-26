@@ -14,7 +14,7 @@ import { initOcct, laadStep, laadVorm, countMeshEdges, schrijfStep,
 import { maakNavigatie } from './navigation.js';
 import { bouwBalustrade, bouwBlok, bouwBalustradeOpRanden, beoordeelRanden,
     voorspelBalustrade } from './build-balustrade.js';
-import { STANDAARD, valideer, VULLING, GLAS, vullingSoort } from './balustrade-rules.js';
+import { STANDAARD, valideer, VULLING, GLAS, GLASVRIJ, vullingSoort } from './balustrade-rules.js';
 import { parseer, noemtProfiel } from './command-parser.js';
 import { bouwTrap, trapDelen, wandleuningFout, controleerWentel } from './build-trap.js';
 import { maakVoorbeeld, ruimVoorbeeldOp } from './preview.js';
@@ -1124,12 +1124,15 @@ function werkAfgeleideBij() {
     // hoort bij wat ernaast staat is erger dan geen label: het getal klopte
     // wel, maar je leest het verkeerd.
     const lig = veld.vulling === 'horizontaal' && veld.liggend;
-    const glas = veld.vulling === 'glas' && veld.glas;
+    const glas = (veld.vulling === 'glas' || veld.vulling === 'glasvrij') && veld.glas;
     const toon = lig ? veld.liggend : veld.spijlen;
 
     const rijen = glas ? {
-        aantal: ['ruiten', '1 per veld'],
-        doorgang: ['vrije opening', `${veld.glas.vrijeHoogte.toFixed(0)} mm`],
+        // Zonder staanders is er geen "veld"; dan telt het aantal ruiten.
+        aantal: ['ruiten', veld.vulling === 'glasvrij' ? String(veld.aantalVelden) : '1 per veld'],
+        doorgang: veld.vulling === 'glasvrij'
+            ? ['glas boven profiel', `${veld.glas.vrijeHoogte.toFixed(0)} mm`]
+            : ['vrije opening', `${veld.glas.vrijeHoogte.toFixed(0)} mm`],
         steek: ['bestelmaat ruit',
             `${veld.glas.lengte.toFixed(0)} × ${veld.glas.hoogte.toFixed(0)}`
             + ` × ${veld.glas.dikte} mm`],
@@ -1158,7 +1161,7 @@ function werkAfgeleideBij() {
     // Bij een recht stuk zijn alle velden gelijk en zegt "veld 1 van 3" niets
     // - dat is ruis bij elke gewone balustrade, want 2000 mm met een maximale
     // staanderafstand van 850 heeft er al drie.
-    if (veld.veldenVerschillen) {
+    if (veld.veldenVerschillen && veld.vulling !== 'glasvrij') {
         afgeleidKoppen.aantal.textContent += ' (veld 1 van ' + veld.aantalVelden + ')';
     }
 
@@ -1181,6 +1184,14 @@ function werkAfgeleideBij() {
             + 'dikte je nodig hebt hangt af van de ruitmaat en de belasting. '
             + 'De ruit wordt op maat besteld en staat daarom niet in de '
             + 'zaaglijst en niet bij de snijdelen.',
+        glasvrij:
+            'Glas zonder staanders: de ruiten staan in een aluminium '
+            + 'bodemprofiel op de vloer, met een kaplijst erover. De app tekent '
+            + GLASVRIJ.dikte + ' mm gehard gelaagd glas in ruiten van hooguit '
+            + GLASVRIJ.maxRuit + ' mm, maar maakt GEEN sterkteberekening: de '
+            + 'leverancier van het systeem rekent de dikte en de bevestiging '
+            + 'uit. Alleen op een vlakke rand; de staander- en spijlmaten doen '
+            + 'hier niets.',
     }[veld.vulling];
     vullingLetEl.style.display = let_ ? 'block' : 'none';
     if (let_) vullingLetEl.textContent = let_;
@@ -1425,6 +1436,11 @@ genereerKnop.addEventListener('click', async () => {
                 ? `${gebouwd.spijlen.aantal} spijlen, `
                   + `doorgang ${gebouwd.spijlen.doorgang.toFixed(1)} mm`
             : eersteVeld.vulling === 'geen' ? 'geen vulling'
+            : eersteVeld.vulling === 'glasvrij'
+                ? `glas zonder staanders, ${gebouwd.velden.length} `
+                  + `${gebouwd.velden.length === 1 ? 'ruit' : 'ruiten'} van `
+                  + `${eersteVeld.glas.lengte.toFixed(0)}×${eersteVeld.glas.hoogte.toFixed(0)}`
+                  + `×${eersteVeld.glas.dikte} mm`
             : eersteVeld.vulling === 'glas' && eersteVeld.glas
                 ? `glas ${eersteVeld.glas.lengte.toFixed(0)}×`
                   + `${eersteVeld.glas.hoogte.toFixed(0)}×${eersteVeld.glas.dikte} mm`
@@ -2220,7 +2236,8 @@ function offerteKeuzes() {
         : ral || 'blank';
     const b = huidigeMaten();
     const vulling = { spijlen: 'verticale spijlen', horizontaal: 'liggende regels',
-                      glas: 'glazen panelen', geen: 'zonder vulling' }[b.vulling]
+                      glas: 'glazen panelen', glasvrij: 'glas zonder staanders, in een bodemprofiel',
+                      geen: 'zonder vulling' }[b.vulling]
         || b.vulling;
     const mm = (v) => `${Math.round(v)} mm`;
     // Een komma, zoals een Nederlandse klant een maat leest.
@@ -2232,8 +2249,12 @@ function offerteKeuzes() {
             ['Soort', 'Balustrade'],
             ['Lengte', mm(b.lengte)], ['Hoogte', mm(b.hoogte)],
             ['Vulling', vulling],
-            ['Staanders', profielNaam(b.staanderProfiel, `${b.staanderBreedte} × ${b.staanderBreedte}`)],
-            ['Handregel', profielNaam(b.handregelProfiel, `${b.handregelHoogte} mm`)],
+            // Zonder staanders geen staander- en handregelregel: daar zijn
+            // een bodemprofiel en een kaplijst voor in de plaats.
+            ...(b.vulling === 'glasvrij' ? [] : [
+                ['Staanders', profielNaam(b.staanderProfiel, `${b.staanderBreedte} × ${b.staanderBreedte}`)],
+                ['Handregel', profielNaam(b.handregelProfiel, `${b.handregelHoogte} mm`)],
+            ]),
             // Alleen als er spijlen ZIJN: bij glas stond hier "20 × 20".
             ...(b.vulling === 'spijlen' || !b.vulling
                 ? [['Spijlen', profielNaam(b.spijlProfiel, `${b.spijlBreedte} × ${b.spijlBreedte}`)]]

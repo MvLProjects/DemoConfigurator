@@ -369,7 +369,7 @@
     "hij voldoet. Marthijn moet dit getal bevestigen."
   ],
   "vulling": {
-    "soorten": ["spijlen", "horizontaal", "glas", "geen"],
+    "soorten": ["spijlen", "horizontaal", "glas", "glasvrij", "geen"],
     "maxDoorgangHorizontaal": 100
   },
 
@@ -423,6 +423,45 @@
     "inklemming": 18,
     "rubber": 2,
     "klem": { "breedte": 50, "hoogte": 45, "wang": 8, "perRand": 2 }
+  },
+
+  "_glasvrij": [
+    "GLAS ZONDER STAANDERS: de ruiten staan ingeklemd in een aluminium",
+    "bodemprofiel op de vloer, met een kaplijst over de bovenrand. Geen",
+    "staanders, geen voetplaten en geen klemmen.",
+    "",
+    "DIKTE 17,52. Een vrijdragende ruit moet de hele duwkracht via zijn voet",
+    "kwijt en is daarom dikker dan een ruit tussen staanders: twee lagen van",
+    "8 mm GEHARD glas met 1,52 mm folie. Dat is wat de bekende systemen in",
+    "hun tabellen voor een woning noemen. HET IS EEN AANNAME: de dikte die je",
+    "nodig hebt volgt uit de belasting, de ruithoogte en het profiel, en de",
+    "leverancier van het systeem rekent dat uit. Deze app rekent het niet.",
+    "",
+    "HET PROFIEL 90 x 120, wanden 10, bodem 15. Een gangbare maat voor een",
+    "profiel dat op de vloer wordt geschroefd; de ruit steekt er 100 mm in",
+    "(insteek), op een onderlegblok van 5 mm. Het blok, de wiggen en de",
+    "rubbers die de ruit vastzetten zijn niet getekend; ze horen bij het",
+    "systeem dat je koopt.",
+    "",
+    "RUITBREEDTE hooguit 1500. Breder wordt een ruit van 17,52 zwaar (ruim",
+    "40 kg per meter hoogte) en lastig te plaatsen. Een recht stuk wordt in",
+    "gelijke ruiten verdeeld met een VOEG van 6 mm ertussen.",
+    "",
+    "DE KAPLIJST, een U van 3 mm dik over de bovenrand, beschermt de",
+    "glasrand en houdt de ruiten op één lijn. Zijn rug ligt op de",
+    "leuninghoogte.",
+    "",
+    "ALLEEN OP EEN VLAKKE RAND. Op een helling worden de ruiten scheve",
+    "parallellogrammen en moet het profiel mee hellen; dat bouwt deze app",
+    "niet. Op een trap hoort glas tussen staanders."
+  ],
+  "glasvrij": {
+    "dikte": 17.52,
+    "maxRuit": 1500,
+    "voeg": 6,
+    "profiel": { "breedte": 90, "hoogte": 120, "wand": 10, "bodem": 15 },
+    "onderlegblok": 5,
+    "kap": { "hoogte": 30, "wand": 3, "rug": 4, "speling": 2 }
   },
 
   "_sierpunt": [

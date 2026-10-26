@@ -77,6 +77,10 @@ export const VULLING = regels.vulling;
 // alle getallen hier zijn aannames tot Marthijn ze bevestigt.
 export const GLAS = regels.glas;
 
+// Glas zonder staanders: een ruit in een bodemprofiel. Zie regels.json en
+// glasvrij.js; ook dit zijn aannames, geen berekening.
+export const GLASVRIJ = regels.glasvrij;
+
 // Sierpunten en paalkoppen. De modellen zelf staan in sierpunten.js; hier
 // alleen wat de regels erover zeggen. Zie regels.json: de verhoudingen komen
 // uit twee gemeten maten, de rest is een keuze.

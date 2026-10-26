@@ -7898,8 +7898,8 @@ try {
     check('de maximale opening voor liggende regels staat APART in de regels',
         typeof regelsNu.VULLING.maxDoorgangHorizontaal === 'number',
         regelsNu.VULLING.maxDoorgangHorizontaal);
-    check('er zijn vier soorten vulling',
-        regelsNu.VULLING.soorten.join(',') === 'spijlen,horizontaal,glas,geen',
+    check('er zijn vijf soorten vulling',
+        regelsNu.VULLING.soorten.join(',') === 'spijlen,horizontaal,glas,glasvrij,geen',
         regelsNu.VULLING.soorten.join(','));
     // Een onbekende waarde mag de bouw niet laten vastlopen.
     // Let op bij het uitbreiden: 'glas' stond hier als voorbeeld van een
@@ -10948,6 +10948,71 @@ try {
         bdM.dispatchEvent(new Event('change'));
         check('RVS, aluminium en verzinken geven geen fout in de console',
             errors.length === bdVoor, errors.slice(bdVoor).join(' | '));
+    }
+
+    // ============ DEEL BE: glas zonder staanders ===========================
+    log('\n\n======== DEEL BE: glas zonder staanders ========\n');
+    {
+        const beVoor = errors.length;
+        const beMaten = { ...regelsNu.STANDAARD, lengte: 4000, hoogte: 1000, vulling: 'glasvrij' };
+        const beG = regelsNu.GLASVRIJ;
+
+        log('--- 1. de opbouw ---');
+        const beDelen = bouwMod.balustradeDelen(beMaten);
+        const beSoorten = [...new Set(beDelen.map(d => d.soort))].sort().join(',');
+        check('geen staanders en geen voetplaten: profiel, ruiten en kaplijst',
+            beSoorten === 'bodemprofiel,kaplijst,ruit', beSoorten);
+        const beRuiten = beDelen.filter(d => d.soort === 'ruit');
+        check('4 meter wordt drie gelijke ruiten van hooguit ' + beG.maxRuit + ' mm',
+            beRuiten.length === 3 && beRuiten.every(r => r.dx <= beG.maxRuit
+                && Math.abs(r.dx - beRuiten[0].dx) < 1e-9)
+            && Math.abs(3 * beRuiten[0].dx + 2 * beG.voeg - 4000) < 1e-6,
+            beRuiten.map(r => r.dx.toFixed(1)).join(', '));
+        check('de ruit is ' + beG.dikte + ' mm dik en heeft een eigen bestelpost',
+            beRuiten.every(r => r.dy === beG.dikte && r.bestelSoort === 'ruit:gehard'));
+        const beProfiel = beDelen.find(d => d.soort === 'bodemprofiel');
+        check('het bodemprofiel is aluminium; met RVS gekozen wordt het RVS',
+            beProfiel.materiaal === 'aluminium'
+            && bouwMod.balustradeDelen({ ...beMaten, metaal: 'rvs' })
+                .find(d => d.soort === 'bodemprofiel').materiaal === 'rvs');
+        const beV = bouwMod.voorspelBalustrade(beMaten);
+        check('het paneel voorspelt hetzelfde', beV.aantalVelden === 3
+            && Math.abs(beV.glas.lengte - beRuiten[0].dx) < 1e-9, beV.aantalVelden);
+
+        log('\n--- 2. hoeken: geen glas of aluminium op twee plekken ---');
+        adMeet('glasvrij hoek 90 graden', await bouwMod.bouwPad(
+            [[0, 0, 0], [3000, 0, 0], [3000, 2000, 0]], false, beMaten));
+        adMeet('glasvrij hoek 135 graden', await bouwMod.bouwPad(
+            [[0, 0, 0], [2500, 0, 0], [4000, 1500, 0]], false, beMaten));
+        const beHoek = (await bouwMod.bouwPad(
+            [[0, 0, 0], [3000, 0, 0], [3000, 2000, 0]], false, beMaten)).delen;
+        check('in een hoek komen de profielen en kaplijsten op verstek',
+            beHoek.filter(d => d.soort !== 'ruit').every(d => d.verstek.length === 1));
+
+        log('\n--- 3. waar het niet kan ---');
+        let beFout = '';
+        try { await bouwMod.bouwPad([[0, 0, 0], [3000, 0, 1500]], false, beMaten); }
+        catch (e) { beFout = e.message; }
+        check('op een helling geweigerd, met een uitweg', /vlakke rand/.test(beFout)
+            && /glas in klemmen/.test(beFout), beFout);
+        let beTrap = '';
+        try { trapBouw.trapDelen({ ...trapRegels.STANDAARD }, beMaten, 'rechts'); }
+        catch (e) { beTrap = e.message; }
+        check('en dus ook als leuning op een trap', /vlakke rand/.test(beTrap), beTrap);
+
+        log('\n--- 4. kosten en woorden ---');
+        const beBouw = await bouwMod.bouwBalustrade(beMaten);
+        const beH = ks.hoeveelheden(beBouw.onderdelen);
+        check('het glas telt als gehard glas, het profiel als aluminium',
+            beH.m2['ruit:gehard'] > 3 && beH.aluminiumKg > 0 && beH.staalKg === 0,
+            `${(beH.m2['ruit:gehard'] || 0).toFixed(2)} m2, ${beH.aluminiumKg.toFixed(1)} kg`);
+        const beZin = await win.eval("import('/command-parser.js')");
+        const beA = beZin.parseer('glazen balustrade zonder staanders van 5 meter', null, {});
+        check('"glazen balustrade zonder staanders" wordt glas zonder staanders',
+            beA.actie === 'balustrade' && beA.params.vulling === 'glasvrij'
+            && beA.params.lengte === 5000, beA.fout || beA.uitleg);
+        check('glas zonder staanders geeft geen fout in de console',
+            errors.length === beVoor, errors.slice(beVoor).join(' | '));
     }
 
     log('\n' + (failures === 0

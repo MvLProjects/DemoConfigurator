@@ -66,6 +66,13 @@ export const VOORBEELDEN = [
              handregelProfiel: CHS48, afwerking: '7016' },
     },
     {
+        id: 'glas-vrij',
+        naam: 'Glas zonder staanders',
+        uitleg: 'Balkon van 5 m: gehard glas in een zwart bodemprofiel, met een kaplijst',
+        wat: 'balustrade',
+        b: { lengte: 5000, hoogte: 1000, vulling: 'glasvrij', afwerking: '9005' },
+    },
+    {
         id: 'hekwerk',
         naam: 'Klassiek hekwerk',
         uitleg: 'Balustrade met doorgestoken spijlen, speerpunten en sierbollen op de palen',

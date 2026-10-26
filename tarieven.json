@@ -118,6 +118,7 @@
   ],
   "besteld": {
     "ruit":      { "naam": "Gelaagd glas",      "eenheid": "m2",   "eigen": null },
+    "ruit:gehard": { "naam": "Gehard gelaagd glas 17,52 (zonder staanders)", "eenheid": "m2", "eigen": null },
     "glasklem":  { "naam": "Glasklem",          "eenheid": "stuk", "eigen": null },
     "sierpunt":  { "naam": "Sierpunt/paalkop",  "eenheid": "stuk", "eigen": null },
     "spijl":     { "naam": "Gedraaide baluster","eenheid": "stuk", "eigen": null },

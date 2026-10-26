@@ -76,6 +76,7 @@ import { modelVan, hoogteVoor, GEEN as SIERPUNT_GEEN } from './sierpunten.js';
 // ontstaat geen kringetje.
 import { isRond } from './profielen.js';
 import { stempelWerk } from './materialen.js';
+import { glasvrijDelen } from './glasvrij.js';
 
 // Hier vandaan doorgegeven: build-balustrade.js haalt hem bij pad.js, en dat
 // hoeft niet te veranderen nu hij bij de regels staat.
@@ -502,6 +503,10 @@ export function handregelStukken(punten, gesloten, tolerantie = 1e-4) {
  * geometrie als de stuklijst komt hieruit.
  */
 export function padDelen(punten, gesloten, p) {
+    // Glas zonder staanders is een andere opbouw: geen staanders en geen
+    // velden ertussen. Zie glasvrij.js.
+    if (vullingSoort(p.vulling) === 'glasvrij') return glasvrijDelen(punten, gesloten, p);
+
     const omhoog = [0, 0, 1];
 
     // Tussenstaanders erbij voordat er ook maar iets gebouwd wordt. Daarna

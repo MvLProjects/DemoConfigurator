@@ -229,6 +229,9 @@ const VERZINKZIN = /\b(?:(?:thermisch\s+)?verzinkte?|verzinken|duplex)\b/gi;
 // DE VULLING van de leuning. Bewust alleen hele uitdrukkingen: "glazen treden"
 // gaat over de treden en mag hier NIET als glazen vulling gelezen worden.
 const VULLINGZINNEN = [
+    // Glas zonder staanders EERST: "glazen balustrade zonder staanders" moet
+    // in zijn geheel hier vallen, en niet als gewoon glas tussen staanders.
+    [/\b(?:(?:glazen\s+(?:balustrade|panelen|ruiten)|glas)\s+)?(?:zonder\s+staanders|in\s+(?:een\s+)?bodemprofiel)\b|\bframeless\b/gi, 'glasvrij'],
     [/\b(?:glazen\s+(?:vulling|panelen|ruiten|balustrade)|(?:vulling|panelen|ruiten)\s+(?:van|in|uit)\s+glas|met\s+glas(?:\s+als\s+vulling)?)\b/gi, 'glas'],
     [/\b(?:liggende|horizontale)\s+(?:regels|spijlen|vulling|staven)\b/gi, 'horizontaal'],
     [/\b(?:verticale|staande)\s+(?:spijlen|staven|vulling)\b/gi, 'spijlen'],
