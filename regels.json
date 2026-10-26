@@ -114,10 +114,9 @@
       "inlaat ook. De sleuf is 0,5 mm ruimer dan de trede, zodat de trede er",
       "in past en er in de tekening geen hout op twee plekken zit.",
       "",
-      "VOORLOPIG ALLEEN EEN RECHTE TRAP, met of zonder bordes. Bij een",
-      "kwartslag- of halfslagtrap draait het bordes en moeten de sleuven langs",
-      "meerdere kanten; dat bouwt de app nog niet. Voet- en kopplaten zijn er",
-      "voor stalen bomen."
+      "BIJ EEN KWARTSLAG OF HALFSLAG ligt ook het bordes in een sleuf, aan elke",
+      "kant waar een bordesboom zit. Een wenteltrap heeft geen bomen. Voet- en",
+      "kopplaten zijn er voor stalen bomen."
     ],
     "optrede": [150, 188],
     "aantrede": [220, 350],

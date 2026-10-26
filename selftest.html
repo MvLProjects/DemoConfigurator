@@ -11063,11 +11063,24 @@ try {
         adMeet('houten bomen + leuning', await trapBouw.bouwTrap(bfP, bfBal, 'rechts'));
         adMeet('houten bomen + bordes', await trapBouw.bouwTrap(
             { ...bfP, bordesNa: 7, bordesLengte: 1000 }, bfBal, 'rechts'));
+        // Om een draaiend bordes heen: het bordes ligt in A, B en (halfslag) C.
+        adMeet('houten kwartslag', await trapBouw.bouwTrap(
+            { ...bfP, soort: 'kwartslag', draai: 'rechts' }, bfBal, 'links'));
+        adMeet('houten halfslag naar links', await trapBouw.bouwTrap(
+            { ...bfP, soort: 'halfslag', draai: 'links' }, bfBal, 'rechts'));
+        const bfK = trapBouw.trapDelen({ ...bfP, soort: 'halfslag', draai: 'rechts' }).delen;
+        check('bij een halfslag zijn alle bordesbomen hout, met een sleuf',
+            bfK.filter(d => d.soort === 'bordesboom').length === 3
+            && bfK.filter(d => d.soort === 'bordesboom')
+                .every(d => d.materiaal === 'eiken' && d.sleuven.length === 1)
+            && !bfK.some(d => d.soort === 'tredehoek'));
 
         log('\n--- 3. waar het (nog) niet kan ---');
         const bfFout = (extra) => trapBouw.controleerHoutBoom({ ...bfP, ...extra }).join(' ');
-        check('een kwartslagtrap met houten bomen wordt geweigerd',
-            /alleen bij een rechte trap/.test(bfFout({ soort: 'kwartslag' })), bfFout({ soort: 'kwartslag' }));
+        check('een wenteltrap heeft geen bomen, dus daar wordt hout geweigerd',
+            /wenteltrap/.test(bfFout({ soort: 'wentel' })), bfFout({ soort: 'wentel' }));
+        check('een kwartslag en een halfslag mogen wel',
+            bfFout({ soort: 'kwartslag' }) === '' && bfFout({ soort: 'halfslag' }) === '');
         check('en voet- en kopplaten ook', /stalen trapbomen/.test(bfFout({ platen: true })));
         check('een stalen boom heeft er geen last van',
             trapBouw.controleerHoutBoom({ ...bfP, boomMateriaal: 'staal', soort: 'halfslag' }).length === 0);

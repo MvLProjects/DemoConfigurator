@@ -443,6 +443,9 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
      * sleuf zit aan de BINNENkant: bij de linker boom (y = -halve breedte) is
      * dat de kant van zijn grootste y, bij de rechter de kleinste.
      */
+    //
+    // `y` mag ook een teken zijn: -1 als het binnenvlak de grootste y van de
+    // plank is, +1 als het de kleinste is.
     const houtBoomDeel = (y, sleuven) => (houtBoom ? {
         materiaal: p.boomMateriaal, besteld: true, bestelSoort: 'trapboom:hout',
         sleuven, sleufDiepte: inlaat, sleufSpeling: HB.speling,
@@ -477,11 +480,17 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
         const yA = -s * (hb - tb);                       // binnenkant strook A
         const yC = s * (halfslag ? yVer - tb : hb);      // overkant van de plank
 
+        // In houten bomen ligt het bordes in een sleuf, aan elke kant waar een
+        // bordesboom zit: buiten (A), achter (B) en bij een halfslag ook aan
+        // de overkant (C). Waar een vlucht aankomt of vertrekt zit geen boom.
+        const yA2 = yA - s * inlaat;
+        const yC2 = halfslag ? yC + s * inlaat : yC;
+        const bordesX2 = L1 + B - tb + inlaat;
         delen.push({
             soort: 'bordes',
-            oorsprong: [L1, Math.min(yA, yC), bZ - p.tredeDikte],
+            oorsprong: [L1, Math.min(yA2, yC2), bZ - p.tredeDikte],
             xAs: [1, 0, 0], yAs: [0, 1, 0], zAs: [0, 0, 1],
-            dx: B - tb, dy: Math.abs(yC - yA), dz: p.tredeDikte,
+            dx: bordesX2 - L1, dy: Math.abs(yC2 - yA2), dz: p.tredeDikte,
             materiaal: tredeMateriaal,
             ...tredeBestel,
         });
@@ -492,6 +501,7 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
 
         /** Een liggende bordesboom langs een buitenrand, opening naar binnen. */
         const liggend = (start, run, lengte, uit) => {
+            if (houtBoom) return liggendHout(start, run, lengte, uit);
             const zAs = [run[1] * uit[2] - run[2] * uit[1],
                          run[2] * uit[0] - run[0] * uit[2],
                          run[0] * uit[1] - run[1] * uit[0]];
@@ -504,6 +514,41 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
                 ...(boomDoos ? { profiel: p.boomProfiel } : {}),
             });
         };
+        /**
+         * Dezelfde bordesboom van HOUT: een plank als plaat, met de sleuf voor
+         * het bordes aan de binnenkant. Een plaat staat in het XZ-vlak; loopt
+         * de boom langs y, dan draait `plaatsing` hem een kwartslag om z.
+         */
+        const yBordes = [Math.min(yA2, yC2), Math.max(yA2, yC2)];
+        const zSleuf = [bZ - p.tredeDikte, bZ];
+        function liggendHout(start, run, lengte, uit) {
+            const h = p.boomHoogte;
+            if (run[0] !== 0) {
+                // Langs x. De plank ligt aan de `uit`-kant van zijn binnenvlak.
+                const y = uit[1] > 0 ? start[1] : start[1] - tb;
+                delen.push({
+                    soort: 'bordesboom',
+                    omtrek: [[start[0], bZ - h], [start[0] + lengte, bZ - h],
+                             [start[0] + lengte, bZ], [start[0], bZ]],
+                    y, dikte: tb, dx: lengte, dy: tb, dz: h,
+                    ...houtBoomDeel(uit[1] > 0 ? 1 : -1,
+                        [[L1, zSleuf[0], bordesX2, zSleuf[1]]]),
+                });
+                return;
+            }
+            // Langs y, aan het eind van het bordes: lokaal x is wereld-y, en de
+            // dikte loopt na de draaiing van L1 + B terug naar binnen.
+            const [ya, yb] = [Math.min(start[1], start[1] + run[1] * lengte),
+                              Math.max(start[1], start[1] + run[1] * lengte)];
+            delen.push({
+                soort: 'bordesboom',
+                omtrek: [[ya, bZ - h], [yb, bZ - h], [yb, bZ], [ya, bZ]],
+                y: 0, dikte: tb, dx: lengte, dy: tb, dz: h,
+                plaatsing: { hoek: Math.PI / 2, verschuiving: [L1 + B, 0, 0] },
+                ...houtBoomDeel(-1, [[yBordes[0], zSleuf[0], yBordes[1], zSleuf[1]]]),
+            });
+        }
+
         liggend([L1, yA], [1, 0, 0], B, [0, -s, 0]);
         liggend([L1 + B - tb, yA], [0, s, 0], Math.abs(yC - yA), [1, 0, 0]);
         if (halfslag) liggend([L1, yC], [1, 0, 0], B, [0, s, 0]);
@@ -762,9 +807,9 @@ export function wentelMaten(p) {
 export function controleerHoutBoom(p) {
     if (!isHout(p.boomMateriaal)) return [];
     const fouten = [];
-    if ((p.soort || 'recht') !== 'recht') {
-        fouten.push('Houten trapbomen kan de app nu alleen bij een rechte trap maken, '
-            + 'met of zonder bordes. Kies een stalen boom of een rechte trap.');
+    if (p.soort === 'wentel') {
+        fouten.push('Een wenteltrap heeft geen trapbomen: de treden zitten aan de spil. '
+            + 'Zet "trapboom van" op staal.');
     }
     if (p.platen) {
         fouten.push('Voet- en kopplaten zijn er voor stalen trapbomen. Zet ze uit bij '
