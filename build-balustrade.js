@@ -223,7 +223,7 @@ export async function maakDeel(oc, d, opruimen) {
         // hergebruikt en geplaatst als elk ander liggend onderdeel. Alleen de
         // doorsnede tekenen we zelf in plaats van hem uit een STEP te halen.
         const sleutel = JSON.stringify({ k: d.dekband, m: [d.dx, d.dy, d.dz],
-                                         v: d.verstek || [], g: d.doorsteken || [] });
+                                         v: d.verstek || [], vb: d.vissebek || [], g: d.doorsteken || [] });
         let lokaal = lokaleVormen.get(sleutel);
         if (!lokaal) {
             lokaal = lokaleDekbandvorm(oc, d, opruimen);
@@ -261,7 +261,7 @@ export async function maakDeel(oc, d, opruimen) {
         // Een eigen doorsnede, zoals het bodemprofiel en de kaplijst van glas
         // zonder staanders. Zie lokalePrismavorm.
         const sleutel = JSON.stringify({ s: d.doorsnede, m: [d.dx, d.dy, d.dz],
-                                         v: d.verstek || [] });
+                                         v: d.verstek || [], vb: d.vissebek || [] });
         let lokaal = lokaleVormen.get(sleutel);
         if (!lokaal) {
             lokaal = lokalePrismavorm(oc, d, opruimen);
@@ -340,7 +340,7 @@ function vormSleutel(d) {
             p: prof(d.profiel),
             as: d.lengteAs || 'z',
             m: [d.dx, d.dy, d.dz],
-            v: d.verstek || [],
+            v: d.verstek || [], vb: d.vissebek || [],
             z: sneden(d.zadel),
             k: sneden(d.uitklinken),
             a: d.afronden || null,
@@ -728,7 +728,8 @@ function logischNaarLokaal(d) {
  */
 function metVerstek(oc, d, vorm, opruimen) {
     const lijst = d.verstek || [];
-    if (lijst.length === 0) return vorm;
+    const vissen = d.vissebek || [];
+    if (lijst.length === 0 && vissen.length === 0) return vorm;
 
     const om = logischNaarLokaal(d);
     // Ruim om het onderdeel heen, zodat het mes er altijd voorbij reikt.
@@ -750,6 +751,25 @@ function metVerstek(oc, d, vorm, opruimen) {
         opruimen.push(hoek, mes, t, gezet);
         // `snede` NIET opruimen: zijn resultaat is de vorm waar we mee verder
         // gaan. Zelfde reden als bij het uitklinken en de gaten.
+    }
+
+    // DE VISSEBEK: een buis die stomp tegen een ronde staander komt, krijgt
+    // een holle kop die om die staander past. Het mes is de staander zelf, een
+    // massieve cilinder: `punt` ligt op zijn as, `as` is zijn richting, beide
+    // in de logische assen van dit onderdeel. Het onderdeel moet tot voorbij
+    // het hart van de staander doorlopen; de cilinder haalt de rest weg.
+    for (const vb of vissen) {
+        const as = opEen(om.richting(vb.as));
+        const q = om.punt(vb.punt);
+        const voet = new oc.gp_Pnt_3(q[0] - as[0] * maat, q[1] - as[1] * maat, q[2] - as[2] * maat);
+        const richting = new oc.gp_Dir_4(as[0], as[1], as[2]);
+        const stelsel = new oc.gp_Ax2_3(voet, richting);
+        const mes = new oc.BRepPrimAPI_MakeCylinder_3(stelsel, vb.straal, 2 * maat);
+        const snede = new oc.BRepAlgoAPI_Cut_3(
+            vorm, mes.Shape(), new oc.Message_ProgressRange_1());
+        snede.Build(new oc.Message_ProgressRange_1());
+        vorm = snede.Shape();
+        opruimen.push(voet, richting, stelsel, mes);
     }
 
     // NATELLEN. Een verstek hoort een hoekje af te zagen, niet het hele
@@ -1050,7 +1070,7 @@ function lokaleDekbandvorm(oc, d, opruimen) {
 /** De vingerafdruk van een gedraaide baluster: model, maten en kopsneden. */
 function balusterSleutel(d) {
     return JSON.stringify({ b: d.baluster, m: [d.dx, d.dy, d.dz],
-                            v: d.verstek || [] });
+                            v: d.verstek || [], vb: d.vissebek || [] });
 }
 
 /**

@@ -486,10 +486,15 @@
     "er stomp tegenaan, zoals in een hoek. Dichte uiteinden kunnen dan niet:",
     "de knieregel moet daarvoor door de eindstaander.",
     "",
+    "TEGEN EEN RONDE STAANDER krijgt het eind een VISSEBEK: rond uitgesneden",
+    "zodat het om de staander past, met 'vissebekSpeling' mm lasspleet. Alleen",
+    "als de staander minstens 'vissebekMarge' mm dikker is dan de knieregel;",
+    "bij twee buizen van dezelfde maat blijft het een recht eind.",
+    "",
     "GEEN KINDVEILIGE VULLING: tussen de regels blijft een opening van ruim",
     "400 mm. Voor een werkvloer of bordes, niet waar kinderen komen."
   ],
-  "knieregel": { "hoogte": 500, "vlees": 10 },
+  "knieregel": { "hoogte": 500, "vlees": 10, "vissebekMarge": 4, "vissebekSpeling": 0.2 },
 
   "_lasbocht": [
     "GESLOTEN UITEINDEN: aan een vrij eind buigt de handregel met een lasbocht",

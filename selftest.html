@@ -11473,6 +11473,30 @@ try {
         check('op de trap staat het eind van de knieregel recht tegen de staander',
             bnTrapTussen.delen.filter(d => d.soort === 'knieregel').every(d => d.verstek.length === 2));
 
+        // DE VISSEBEK: tegen een ronde staander die dikker is dan de knieregel
+        // wordt het eind rond uitgesneden in plaats van recht afgezaagd.
+        log('\n--- vissebek tegen een ronde staander ---');
+        const bnPaal = cat.alleProfielen(catBoom).find(x => /^CHS 60\.3x/.test(x.englishLabel || x.label || ''));
+        const bnVis = { ...bnBuisSt, staanderProfiel: bnPaal, lengte: 2400 };
+        const bnVisKnie = bouwMod.balustradeDelen(bnVis).filter(d => d.soort === 'knieregel');
+        const bnVisR = Math.max(...bouwMod.balustradeDelen(bnVis).filter(d => d.soort === 'staander').map(d => d.dx)) / 2;
+        const bnBek = Math.sqrt((bnVisR + regelsNu.KNIEREGEL.vissebekSpeling) ** 2 - (48.3 / 2) ** 2);
+        check('tegen een buis van 60,3: aan beide einden een vissebek, tot het hart van de staander',
+            bnVisKnie.length > 0 && bnVisKnie.every(d => d.vissebek.length === 2
+                && Math.abs(d.dx - 2400 / bnVisKnie.length) < 1e-6),
+            bnVisKnie.map(d => `${d.dx.toFixed(1)} / ${(d.vissebek || []).length}`).join(', '));
+        check('de zaaglengte is tot de punten van de bek',
+            bnVisKnie.every(d => Math.abs(d.zaaglengte - (d.dx - 2 * bnBek)) < 1e-6),
+            bnVisKnie.map(d => d.zaaglengte.toFixed(1)).join(', '));
+        const bnVisBouw = await bouwMod.bouwBalustrade(bnVis);
+        adMeet('vissebek', bnVisBouw);
+        check('en alle knieregels zijn één onderdeel',
+            bnVisBouw.onderdelen.filter(o => o.deel.soort === 'knieregel').length === 1);
+        adMeet('vissebek op een trap', await trapBouw.bouwTrap({ ...trapRegels.STANDAARD,
+            tredeMateriaal: 'rooster', tredeDikte: 30 }, bnVis, 'rechts'));
+        check('tegen een buis van dezelfde maat blijft het een recht eind',
+            bouwMod.balustradeDelen(bnBuisSt).filter(d => d.soort === 'knieregel').every(d => !d.vissebek));
+
         // EINDKAPPEN: een dop op elk open eind van een holle regel.
         log('\n--- eindkappen op open buiseinden ---');
         const boKap = { ...regelsNu.STANDAARD, handregelProfiel: bnBuis, lengte: 2400, eindkappen: 1 };

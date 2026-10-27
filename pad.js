@@ -2480,12 +2480,23 @@ export function padDelen(punten, gesloten, p) {
             // klopt het ook als de regel vóór de staander ligt (regelLijn) en
             // dus niet door het hart van de staander loopt.
             const halfDwarsSt = (stDoos ? stDoos[1] : staanderBreedte) / 2;
+            // TEGEN EEN RONDE STAANDER EEN VISSEBEK: de kop van de knieregel
+            // wordt rond uitgesneden zodat hij om de staander past, in plaats
+            // van er met een recht eind tegenaan te staan (en aan de zijkanten
+            // een kier te laten). Dan loopt hij door tot het hart van de
+            // staander en haalt de cilinder van de staander de rest weg. Alleen
+            // als de staander duidelijk dikker is dan de knieregel: bij twee
+            // buizen van dezelfde maat raakt de snede de zijkanten precies, en
+            // daar loopt OCCT op vast.
+            const vis = isRond(p.staanderProfiel)
+                && dikte <= 2 * halfLangsSt - KNIEREGEL.vissebekMarge;
             const tegenHoek = (k, P) => {
                 const st = staanders[k];
                 const l = r.langsVlak;
-                const half = Math.abs(punt(l, st.deelhoek)) * halfLangsSt
+                const half = vis ? 0 : Math.abs(punt(l, st.deelhoek)) * halfLangsSt
                     + Math.abs(punt(l, st.dwars)) * halfDwarsSt;
-                return { verschil: punt(min(punten[k], P), l), half };
+                return { verschil: punt(min(punten[k], P), l), half,
+                         opzij: punt(min(punten[k], P), r.dwars) };
             };
             const bh = hoekBegin && tegenHoek(ks.begin, A);
             const eh = hoekEind && tegenHoek(ks.eind, B);
@@ -2522,6 +2533,22 @@ export function padDelen(punten, gesloten, p) {
                 verstek.push({ punt: [lengteKnie - recht, dikte / 2, handregelHoogte / 2],
                                richting: naarAssen(r.langsVlak, 1) });
             }
+            // De vissebek: de as van de staander, in de assen van de knieregel.
+            const vissebek = [];
+            const staanderAs = [r.langs[2], r.dwars[2], r.loodrecht[2]];
+            const visStraal = halfLangsSt + KNIEREGEL.vissebekSpeling;
+            if (vis && hoekBegin) {
+                vissebek.push({ punt: [recht, dikte / 2 + bh.opzij, handregelHoogte / 2],
+                                as: staanderAs, straal: visStraal });
+            }
+            if (vis && hoekEind) {
+                vissebek.push({ punt: [r.schuineLengte + uitBegin + uitEind - recht,
+                                       dikte / 2 + eh.opzij, handregelHoogte / 2],
+                                as: staanderAs, straal: visStraal });
+            }
+            // De zaaglengte is tot de punten van de bek: aan de zijkanten van de
+            // buis, waar de cilinder het verst terugwijkt.
+            const bekDiepte = recht + Math.sqrt(Math.max(0, visStraal ** 2 - (dikte / 2) ** 2)) / r.cos;
             const hart = plus(A, [0, 0, knieHart]);
             // De uiteinden dicht met lasbochten; zie maakEinde.
             if (gesloten_eind(stuk)) {
@@ -2543,6 +2570,10 @@ export function padDelen(punten, gesloten, p) {
                 profiel: p.handregelProfiel || null,
                 lengteAs: 'x',
                 verstek,
+                ...(vissebek.length ? {
+                    vissebek,
+                    zaaglengte: r.schuineLengte + uitBegin + uitEind - vissebek.length * bekDiepte,
+                } : {}),
             });
         }
     }
