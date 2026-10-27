@@ -11446,6 +11446,74 @@ try {
             !bouwMod.balustradeDelen({ ...bnDicht, vulling: 'spijlen' }).some(d => d.soort === 'lasbocht'));
         check('knieregel geeft geen fout in de console',
             errors.length === bnVoor, errors.slice(bnVoor).join(' | '));
+
+        // DOOR EEN BUIS OF EEN SMALLE STAANDER KAN HET NIET: dan per veld
+        // ertussen. "balustrade met knieregel" met de standaardstaander gaf
+        // "Bouwen mislukt" - de kop viel in twee stukken.
+        log('\n--- knieregel tussen de staanders als hij er niet door kan ---');
+        const bnTussen = bouwMod.balustradeDelen({ ...regelsNu.STANDAARD, vulling: 'knieregel', lengte: 3000 });
+        const bnTussenKnie = bnTussen.filter(d => d.soort === 'knieregel');
+        const bnTussenSt = bnTussen.filter(d => d.soort === 'staander');
+        check('met een staander van 40 × 40: één knieregel per veld, geen gaten',
+            bnTussenKnie.length === bnTussenSt.length - 1
+            && bnTussenSt.every(d => d.zadel.every(z => z.top > 900)),
+            `${bnTussenKnie.length} knieregels, ${bnTussenSt.length} staanders`);
+        check('en die staat precies tussen twee staanders: h.o.h. min een staander',
+            bnTussenKnie.every(d => Math.abs(d.dx - (3000 / bnTussenKnie.length - 40)) < 1e-6),
+            bnTussenKnie.map(d => d.dx.toFixed(1)).join(', '));
+        adMeet('knieregel tussen de staanders', await bouwMod.bouwBalustrade(
+            { ...regelsNu.STANDAARD, vulling: 'knieregel', lengte: 3000 }));
+        const bnBuisSt = { ...bnMaten, staanderProfiel: bnBuis, schoprand: 0 };
+        check('door een buisstaander ook niet, en dan geen dichte uiteinden',
+            !bouwMod.balustradeDelen({ ...bnBuisSt, lengte: 2400, geslotenEind: 1 })
+                .some(d => d.soort === 'lasbocht' || (d.soort === 'staander' && d.zadel.some(z => z.top < 900))));
+        const bnTrapTussen = await trapBouw.bouwTrap({ ...trapRegels.STANDAARD, tredeMateriaal: 'rooster',
+                                                      tredeDikte: 30 }, bnBuisSt, 'rechts');
+        adMeet('trap, knieregel tussen buizen', bnTrapTussen);
+        check('op de trap staat het eind van de knieregel recht tegen de staander',
+            bnTrapTussen.delen.filter(d => d.soort === 'knieregel').every(d => d.verstek.length === 2));
+
+        // EINDKAPPEN: een dop op elk open eind van een holle regel.
+        log('\n--- eindkappen op open buiseinden ---');
+        const boKap = { ...regelsNu.STANDAARD, handregelProfiel: bnBuis, lengte: 2400, eindkappen: 1 };
+        const boKaal = bouwMod.balustradeDelen({ ...boKap, eindkappen: 0 });
+        check('zonder vinkje geen eindkappen', !boKaal.some(d => d.soort === 'eindkap'));
+        const boSpijl = bouwMod.balustradeDelen(boKap);
+        const boKappen = boSpijl.filter(d => d.soort === 'eindkap');
+        check('een handregel met twee vrije einden krijgt twee ronde kappen',
+            boKappen.length === 2 && boKappen.every(d => d.rond && d.besteld
+                && Math.abs(d.dx - 48.3) < 1e-9 && d.dz === regelsNu.EINDKAP.dikte),
+            boKappen.map(d => d.omschrijving).join(', '));
+        // Elke kap ligt met zijn binnenkant precies op het eindvlak van de regel.
+        const boRegel = boSpijl.find(d => d.soort === 'handregel');
+        const boAs = (d, w) => ({ x: d.xAs, y: d.yAs, z: d.zAs })[w];
+        const boLangs = boAs(boRegel, 'x');
+        const boKopVlak = [0, boRegel.dx].map(t => boRegel.oorsprong[0] + boLangs[0] * t);
+        check('de kappen zitten tegen de kopse kanten van de handregel, naar buiten',
+            boKappen.some(d => Math.abs(d.oorsprong[0] - boKopVlak[0]) < 1e-6 && d.zAs[0] < 0)
+            && boKappen.some(d => Math.abs(d.oorsprong[0] - boKopVlak[1]) < 1e-6 && d.zAs[0] > 0),
+            boKappen.map(d => d.oorsprong.map(v => v.toFixed(1)).join('/')).join(' ; '));
+        check('zonder overstek geen kap: dan zou hij in de kop van de staander staan',
+            !bouwMod.balustradeDelen({ ...boKap, handregelOverstek: 0 }).some(d => d.soort === 'eindkap'));
+        check('met een knieregel ook op de knieregel: vier kappen',
+            bouwMod.balustradeDelen({ ...boKap, staanderProfiel: bnFl, vulling: 'knieregel' })
+                .filter(d => d.soort === 'eindkap').length === 4);
+        check('met dichte uiteinden geen kappen: de lasbocht maakt het eind al dicht',
+            !bouwMod.balustradeDelen({ ...boKap, staanderProfiel: bnFl, vulling: 'knieregel', geslotenEind: 1 })
+                .some(d => d.soort === 'eindkap'));
+        check('een massieve handregel krijgt geen kap',
+            !bouwMod.balustradeDelen({ ...boKap, handregelProfiel: bnFl }).some(d => d.soort === 'eindkap'));
+        const boBouw = await bouwMod.bouwBalustrade({ ...boKap, staanderProfiel: bnFl, vulling: 'knieregel' });
+        adMeet('eindkappen', boBouw);
+        const boOnd = boBouw.onderdelen.filter(o => o.deel.soort === 'eindkap');
+        check('alle vier kappen zijn één onderdeel',
+            boOnd.length === 1 && boOnd[0].aantal === 4, boOnd.map(o => o.aantal).join(' + '));
+        check('de kap staat als bestelde post',
+            ks.hoeveelheden(boBouw.onderdelen).besteld.eindkap === 4,
+            JSON.stringify(ks.hoeveelheden(boBouw.onderdelen).besteld));
+        const boZin = bnZin.parseer('balustrade van 3 meter met eindkappen', null, {});
+        check('"met eindkappen" wordt begrepen',
+            boZin.params && boZin.params.eindkappen === 1, boZin.fout || boZin.uitleg);
     }
 
     // ============ DEEL BM: schoprand ========================================

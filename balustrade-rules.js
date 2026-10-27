@@ -92,6 +92,8 @@ export const KNIEREGEL = regels.knieregel;
 
 // Gesloten uiteinden met lasbochten; zie regels.json.
 export const LASBOCHT = regels.lasbocht;
+// Kappen op open buiseinden; zie regels.json.
+export const EINDKAP = regels.eindkap;
 
 // Sierpunten en paalkoppen. De modellen zelf staan in sierpunten.js; hier
 // alleen wat de regels erover zeggen. Zie regels.json: de verhoudingen komen

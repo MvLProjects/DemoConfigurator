@@ -249,6 +249,15 @@
       "hoog": 12,
       "bron": "schatting (2026-10-27), niet nagezocht",
       "toelichting": "SCHATTING. Een stalen lasbocht 90 graden voor buis 48,3, per stuk."
+    },
+    "eindkap": {
+      "naam": "Eindkap op buiseinde",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 0.5,
+      "hoog": 3,
+      "bron": "schatting (2026-10-27), niet nagezocht",
+      "toelichting": "SCHATTING. Een kunststof of stalen dop op een open buis- of kokereind, per stuk."
     }
   },
   "_controle": [

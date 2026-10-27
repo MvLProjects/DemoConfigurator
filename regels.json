@@ -217,7 +217,8 @@
     "handregelHout": "",
     "schoprand": 0,
     "regelVoor": 0,
-    "geslotenEind": 0
+    "geslotenEind": 0,
+    "eindkappen": 0
   },
 
   "voetplaat": {
@@ -478,10 +479,17 @@
     "door, in een hoek op verstek, en eindigt gelijk met de buitenkant van de",
     "eindstaander.",
     "",
+    "DOOR DE STAANDER KAN ALLEEN BIJ MASSIEF STAAL (platstaal, vierkant staf)",
+    "met genoeg vlees eromheen: 'vlees' mm dwars, naast het gat. Een buis of",
+    "koker als staander valt uit elkaar als je er een buis van 48,3 doorheen",
+    "steekt. Dan loopt de knieregel per veld TUSSEN de staanders en komt hij",
+    "er stomp tegenaan, zoals in een hoek. Dichte uiteinden kunnen dan niet:",
+    "de knieregel moet daarvoor door de eindstaander.",
+    "",
     "GEEN KINDVEILIGE VULLING: tussen de regels blijft een opening van ruim",
     "400 mm. Voor een werkvloer of bordes, niet waar kinderen komen."
   ],
-  "knieregel": { "hoogte": 500 },
+  "knieregel": { "hoogte": 500, "vlees": 10 },
 
   "_lasbocht": [
     "GESLOTEN UITEINDEN: aan een vrij eind buigt de handregel met een lasbocht",
@@ -494,6 +502,16 @@
     "ronde handregel, en alleen langs een vlakke rand. Een lasbocht koop je."
   ],
   "lasbocht": { "straalFactor": 1.18 },
+
+  "_eindkap": [
+    "EINDKAPPEN: een gekocht dopje op elk open eind van een holle handregel of",
+    "knieregel (buis of koker), zodat er geen scherpe rand en geen open gat is",
+    "waar water in loopt. Rond op een buis, rechthoekig op een koker. Niet",
+    "waar een lasbocht het eind al dicht maakt, en op een handregel alleen als",
+    "hij voorbij de staander uitsteekt. De dikte is die van de kop buiten de",
+    "buis; het deel dat erin steekt telt niet mee in de vorm."
+  ],
+  "eindkap": { "dikte": 3 },
 
   "_schoprand": [
     "DE SCHOPRAND: een plaat langs de vloer, zodat er niets onder de leuning",

@@ -1199,7 +1199,9 @@ function werkAfgeleideBij() {
             + 'regels blijft een opening van ruim 400 mm. Voor een werkvloer, '
             + 'een bordes of een dak, niet waar kinderen komen. De knieregel '
             + 'heeft dezelfde doorsnede als de handregel; met een schoprand '
-            + 'erbij is het de gewone industriële leuning.',
+            + 'erbij is het de gewone industriële leuning. Door de staanders '
+            + 'heen kan alleen bij massief staal, zoals platstaal 80 × 12; bij '
+            + 'een buis of een smalle staander zit hij per veld ertussen.',
         glasvrij:
             'Glas zonder staanders: de ruiten staan in een aluminium '
             + 'bodemprofiel op de vloer, met een kaplijst erover. De app tekent '
@@ -2348,6 +2350,7 @@ function offerteKeuzes() {
                 : []),
             ['Materiaal', metaal],
             ...(b.schoprand ? [['Schoprand', '100 mm, langs de vloer']] : []),
+            ...(b.eindkappen ? [['Eindkappen', 'op de open buiseinden']] : []),
             ['Afwerking', afwerking],
         ];
     }
