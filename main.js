@@ -2335,6 +2335,7 @@ function offerteKeuzes() {
                 ? [['Spijlen', profielNaam(b.spijlProfiel, `${b.spijlBreedte} × ${b.spijlBreedte}`)]]
                 : []),
             ['Materiaal', metaal],
+            ...(b.schoprand ? [['Schoprand', '100 mm, langs de vloer']] : []),
             ['Afwerking', afwerking],
         ];
     }
@@ -2822,6 +2823,16 @@ async function herstelProfielen(maten, trapMaten) {
 }
 
 /** Zet waarden in invulvelden, en negeert wat er niet in past. */
+/**
+ * Eén veld zetten vanuit een zin. Een vinkje heeft geen `value` die iets
+ * doet: "met schoprand" of "vulraamwerk 1" werd begrepen en kwam dan nooit
+ * in het paneel. Zie ook vulVelden.
+ */
+function zetVeld(veld, waarde) {
+    if (isVinkje(veld)) veld.checked = Boolean(Number(waarde));
+    else veld.value = waarde;
+}
+
 function vulVelden(doelVelden, waarden) {
     if (!waarden) return 0;
     let aantal = 0;
@@ -3147,7 +3158,7 @@ async function voerOpdrachtKern(tekst) {
             // Het paneel bijwerken, zodat je ziet wat er gebeurd is en het
             // daarna met de hand kunt bijstellen.
             for (const [naam, veld] of Object.entries(trapVelden)) {
-                if (gelezen.params[naam] !== undefined) veld.value = gelezen.params[naam];
+                if (gelezen.params[naam] !== undefined) zetVeld(veld, gelezen.params[naam]);
             }
             document.getElementById('t_leuning').value = gelezen.leuning;
             // De keuzes die geen getalveld zijn: tredesoort, stootborden,
@@ -3166,7 +3177,7 @@ async function voerOpdrachtKern(tekst) {
             // de trapleuning zijn maten vandaan.
             for (const [naam, veld] of Object.entries(velden)) {
                 const w = (gelezen.leuningMaten || {})[naam];
-                if (w !== undefined) veld.value = w;
+                if (w !== undefined) zetVeld(veld, w);
             }
             const maten = werkTrapBij();
             if (!maten) {
@@ -3232,7 +3243,7 @@ async function voerOpdrachtKern(tekst) {
         // balustrade: het formulier bijwerken, zodat je ziet wat er gebeurd is
         // en het daarna met de hand kunt bijstellen.
         for (const [naam, veld] of Object.entries(velden)) {
-            if (gelezen.params[naam] !== undefined) veld.value = gelezen.params[naam];
+            if (gelezen.params[naam] !== undefined) zetVeld(veld, gelezen.params[naam]);
         }
         const maten = werkAfgeleideBij();
         if (!maten) {

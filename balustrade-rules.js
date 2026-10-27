@@ -84,6 +84,9 @@ export const GLASVRIJ = regels.glasvrij;
 // De staanderkop afronden naast een ronde handregel; zie regels.json.
 export const AFRONDING = regels.afronding;
 
+// De schoprand langs de vloer; zie regels.json.
+export const SCHOPRAND = regels.schoprand;
+
 // Sierpunten en paalkoppen. De modellen zelf staan in sierpunten.js; hier
 // alleen wat de regels erover zeggen. Zie regels.json: de verhoudingen komen
 // uit twee gemeten maten, de rest is een keuze.

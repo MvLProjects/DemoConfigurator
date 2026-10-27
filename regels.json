@@ -214,7 +214,8 @@
     "spijlMateriaal": "steen",
     "handregelModel": "",
     "handregelMateriaal": "steen",
-    "handregelHout": ""
+    "handregelHout": "",
+    "schoprand": 0
   },
 
   "voetplaat": {
@@ -464,6 +465,22 @@
     "rubber": 2,
     "klem": { "breedte": 50, "hoogte": 45, "wang": 8, "perRand": 2 }
   },
+
+  "_schoprand": [
+    "DE SCHOPRAND: een plaat langs de vloer, zodat er niets onder de leuning",
+    "door van de rand kan rollen of geschopt worden. Bij een industriele",
+    "leuning hoort hij erbij.",
+    "",
+    "Maten zoals in Marthijns voorbeeld (HCW.stp): 6 dik en 100 hoog, de",
+    "bovenhoeken aan de uiteinden 25 mm afgeschuind. Daar staat hij 30 mm",
+    "boven de vloer; hier 10 mm boven de voetplaat, zodat er geen bal of",
+    "gereedschap onderdoor past.",
+    "",
+    "TEGEN DE ZIJKANT VAN DE STAANDERS, niet ertussen: tussen de staanders",
+    "zit op 100 mm hoogte de onderregel van het vulveld. Aan de kant waar geen",
+    "glas zit. In een hoek op verstek; alleen langs een vlakke rand."
+  ],
+  "schoprand": { "hoogte": 100, "dikte": 6, "vrij": 10, "afschuining": 25 },
 
   "_afronding": [
     "DE STAANDERKOP AFRONDEN naast een ronde handregel. Is de staander breder",

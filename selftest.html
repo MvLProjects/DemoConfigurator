@@ -11312,6 +11312,48 @@ try {
         adMeet('platte staanders FL 80x12', await bouwMod.bouwBalustrade(bkPlat));
     }
 
+    // ============ DEEL BM: schoprand ========================================
+    log('\n\n======== DEEL BM: schoprand langs de vloer ========\n');
+    {
+        const bmVoor = errors.length;
+        const bmMaten = { ...regelsNu.STANDAARD, schoprand: 1 };
+        const bmS = regelsNu.SCHOPRAND;
+        const bmRecht = bouwMod.balustradeDelen({ ...bmMaten, lengte: 2400 });
+        const bmPlaten = bmRecht.filter(d => d.soort === 'schoprand');
+        check('een recht stuk krijgt één schoprand van 100 x 6',
+            bmPlaten.length === 1 && bmPlaten[0].dz === bmS.hoogte && bmPlaten[0].dy === bmS.dikte,
+            bmPlaten.length);
+        check('zonder vinkje geen schoprand',
+            !bouwMod.balustradeDelen({ ...bmMaten, schoprand: 0 }).some(d => d.soort === 'schoprand'));
+        // Tegen de zijkant van de staander, niet erdoorheen.
+        const bmYs = [bmPlaten[0].oorsprong[1],
+                      bmPlaten[0].oorsprong[1] + bmPlaten[0].dy * bmPlaten[0].yAs[1]];
+        check('hij staat tegen de zijkant van de staanders, buiten het vulveld',
+            Math.sign(bmYs[0]) === Math.sign(bmYs[1])
+            && Math.abs(Math.min(...bmYs.map(Math.abs)) - bmMaten.staanderBreedte / 2) < 1e-6,
+            bmYs.map(y => y.toFixed(2)).join(' .. '));
+        adMeet('schoprand recht', await bouwMod.bouwBalustrade({ ...bmMaten, lengte: 2400 }));
+        adMeet('schoprand hoek links', await bouwMod.bouwPad(
+            [[0, 0, 0], [2000, 0, 0], [2000, 1500, 0]], false, bmMaten));
+        adMeet('schoprand hoek rechts', await bouwMod.bouwPad(
+            [[0, 0, 0], [2000, 0, 0], [2000, -1500, 0]], false, bmMaten));
+        adMeet('schoprand met glas', await bouwMod.bouwPad(
+            [[0, 0, 0], [2000, 0, 0], [2000, 1500, 0]], false, { ...bmMaten, vulling: 'glas' }));
+        const bmHoek = (await bouwMod.bouwPad([[0, 0, 0], [2000, 0, 0], [2000, 1500, 0]],
+            false, bmMaten)).delen.filter(d => d.soort === 'schoprand');
+        check('in een hoek twee platen op verstek, met een schuine kop aan de vrije uiteinden',
+            bmHoek.length === 2 && bmHoek.every(d => d.verstek.length === 2));
+        check('op een helling geen schoprand',
+            !(await bouwMod.bouwPad([[0, 0, 0], [3000, 0, 1500]], false, bmMaten))
+                .delen.some(d => d.soort === 'schoprand'));
+        const bmZin = await win.eval("import('/command-parser.js')");
+        const bmA = bmZin.parseer('balustrade van 3 meter met schoprand', null, {});
+        check('"met schoprand" zet hem aan', bmA.params && bmA.params.schoprand === 1,
+            bmA.fout || bmA.uitleg);
+        check('schoprand geeft geen fout in de console',
+            errors.length === bmVoor, errors.slice(bmVoor).join(' | '));
+    }
+
     // ============ DEEL BL: direct bijwerken ================================
     log('\n\n======== DEEL BL: het model werkt zichzelf bij ========\n');
     {

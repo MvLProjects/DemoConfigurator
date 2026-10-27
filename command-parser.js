@@ -358,6 +358,11 @@ function leesExtras(tekst, voorraad) {
         gevonden.push(`handregel van ${uit.handregelHout}`);
         rest = poets(rest, m.index, m.index + m[0].length);
     }
+    for (const m of [...rest.matchAll(/\b(?:schoprand|schopplaat|kantplaat)\b/gi)]) {
+        if (!uit.schoprand) gevonden.push('met schoprand');
+        uit.schoprand = 1;
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
     if (uit.verzinken && uit.metaal) {
         genegeerd.push('Verzinken kan alleen bij staal; RVS en aluminium roesten niet.');
         uit.verzinken = undefined;
@@ -963,6 +968,7 @@ export function parseer(invoer, vorige = null, opties = {}) {
         extraMaten.handregelModel = extra.handregelModel;
     }
     if (extra.handregelHout !== undefined) extraMaten.handregelHout = extra.handregelHout;
+    if (extra.schoprand !== undefined) extraMaten.schoprand = extra.schoprand;
     // Velden die bij naam genoemd zijn gaan er zo in; ze hebben hun eigen naam
     // dus er valt niets te raden.
     Object.assign(extraMaten, extra.velden || {});

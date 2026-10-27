@@ -66,7 +66,7 @@
 
 import { berekenSpijlen, spijlPosities, VOETPLAAT, VULRAAMWERK, PAALKAP,
          uitklinkDiepte, stripBreedte, profielDoos,
-         VULLING, vullingSoort, GLAS, SIERPUNT, AFRONDING,
+         VULLING, vullingSoort, GLAS, SIERPUNT, AFRONDING, SCHOPRAND,
          DEKBAND } from './balustrade-rules.js';
 // De modellenbibliotheek. pad.js bepaalt alleen WAAR het ornament komt en hoe
 // groot; de vorm zelf wordt pas bij het bouwen gemaakt, in build-balustrade.js.
@@ -2296,6 +2296,57 @@ export function padDelen(punten, gesloten, p) {
     // leuning wordt in één kleur gepoedercoat - en zo kan er geen onderdeel
     // vergeten worden.
     // materialen.js haalt hem er weer af waar hij niet kan, zoals op hout.
+    // --- de schoprand ----------------------------------------------------
+    //
+    // Een plaat langs de vloer, TEGEN de zijkant van de staanders: tussen de
+    // staanders zit op 100 mm de onderregel van het vulveld. Aan de kant waar
+    // geen glas zit (het glas staat aan de +dwars-kant, zie de ruit). Per
+    // recht stuk één plaat, in een hoek op verstek, aan een vrij eind gelijk
+    // met de buitenkant van de staander en met een afgeschuinde bovenhoek.
+    // Zie regels.json onder _schoprand.
+    if (Number(p.schoprand)) {
+        const S = SCHOPRAND;
+        const halfDwarsSt = (stDoos ? stDoos[1] : staanderBreedte) / 2;
+        const halfLangsSt = (stDoos ? stDoos[0] : staanderBreedte) / 2;
+        const lijn = verschuifPad(punten, gesloten, -(halfDwarsSt + S.dikte / 2));
+        const zOnder = plaatDikte + S.vrij;
+        for (const stuk of handregelStukken(lijn, gesloten)) {
+            // Alleen vlak: op een trap is een schoprand iets anders.
+            if (Math.abs(stuk.langs[2]) > 1e-6) continue;
+            const A = lijn[stuk.begin], B = lijn[stuk.eind];
+            const L = vlakLengte(min(B, A));
+            const ls = stuk.langs;
+            const dw = eenheid(kruis(omhoog, ls));
+            const uitloop = (n) => (n ? (S.dikte / 2) * Math.abs(punt(dw, n)) / punt(ls, n) : 0);
+            const uitBegin = stuk.beginVrij ? halfLangsSt : uitloop(stuk.beginNormaal);
+            const uitEind = stuk.eindVrij ? halfLangsSt : uitloop(stuk.eindNormaal);
+            const naarAssen = (n, teken) => [teken * punt(n, ls), teken * punt(n, dw),
+                                             teken * punt(n, omhoog)];
+            const dx = L + uitBegin + uitEind;
+            const verstek = [];
+            if (stuk.beginNormaal) {
+                verstek.push({ punt: [uitBegin, S.dikte / 2, 0],
+                               richting: naarAssen(stuk.beginNormaal, -1) });
+            }
+            if (stuk.eindNormaal) {
+                verstek.push({ punt: [uitBegin + L, S.dikte / 2, 0],
+                               richting: naarAssen(stuk.eindNormaal, 1) });
+            }
+            // De bovenhoek aan een vrij eind schuin af, zoals bij Marthijn.
+            if (stuk.beginVrij) verstek.push({ punt: [S.afschuining, 0, S.hoogte], richting: [-1, 0, 1] });
+            if (stuk.eindVrij) verstek.push({ punt: [dx - S.afschuining, 0, S.hoogte], richting: [1, 0, 1] });
+            voegToe({
+                soort: 'schoprand',
+                oorsprong: plus(plus(plus(A, [0, 0, zOnder]), maal(dw, -S.dikte / 2)),
+                                maal(ls, -uitBegin)),
+                xAs: ls, yAs: dw, zAs: omhoog,
+                dx, dy: S.dikte, dz: S.hoogte,
+                lengteAs: 'x', verstek,
+                omschrijving: `FL ${S.hoogte} × ${S.dikte}`,
+            });
+        }
+    }
+
     stempelWerk(delen, p);
 
     return { delen, velden, staanders, verbindingen };
