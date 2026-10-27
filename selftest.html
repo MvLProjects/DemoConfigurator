@@ -59,6 +59,12 @@ try {
         await new Promise(r => frame.addEventListener('load', r, { once: true }));
     }
     const win = frame.contentWindow, doc = frame.contentDocument;
+    // DIRECT BIJWERKEN UIT. De zelftest zet velden en stuurt input-
+    // gebeurtenissen, en drukt daarna zelf op Genereer. Met direct bijwerken
+    // aan liep er dan een tweede bouw dwars door een controle heen. Deel BL
+    // zet hem even aan om juist dat te beproeven. Met de hand, zonder
+    // change-gebeurtenis, zodat de keuze in de browser niet verandert.
+    doc.getElementById('instDirect').checked = false;
 
     const errors = [];
     // OrbitControls roept setPointerCapture aan; dat kan niet met kunstmatige
@@ -11285,6 +11291,60 @@ try {
             `${(bkKaal - bkMet).toFixed(1)} tegen ${bkWeg.toFixed(1)} mm3`);
         check('afronden geeft geen fout in de console',
             errors.length === bkVoor, errors.slice(bkVoor).join(' | '));
+
+        // PLATTE STAANDERS: 80 x 12, langs de leuning maar 12 dik. De
+        // vulregels stopten 34 mm voor de staander, omdat er met 80 aan
+        // elke kant gerekend werd. Ze horen er tegenaan te komen.
+        const bkFl = cat.alleProfielen(catBoom)
+            .find(x => /^FL 80x12$/.test(x.englishLabel || x.label || ''));
+        check('het platstaal FL 80x12 zit in de catalogus', !!bkFl);
+        const bkPlat = { ...regelsNu.STANDAARD, lengte: 3000, staanderProfiel: bkFl,
+                         handregelProfiel: bkBuis, vulraamwerk: 1 };
+        const bkPd = bouwMod.balustradeDelen(bkPlat);
+        const bkDoos = regelsNu.profielDoos(bkFl);
+        const bkSt2 = bkPd.filter(d => d.soort === 'staander')
+            .map(d => d.oorsprong[0] + d.dx / 2).sort((a, b) => a - b);
+        const bkHoh = bkSt2[1] - bkSt2[0];
+        const bkRegel = bkPd.find(d => d.soort === 'vulregel');
+        check('de vulregel loopt van staander tot staander: h.o.h. min de dikte langs de leuning',
+            Math.abs(bkRegel.dx - (bkHoh - bkDoos[0])) < 0.01,
+            `${bkRegel.dx.toFixed(1)} tegen ${(bkHoh - bkDoos[0]).toFixed(1)} (dikte ${bkDoos[0]})`);
+        adMeet('platte staanders FL 80x12', await bouwMod.bouwBalustrade(bkPlat));
+    }
+
+    // ============ DEEL BL: direct bijwerken ================================
+    log('\n\n======== DEEL BL: het model werkt zichzelf bij ========\n');
+    {
+        const blVoor = errors.length;
+        const blSt = doc.getElementById('status');
+        const blWacht = async (re) => {
+            for (let i = 0; i < 40000 && !re.test(blSt.textContent); i++) await sleep(25);
+        };
+        // Eerst een gewone balustrade, met de knop.
+        doc.getElementById('p_lengte').value = 2000;
+        blSt.textContent = '';
+        doc.getElementById('genereer').click();
+        await blWacht(/Balustrade \d|mislukt/);
+        // Dan aan, en een maat veranderen zoals een gebruiker dat doet: typen
+        // en een input-gebeurtenis. Niet op de knop drukken.
+        doc.getElementById('instDirect').checked = true;
+        const blVeld = doc.getElementById('p_lengte');
+        blVeld.value = 2600;
+        blSt.textContent = '';
+        blVeld.dispatchEvent(new Event('input', { bubbles: true }));
+        await blWacht(/Balustrade 2600|mislukt/);
+        check('een gewijzigde lengte bouwt het model vanzelf opnieuw',
+            /Balustrade 2600/.test(blSt.textContent), blSt.textContent.slice(0, 60));
+        // Uit: dan blijft het model staan.
+        doc.getElementById('instDirect').checked = false;
+        blVeld.value = 2000;
+        blSt.textContent = 'onaangeroerd';
+        blVeld.dispatchEvent(new Event('input', { bubbles: true }));
+        await sleep(3000);
+        check('met direct bijwerken uit gebeurt er niets', blSt.textContent === 'onaangeroerd',
+            blSt.textContent.slice(0, 60));
+        check('direct bijwerken geeft geen fout in de console',
+            errors.length === blVoor, errors.slice(blVoor).join(' | '));
     }
 
     // ============ DEEL BJ: het trapgat ======================================

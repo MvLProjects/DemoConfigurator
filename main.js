@@ -638,6 +638,7 @@ document.getElementById('kies_sierpunt').addEventListener('click', async () => {
         werkConfiguratiesBij();
         statusEl.textContent = `Sierpunt: ${modelVan(gekozen).naam} — druk op `
             + 'Genereer balustrade.';
+        planBouw();
     } catch (err) {
         console.error(err);
         statusEl.textContent = 'Sierpunt kiezen mislukt: ' + err.message;
@@ -651,6 +652,7 @@ document.getElementById('wis_sierpunt').addEventListener('click', () => {
     toonSierpunt();
     werkAfgeleideBij();
     werkConfiguratiesBij();
+    planBouw();
 });
 
 // Meteen bij het openen in de goede stand: zonder sierpunt staan de hoogte en
@@ -825,6 +827,7 @@ document.getElementById('kies_spijlSierpunt').addEventListener('click', async ()
         werkConfiguratiesBij();
         statusEl.textContent = `Punt op de spijlen: ${modelVan(gekozen).naam} — `
             + 'druk op Genereer balustrade.';
+        planBouw();
     } catch (err) {
         console.error(err);
         statusEl.textContent = 'Punt kiezen mislukt: ' + err.message;
@@ -838,6 +841,7 @@ document.getElementById('wis_spijlSierpunt').addEventListener('click', () => {
     toonSpijlPunt();
     werkAfgeleideBij();
     werkConfiguratiesBij();
+    planBouw();
 });
 
 toonSpijlPunt();
@@ -1495,6 +1499,57 @@ const trapAfgeleid = {
 const trapFoutEl = document.getElementById('trapFout');
 const trapLetEl = document.getElementById('trapLet');
 const trapKnop = document.getElementById('genereerTrap');
+
+// --- direct bijwerken --------------------------------------------------------
+//
+// Verander je een maat, een profiel of een kleur terwijl er al een model staat,
+// dan wordt dat model vanzelf opnieuw gebouwd: geen klik meer op Genereer. Het
+// wacht even, zodat er tijdens het typen van "2500" niet vier keer gebouwd
+// wordt. Uit te zetten bij Instellingen; die keuze onthoudt de browser.
+//
+// ALLEEN VANUIT DE GEBRUIKER. Een voorbeeld, een zin of het terugzetten van
+// instellingen zet velden met de hand en klikt daarna zelf op de knop; dat
+// geeft geen input-gebeurtenis en dus ook geen tweede bouw.
+const DIRECT_SLEUTEL = 'railing-configurator/direct/1';
+const directEl = document.getElementById('instDirect');
+try {
+    const v = localStorage.getItem(DIRECT_SLEUTEL);
+    if (v !== null) directEl.checked = v === '1';
+} catch { /* geen opslag: dan gewoon aan */ }
+directEl.addEventListener('change', () => {
+    try { localStorage.setItem(DIRECT_SLEUTEL, directEl.checked ? '1' : '0'); } catch { /* */ }
+});
+
+let bouwPlan = null;
+function planBouw(wacht = 400) {
+    if (!directEl.checked) return;
+    if (laatsteNaam !== 'trap' && laatsteNaam !== 'balustrade') return;
+    clearTimeout(bouwPlan);
+    bouwPlan = setTimeout(() => {
+        bouwPlan = null;
+        const knop = laatsteNaam === 'trap' ? trapKnop : genereerKnop;
+        // Bezig met een bouw: straks nog eens. Ongeldige maten: niets doen,
+        // de rode melding in het paneel zegt al wat er mis is.
+        if (!document.getElementById('bezigVak').hidden) { planBouw(800); return; }
+        if (knop.disabled) return;
+        knop.click();
+    }, wacht);
+}
+
+// Elk veld in de tabbladen die het model bepalen. Typen wacht wat langer dan
+// een keuzelijst of een vinkje.
+{
+    const BOUWGROEPEN = new Set(['Balustrade', 'Profielen', 'Afwerking', 'Trap']);
+    for (const soort of ['input', 'change']) {
+        document.getElementById('panel').addEventListener(soort, (e) => {
+            const el = e.target;
+            const groep = el && el.closest && el.closest('details.groep');
+            if (!groep || !BOUWGROEPEN.has(groep.querySelector('summary').textContent.trim())) return;
+            if (el.type === 'file' || el.type === 'button' || el.type === 'search') return;
+            planBouw(soort === 'input' && el.type !== 'checkbox' ? 900 : 300);
+        });
+    }
+}
 
 for (const [naam, veld] of Object.entries(trapVelden)) {
     veld.value = TRAP_STANDAARD[naam];
@@ -3666,6 +3721,7 @@ for (const onderdeel of ['staander', 'handregel', 'spijl', 'boom']) {
             werkConfiguratiesBij();
             statusEl.textContent = `${onderdeel}: ${gekozen.englishLabel} — druk op `
                 + (onderdeel === 'boom' ? 'Genereer trap.' : 'Genereer balustrade.');
+            planBouw();
         } catch (err) {
             console.error(err);
             // De foutmelding van laadCatalogus noemt het ingestelde pad; dat is
@@ -3683,6 +3739,7 @@ for (const onderdeel of ['staander', 'handregel', 'spijl', 'boom']) {
         werkAfgeleideBij();
         if (onderdeel === 'boom') trapGewijzigd();
         else werkTrapBij();
+        planBouw();
     });
 }
 

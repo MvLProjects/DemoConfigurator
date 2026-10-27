@@ -230,6 +230,10 @@ export function maakPad(randen, tolerantie = 0.05) {
 export function staanderGegevens(punten, gesloten, breedte) {
     const omhoog = [0, 0, 1];
     const aantal = punten.length;
+    // Een getal is een vierkante staander; [langs, dwars] een rechthoekige,
+    // met `langs` in de richting van de deelhoek (de X van het profiel).
+    const [halfLangs, halfDwars] = (Array.isArray(breedte) ? breedte : [breedte, breedte])
+        .map(w => w / 2);
 
     // Horizontale richting van punt i naar punt j.
     const richtingNaar = (i, j) => {
@@ -271,9 +275,11 @@ export function staanderGegevens(punten, gesloten, breedte) {
         const dwars = eenheid(kruis(omhoog, deelhoek));
         const dwarsLijn = eenheid(kruis(omhoog, deellijn));
 
+        // De afstand van het hart tot de rand van de staander, langs
+        // `richting`: de dichtstbijzijnde van de twee zijden.
         const inzetVoor = (as, dw) => (richting) => richting === null ? 0
-            : (breedte / 2) / Math.max(Math.abs(punt(richting, as)),
-                                       Math.abs(punt(richting, dw)));
+            : 1 / Math.max(Math.abs(punt(richting, as)) / halfLangs,
+                           Math.abs(punt(richting, dw)) / halfDwars);
         const inzetLangs = inzetVoor(deelhoek, dwars);
         const inzetLijn = inzetVoor(deellijn, dwarsLijn);
 
@@ -593,7 +599,11 @@ export function padDelen(punten, gesloten, p) {
           * (dekbandModel ? DEKBAND.breedteFactor : 1);
     const handregelHoogte = hrDoos ? hrDoos[1] : p.handregelHoogte;
 
-    const staanders = staanderGegevens(pad, gesloten, staanderBreedte);
+    // DE ECHTE MATEN, niet de grootste twee keer. Een platte staander van
+    // 80 x 12 is langs de leuning 12 dik; met 80 aan elke kant stopten de
+    // vulregels 34 mm voor de staander en hing er een gat tussen.
+    const staanders = staanderGegevens(pad, gesloten,
+        stDoos ? [stDoos[0], stDoos[1]] : staanderBreedte);
     const delen = [];
     const velden = [];
 
