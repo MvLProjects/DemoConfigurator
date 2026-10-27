@@ -3382,12 +3382,17 @@ function kaderGegevens() {
  * een wit vlak. Voor de zekerheid wordt er eerst nog één keer getekend.
  */
 function aanzichtAlsAfbeelding() {
+    // Zonder de bovenvloer: dit plaatje gaat op een tekening.
+    const vloerZichtbaar = vloerRoot ? vloerRoot.visible : false;
     try {
+        if (vloerRoot) vloerRoot.visible = false;
         renderer.render(scene, camera);
         return renderer.domElement.toDataURL('image/png');
     } catch (err) {
         console.error(err);
         return null;
+    } finally {
+        if (vloerRoot) vloerRoot.visible = vloerZichtbaar;
     }
 }
 
@@ -3444,12 +3449,16 @@ export function rendersAanzicht(richting, breedtePx, hoogtePx, opties = {}) {
         near: camera.near,
         far: camera.far,
         maten: matenGroep ? matenGroep.visible : null,
+        vloer: vloerRoot ? vloerRoot.visible : null,
         formaat: new THREE.Vector2(),
     };
     renderer.getSize(was.formaat);
 
     try {
         if (matenGroep) matenGroep.visible = !klant;
+        // De bovenvloer hoort niet op een tekening of offerte: in een
+        // bovenaanzicht lag hij over de trap heen. Zie toonVloer.
+        if (vloerRoot) vloerRoot.visible = false;
         renderer.setSize(breedtePx, hoogtePx, false);
         camera.aspect = breedtePx / hoogtePx;
         camera.updateProjectionMatrix();
@@ -3477,6 +3486,7 @@ export function rendersAanzicht(richting, breedtePx, hoogtePx, opties = {}) {
         controls.target.copy(was.doel);
         controls.update();
         if (matenGroep && was.maten !== null) matenGroep.visible = was.maten;
+        if (vloerRoot && was.vloer !== null) vloerRoot.visible = was.vloer;
         for (const a of aandacht) a.m.color.setHex(a.kleur);
     }
 }
