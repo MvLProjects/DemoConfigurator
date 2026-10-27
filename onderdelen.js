@@ -383,9 +383,17 @@ export function beschrijf(deel) {
     // Allebei in ÉÉN kolom, want in een stuklijst staat één materiaalkolom. Een
     // aparte kolom "staalsoort" naast "materiaal" zou bij een houten trede
     // altijd leeg zijn en bij staal altijd dubbel.
-    const uitProfiel = pr && pr.items
-        ? pr.items.map(i => i.material).filter(Boolean).join(', ') : '';
+    const soorten = pr && pr.items ? pr.items.map(i => i.material).filter(Boolean) : [];
+    const uitProfiel = soorten.join(', ');
     const sleutel = materiaalVanDeel(deel);
+    // EÉN STAALSOORT IN DE KOLOM. De catalogus zet bij een profiel vaak staal
+    // én RVS (S235JRH en X5CrNi18-10); allebei in de stuklijst laat de
+    // werkplaats raden wat er besteld moet worden. Bij staal dus de eerste
+    // soort die geen RVS is - die beginnen met een X of met 1.4
+    // (werkstofnummer). Bij RVS niet de soort uit de catalogus: dat is 304,
+    // en de app belooft RVS 316.
+    const isRvsSoort = (m) => /^(?:X|1\.4)/i.test(m.trim());
+    const gekozenSoort = sleutel === 'staal' ? soorten.find(m => !isRvsSoort(m)) : undefined;
 
     return {
         soort: deel.soort,
@@ -404,8 +412,8 @@ export function beschrijf(deel) {
         norm: pr ? (pr.standardLabel || '') : '',
         // De staalsoort uit de catalogus geldt alleen voor STAAL. Is het frame
         // RVS of aluminium, dan zou "S235JRH" bij een RVS-staander een
-        // verkeerde bestelling opleveren.
-        materiaal: (sleutel === 'staal' && uitProfiel) || materiaalNaam(sleutel),
+        // verkeerde bestelling opleveren. Zie gekozenSoort hierboven.
+        materiaal: gekozenSoort || materiaalNaam(sleutel),
         materiaalSleutel: sleutel,
         // De afwerking is een EIGEN gegeven naast het materiaal: een staander
         // is van staal én gepoedercoat. Leeg betekent blank.

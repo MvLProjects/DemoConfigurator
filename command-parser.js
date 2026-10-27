@@ -238,6 +238,7 @@ const VULLINGZINNEN = [
     [/\b(?:liggende|horizontale)\s+(?:regels|spijlen|vulling|staven)\b/gi, 'horizontaal'],
     [/\b(?:verticale|staande)\s+(?:spijlen|staven|vulling)\b/gi, 'spijlen'],
     [/\bzonder\s+vulling\b/gi, 'geen'],
+    [/\b(?:met\s+(?:een\s+)?)?knie\s?(?:regel|leuning|stang)s?\b/gi, 'knieregel'],
 ];
 
 // "80 mm spijloverstek", "spijloverstek 80", "overstek van 100 mm".
@@ -356,6 +357,18 @@ function leesExtras(tekst, voorraad) {
         const hout = m[1].toLowerCase();
         uit.handregelHout = hout === 'houten' ? 'eiken' : hout;
         gevonden.push(`handregel van ${uit.handregelHout}`);
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+    // "handregel voor de staanders", "buis vóór de staander".
+    for (const m of [...rest.matchAll(/\b(?:handregel|buis|regel)\s+(?:voor|vóór)\s+(?:de\s+)?staanders?\b/gi)]) {
+        if (!uit.regelVoor) gevonden.push('handregel vóór de staanders');
+        uit.regelVoor = 1;
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
+    // "dichte uiteinden", "gesloten einden", "met lasbochten".
+    for (const m of [...rest.matchAll(/\b(?:(?:dichte|gesloten)\s+(?:uit)?einden?|uiteinden\s+dicht|lasbochten?)\b/gi)]) {
+        if (!uit.geslotenEind) gevonden.push('uiteinden dicht met lasbochten');
+        uit.geslotenEind = 1;
         rest = poets(rest, m.index, m.index + m[0].length);
     }
     for (const m of [...rest.matchAll(/\b(?:schoprand|schopplaat|kantplaat)\b/gi)]) {
@@ -969,6 +982,8 @@ export function parseer(invoer, vorige = null, opties = {}) {
     }
     if (extra.handregelHout !== undefined) extraMaten.handregelHout = extra.handregelHout;
     if (extra.schoprand !== undefined) extraMaten.schoprand = extra.schoprand;
+    if (extra.regelVoor !== undefined) extraMaten.regelVoor = extra.regelVoor;
+    if (extra.geslotenEind !== undefined) extraMaten.geslotenEind = extra.geslotenEind;
     // Velden die bij naam genoemd zijn gaan er zo in; ze hebben hun eigen naam
     // dus er valt niets te raden.
     Object.assign(extraMaten, extra.velden || {});

@@ -215,7 +215,9 @@
     "handregelModel": "",
     "handregelMateriaal": "steen",
     "handregelHout": "",
-    "schoprand": 0
+    "schoprand": 0,
+    "regelVoor": 0,
+    "geslotenEind": 0
   },
 
   "voetplaat": {
@@ -410,7 +412,7 @@
     "hij voldoet. Marthijn moet dit getal bevestigen."
   ],
   "vulling": {
-    "soorten": ["spijlen", "horizontaal", "glas", "glasvrij", "geen"],
+    "soorten": ["spijlen", "horizontaal", "glas", "glasvrij", "knieregel", "geen"],
     "maxDoorgangHorizontaal": 100
   },
 
@@ -466,6 +468,33 @@
     "klem": { "breedte": 50, "hoogte": 45, "wang": 8, "perRand": 2 }
   },
 
+  "_knieregel": [
+    "DE KNIEREGEL: een tweede regel halverwege, door de staanders heen, zoals",
+    "in Marthijns voorbeeld (HCW.stp: buis 48,3 op 500, handregel op 1100).",
+    "Met een schoprand erbij is dat de gewone industriele leuning.",
+    "",
+    "Dezelfde doorsnede als de handregel, met het hart op 500 mm - of",
+    "halverwege als de leuning lager is dan 1000. Hij loopt per recht stuk",
+    "door, in een hoek op verstek, en eindigt gelijk met de buitenkant van de",
+    "eindstaander.",
+    "",
+    "GEEN KINDVEILIGE VULLING: tussen de regels blijft een opening van ruim",
+    "400 mm. Voor een werkvloer of bordes, niet waar kinderen komen."
+  ],
+  "knieregel": { "hoogte": 500 },
+
+  "_lasbocht": [
+    "GESLOTEN UITEINDEN: aan een vrij eind buigt de handregel met een lasbocht",
+    "omlaag, loopt als staande buis naar de knieregel en buigt daar met een",
+    "tweede lasbocht in. Geen open buiseinde waar je achter blijft haken.",
+    "",
+    "Zoals in Marthijns voorbeeld (HCW.stp): de bocht begint 118,9 voorbij de",
+    "eindstaander (hier: de handregeloverstek) en heeft een hartstraal van 57",
+    "bij een buis van 48,3 - een factor 1,18. Alleen met een knieregel en een",
+    "ronde handregel, en alleen langs een vlakke rand. Een lasbocht koop je."
+  ],
+  "lasbocht": { "straalFactor": 1.18 },
+
   "_schoprand": [
     "DE SCHOPRAND: een plaat langs de vloer, zodat er niets onder de leuning",
     "door van de rand kan rollen of geschopt worden. Bij een industriele",
@@ -482,6 +511,15 @@
   ],
   "schoprand": { "hoogte": 100, "dikte": 6, "vrij": 10, "afschuining": 25 },
 
+  "_regelVoor": [
+    "DE HANDREGEL VOOR DE STAANDER, zoals in Marthijns voorbeeld (HCW.stp):",
+    "het hart van de buis ligt precies op de voorkant van de plaat, en de",
+    "plaat steekt erachter uit. De staanders en het vulveld blijven waar ze",
+    "zijn; alleen de handregel schuift een halve staanderdiepte naar voren.",
+    "Het zadel schuift mee, en de achterhoek wordt afgerond (zie _afronding).",
+    "Niet samen met doorgestoken spijlen: die moeten DOOR de regel heen."
+  ],
+
   "_afronding": [
     "DE STAANDERKOP AFRONDEN naast een ronde handregel. Is de staander breder",
     "dan de buis, dan steken zijn bovenhoeken aan weerszijden naast de buis",
@@ -494,9 +532,14 @@
     "NOOIT RUIMER DAN HET STUK DAT UITSTEEKT: dan blijft de boog helemaal",
     "buiten de buis en raakt hij het zadel waar de buis in ligt niet. Alleen",
     "bij massief staal - platstaal, vierkant, of een staander zonder profiel.",
-    "Een holle koker zou je er openzagen."
+    "Een holle koker zou je er openzagen.",
+    "",
+    "EN R2 LANGS HET ZADEL. Waar de uitsparing voor de buis een vlak van de",
+    "staander raakt, is een scharpe rand. Marthijn rondt die af met R2; hier",
+    "ook. Lukt dat bij een vorm niet, dan blijft de staander zonder - liever",
+    "een scherpe rand dan een staander die niet gebouwd wordt."
   ],
-  "afronding": { "straal": 20 },
+  "afronding": { "straal": 20, "zadelStraal": 2 },
 
   "_glasvrij": [
     "GLAS ZONDER STAANDERS: de ruiten staan ingeklemd in een aluminium",

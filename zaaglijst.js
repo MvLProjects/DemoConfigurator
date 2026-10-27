@@ -71,7 +71,7 @@ export function wordtGezaagd(deel) {
  *
  * MATERIAAL IS GEEN SCHEIDING. Hetzelfde profiel staat in het manifest vaak in
  * twee staalsoorten (de eerste regel al: S235JRH en X5CrNi18-10), maar de app
- * laat je er geen één van kiezen - `beschrijf` zet ze allebei in de
+ * laat je er geen één van kiezen - `beschrijf` kiest er zelf één voor de
  * materiaalkolom. Op staalsoort groeperen zou dus twee groepen maken waar de
  * gebruiker één keuze heeft gemaakt.
  *

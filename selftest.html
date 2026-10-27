@@ -963,6 +963,7 @@ try {
         Math.abs(hoekL[0].inzetNaarVolgende - w / 2) < 1e-9,
         hoekL[0].inzetNaarVolgende.toFixed(4));
 
+
     // In een HAAKSE hoek staat de paal recht, gelijk met de randen: dan is
     // de inzet naar beide kanten gewoon w/2, en valt hij precies onder de
     // verstekhoek van de handregel. (Hiervoor stond hij in de deelhoek en was
@@ -7913,8 +7914,8 @@ try {
     check('de maximale opening voor liggende regels staat APART in de regels',
         typeof regelsNu.VULLING.maxDoorgangHorizontaal === 'number',
         regelsNu.VULLING.maxDoorgangHorizontaal);
-    check('er zijn vijf soorten vulling',
-        regelsNu.VULLING.soorten.join(',') === 'spijlen,horizontaal,glas,glasvrij,geen',
+    check('er zijn zes soorten vulling',
+        regelsNu.VULLING.soorten.join(',') === 'spijlen,horizontaal,glas,glasvrij,knieregel,geen',
         regelsNu.VULLING.soorten.join(','));
     // Een onbekende waarde mag de bouw niet laten vastlopen.
     // Let op bij het uitbreiden: 'glas' stond hier als voorbeeld van een
@@ -10921,6 +10922,18 @@ try {
             lengteAs: 'z', profiel: { label: 'CHS 48.3x2.6', items: [{ material: 'S235JRH' }] } });
         check('een RVS-staander heet in de stuklijst RVS 316, niet S235JRH',
             bdB.materiaal === 'RVS 316', bdB.materiaal);
+        // De catalogus zet vaak staal én RVS bij één profiel; de stuklijst
+        // noemt er één, die bij het metaal hoort.
+        const bdTwee = { label: 'FL 80x12', items: [{ material: 'X5CrNi18-10' },
+            { material: 'S235JRG2' }, { material: 'S355J2G3' }] };
+        const bdS = ond.beschrijf({ soort: 'staander', dx: 80, dy: 12, dz: 900,
+            lengteAs: 'z', profiel: bdTwee });
+        check('een stalen staander heeft één staalsoort, de eerste die geen RVS is',
+            bdS.materiaal === 'S235JRG2' && bdS.staalsoorten.includes('X5CrNi18-10'), bdS.materiaal);
+        const bdR = ond.beschrijf({ soort: 'staander', materiaal: 'rvs', dx: 80, dy: 12, dz: 900,
+            lengteAs: 'z', profiel: bdTwee });
+        check('en een RVS-staander blijft RVS 316, ook als de catalogus 304 noemt',
+            bdR.materiaal === 'RVS 316', bdR.materiaal);
 
         log('\n--- 2. het gewicht volgt het metaal ---');
         const bdMaten = { ...regelsNu.STANDAARD, lengte: 2400, hoogte: 1000 };
@@ -11251,7 +11264,8 @@ try {
         const bkMaten = { ...regelsNu.STANDAARD, lengte: 2000, staanderBreedte: 60,
                           handregelProfiel: bkBuis, handregelOverstek: 0 };
         const bkSt = bouwMod.balustradeDelen(bkMaten).filter(d => d.soort === 'staander');
-        const bkVerwacht = Math.min(20, 30 - 48.3 / 2);
+        // De uitsteek min een R2: dan past de R2 langs het zadel er nog naast.
+        const bkVerwacht = Math.min(20, 30 - 48.3 / 2 - 2);
         check('een staander van 60 onder een buis van 48,3 krijgt afgeronde hoeken',
             bkSt.length > 0 && bkSt.every(d => d.afronden
                 && Math.abs(d.afronden.straal - bkVerwacht) < 1e-6),
@@ -11286,6 +11300,23 @@ try {
         const bkKaal = await bkVolume({ ...bkSt[0], afronden: null });
         const bkR = bkSt[0].afronden.straal;
         const bkWeg = 2 * bkR * bkR * (1 - Math.PI / 4) * bkSt[0].dx;
+        // EN R2 LANGS HET ZADEL, zoals bij Marthijn: tel de afrondvlakken met
+        // een straal van 2 mm in de staander.
+        const bkR2 = await (async () => {
+            const { lokaal } = await bouwMod.maakDeel(adOc, bkSt[0], []);
+            let n = 0;
+            const fe = new adOc.TopExp_Explorer_2(lokaal, adOc.TopAbs_ShapeEnum.TopAbs_FACE,
+                adOc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+            for (; fe.More(); fe.Next()) {
+                const ad = new adOc.BRepAdaptor_Surface_2(adOc.TopoDS.Face_1(fe.Current()), true);
+                const t = ad.GetType();
+                const cil = adOc.GeomAbs_SurfaceType.GeomAbs_Cylinder;
+                if ((t === cil || (t && cil && t.value === cil.value))
+                    && Math.abs(ad.Cylinder().Radius() - 2) < 0.01) n++;
+            }
+            return n;
+        })();
+        check('langs het zadel zijn de randen afgerond met R2', bkR2 >= 2, `${bkR2} vlakken R2`);
         check('de afronding haalt precies 2 x r² (1 - π/4) x 60 mm³ staal weg',
             Math.abs((bkKaal - bkMet) - bkWeg) < 0.5,
             `${(bkKaal - bkMet).toFixed(1)} tegen ${bkWeg.toFixed(1)} mm3`);
@@ -11310,6 +11341,111 @@ try {
             Math.abs(bkRegel.dx - (bkHoh - bkDoos[0])) < 0.01,
             `${bkRegel.dx.toFixed(1)} tegen ${(bkHoh - bkDoos[0]).toFixed(1)} (dikte ${bkDoos[0]})`);
         adMeet('platte staanders FL 80x12', await bouwMod.bouwBalustrade(bkPlat));
+
+        // DE REGEL VOOR DE STAANDER, zoals bij Marthijn: het hart van de buis
+        // op de voorkant van de plaat, de plaat erachter, de achterhoek R20.
+        const bkVoor2 = { ...bkPlat, regelVoor: 1 };
+        const bkVd = bouwMod.balustradeDelen(bkVoor2);
+        const bkVst = bkVd.filter(d => d.soort === 'staander');
+        const bkVregel = bkVd.find(d => d.soort === 'handregel');
+        const bkHart = bkVregel.oorsprong[1] + (bkVregel.dy / 2) * bkVregel.yAs[1];
+        check('het hart van de regel ligt op de voorkant van de staander',
+            Math.abs(Math.abs(bkHart) - bkDoos[1] / 2) < 1e-6, bkHart.toFixed(2));
+        check('alleen de achterkant wordt afgerond, met R20',
+            bkVst.every(d => d.afronden && d.afronden.kanten.length === 1
+                && d.afronden.kanten[0].straal === 20),
+            JSON.stringify(bkVst[0].afronden && bkVst[0].afronden.kanten));
+        check('het zadel schuift mee naar voren',
+            bkVst.every(d => d.zadel.length && Math.abs(Math.abs(d.zadel[0].opzij) - bkDoos[1] / 2) < 1e-6));
+        check('spijlen komen dan vanzelf in een raam, anders hangen ze in de lucht',
+            bouwMod.balustradeDelen({ ...bkVoor2, vulraamwerk: 0 }).some(d => d.soort === 'vulregel'));
+        check('met doorgestoken spijlen blijft de regel in het hart',
+            (() => { const r = bouwMod.balustradeDelen({ ...bkVoor2, spijlOverstek: 80 })
+                         .find(d => d.soort === 'handregel');
+                     return Math.abs(r.oorsprong[1] + (r.dy / 2) * r.yAs[1]) < 1e-6; })());
+        const bkVbouw = await bouwMod.bouwBalustrade(bkVoor2);
+        adMeet('regel voor de staander', bkVbouw);
+        adMeet('regel voor de staander, hoek', await bouwMod.bouwPad(
+            [[0, 0, 0], [2000, 0, 0], [2000, 1500, 0]], false, bkVoor2));
+        check('de keuring meldt de plaat achter de buis niet als fout',
+            bkCtl.keurGeometrie(bkVbouw.delen, bkVbouw.verbindingen).goed);
+    }
+
+    // ============ DEEL BN: knieregel ======================================
+    log('\n\n======== DEEL BN: knieregel, de industriële leuning ========\n');
+    {
+        const bnVoor = errors.length;
+        const bnBuis = cat.alleProfielen(catBoom).find(x => /48\.3x2\.6/.test(x.englishLabel || x.label || ''));
+        const bnFl = cat.alleProfielen(catBoom).find(x => /^FL 80x12$/.test(x.englishLabel || x.label || ''));
+        const bnMaten = { ...regelsNu.STANDAARD, vulling: 'knieregel', handregelProfiel: bnBuis,
+                          staanderProfiel: bnFl, schoprand: 1 };
+        const bnD = bouwMod.balustradeDelen({ ...bnMaten, lengte: 2400 });
+        const bnKnie = bnD.filter(d => d.soort === 'knieregel');
+        check('een recht stuk krijgt één knieregel, met het hart op 500',
+            bnKnie.length === 1 && Math.abs(bnKnie[0].oorsprong[2] + bnKnie[0].dz / 2 - 500) < 1e-6,
+            bnKnie.map(d => (d.oorsprong[2] + d.dz / 2).toFixed(1)).join(', '));
+        check('geen spijlen en geen raam',
+            !bnD.some(d => d.soort === 'spijl' || d.soort === 'vulregel'));
+        check('elke staander krijgt een gat voor de knieregel',
+            bnD.filter(d => d.soort === 'staander').every(d => d.zadel.length === 2));
+        adMeet('knieregel recht', await bouwMod.bouwBalustrade({ ...bnMaten, lengte: 2400 }));
+        const bnHoek = await bouwMod.bouwPad([[0, 0, 0], [2000, 0, 0], [2000, 1500, 0]], false, bnMaten);
+        adMeet('knieregel in een hoek', bnHoek);
+        const bnHoekSt = bnHoek.delen.filter(d => d.soort === 'staander')
+            .find(d => d.zadel.length && d.zadel.every(z => z.top > 900));
+        check('de hoekstaander krijgt geen gaten: de knieregels komen er stomp tegenaan',
+            !!bnHoekSt);
+        adMeet('knieregel voor de staander, hoek', await bouwMod.bouwPad(
+            [[0, 0, 0], [2000, 0, 0], [2000, 1500, 0]], false, { ...bnMaten, regelVoor: 1 }));
+        const bnZin = await win.eval("import('/command-parser.js')");
+        const bnA = bnZin.parseer('balustrade van 3 meter met een knieregel en schoprand', null, {});
+        const bnB = bnZin.parseer('balustrade van 4 meter met knieregel, de handregel voor de staanders en dichte uiteinden', null, {});
+        check('"handregel voor de staanders en dichte uiteinden" wordt begrepen',
+            bnB.params && bnB.params.regelVoor === 1 && bnB.params.geslotenEind === 1
+            && bnB.params.vulling === 'knieregel', bnB.fout || bnB.uitleg);
+        check('"met een knieregel en schoprand" wordt begrepen',
+            bnA.params && bnA.params.vulling === 'knieregel' && bnA.params.schoprand === 1,
+            bnA.fout || bnA.uitleg);
+        // OP EEN TRAP: de knieregel loopt mee met de helling, en de koppen van
+        // de platte staanders - daar schuin afgezaagd - worden ook afgerond.
+        const bnTrap = await trapBouw.bouwTrap({ ...trapRegels.STANDAARD, tredeMateriaal: 'rooster',
+                                                tredeDikte: 30 }, bnMaten, 'rechts');
+        adMeet('trap met knieregel', bnTrap);
+        const bnTst = bnTrap.delen.filter(d => d.soort === 'staander');
+        check('op de trap worden de schuine koppen ook afgerond',
+            bnTst.filter(d => d.afronden && d.afronden.op[2] < 0.999).length >= 3,
+            bnTst.map(d => d.afronden ? 'R' + d.afronden.straal.toFixed(1) : '-').join(' '));
+        check('en de keuring vindt op de trap niets meer',
+            (await win.eval("import('/controle.js')")).keurGeometrie(bnTrap.delen, bnTrap.verbindingen).goed);
+
+        // GESLOTEN UITEINDEN: de handregel buigt met een lasbocht omlaag de
+        // knieregel in, zoals bij Marthijn.
+        const bnDicht = { ...bnMaten, lengte: 2400, geslotenEind: 1 };
+        const bnDd = bouwMod.balustradeDelen(bnDicht);
+        check('twee vrije uiteinden: vier lasbochten en twee staande buizen',
+            bnDd.filter(d => d.soort === 'lasbocht').length === 4
+            && bnDd.filter(d => d.soort === 'eindbuis').length === 2);
+        const bnBocht = bnDd.find(d => d.soort === 'lasbocht');
+        check('de bocht heeft Marthijns verhouding: R57 bij een buis van 48,3',
+            Math.abs(bnBocht.bocht.straal - 1.18 * 48.3) < 1e-6 && bnBocht.bocht.binnen > 0,
+            `R${bnBocht.bocht.straal.toFixed(1)}, binnen ${bnBocht.bocht.binnen}`);
+        const bnDichtBouw = await bouwMod.bouwBalustrade(bnDicht);
+        check('de twee staande eindbuizen zijn één onderdeel, twee keer',
+            bnDichtBouw.onderdelen.filter(o => o.deel.soort === 'eindbuis').length === 1
+            && bnDichtBouw.onderdelen.find(o => o.deel.soort === 'eindbuis').aantal === 2);
+        // De laatste staander stond 180 graden gedraaid: dezelfde vorm, maar
+        // een andere naad, en dus een eigen regel in de stuklijst.
+        check('alle staanders zijn één onderdeel, ook de laatste',
+            bnDichtBouw.onderdelen.filter(o => o.deel.soort === 'staander').length === 1,
+            bnDichtBouw.onderdelen.filter(o => o.deel.soort === 'staander').map(o => o.aantal).join(' + '));
+        adMeet('gesloten uiteinden', bnDichtBouw);
+        check('de lasbocht staat als bestelde post',
+            ks.hoeveelheden(bnDichtBouw.onderdelen).besteld.lasbocht === 4,
+            JSON.stringify(ks.hoeveelheden(bnDichtBouw.onderdelen).besteld));
+        check('zonder knieregel geen lasbochten',
+            !bouwMod.balustradeDelen({ ...bnDicht, vulling: 'spijlen' }).some(d => d.soort === 'lasbocht'));
+        check('knieregel geeft geen fout in de console',
+            errors.length === bnVoor, errors.slice(bnVoor).join(' | '));
     }
 
     // ============ DEEL BM: schoprand ========================================

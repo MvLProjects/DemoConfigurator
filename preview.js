@@ -54,6 +54,18 @@ export function maakVoorbeeld(delen) {
             continue;
         }
 
+        if (d.bocht) {
+            // Een lasbocht: een kwart torus, zoals de bouwer hem maakt.
+            const geo = new THREE.TorusGeometry(d.bocht.straal, d.bocht.buiten, 10, 12, Math.PI / 2);
+            const mesh = new THREE.Mesh(geo, stofVoor(uit));
+            mesh.applyMatrix4(new THREE.Matrix4().makeBasis(
+                new THREE.Vector3(...d.xAs), new THREE.Vector3(...d.yAs),
+                new THREE.Vector3(...d.zAs)).setPosition(...d.oorsprong));
+            mesh.userData.deel = d;
+            groep.add(mesh);
+            continue;
+        }
+
         if (d.doorsnede) {
             // Een steunhoek of een taartpunttrede: een eigen doorsnede. Een
             // taartpunt als doosje tekenen zou een wenteltrap van balken

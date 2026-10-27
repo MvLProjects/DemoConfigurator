@@ -66,7 +66,7 @@
 
 import { berekenSpijlen, spijlPosities, VOETPLAAT, VULRAAMWERK, PAALKAP,
          uitklinkDiepte, stripBreedte, profielDoos,
-         VULLING, vullingSoort, GLAS, SIERPUNT, AFRONDING, SCHOPRAND,
+         VULLING, vullingSoort, GLAS, SIERPUNT, AFRONDING, SCHOPRAND, KNIEREGEL, LASBOCHT,
          DEKBAND } from './balustrade-rules.js';
 // De modellenbibliotheek. pad.js bepaalt alleen WAAR het ornament komt en hoe
 // groot; de vorm zelf wordt pas bij het bouwen gemaakt, in build-balustrade.js.
@@ -604,6 +604,20 @@ export function padDelen(punten, gesloten, p) {
     // vulregels 34 mm voor de staander en hing er een gat tussen.
     const staanders = staanderGegevens(pad, gesloten,
         stDoos ? [stDoos[0], stDoos[1]] : staanderBreedte);
+
+    // DE LIJN VAN DE HANDREGEL. Normaal het pad zelf, door het hart van de
+    // staanders. Met regelVoor een halve staanderdiepte naar de -dwars-kant,
+    // zodat het hart van de regel op de voorkant van de staander ligt - zoals
+    // bij Marthijn. Niet met doorgestoken spijlen: die moeten door de regel.
+    const regelVoor = Number(p.regelVoor) > 0
+        && !(vullingSoort(p.vulling) === 'spijlen' && Number(p.spijlOverstek) > 0);
+    const regelLijn = regelVoor
+        ? verschuifPad(pad, gesloten, -(stDoos ? stDoos[1] : staanderBreedte) / 2)
+        : pad;
+
+    // Het hart van de knieregel boven het pad: 500, of halverwege bij een lage
+    // leuning. Zie regels.json onder _knieregel.
+    const knieHart = Math.min(KNIEREGEL.hoogte, p.hoogte / 2);
     const delen = [];
     const velden = [];
 
@@ -984,8 +998,10 @@ export function padDelen(punten, gesloten, p) {
     // bovenregel vastgezet; zonder raam is er niets om hem aan te klemmen.
     const vulling = vullingSoort(p.vulling);
     const wilRaam = vulling === 'horizontaal' || vulling === 'glas' ? true
-        : vulling === 'geen' ? false
-        : Boolean(Number(p.vulraamwerk));
+        : vulling === 'geen' || vulling === 'knieregel' ? false
+        // Met de regel vóór de staander hangen spijlen tot onder de regel in
+        // de lucht: die moeten dan in een eigen raam.
+        : Boolean(Number(p.vulraamwerk)) || regelVoor;
 
     const raamDoos = profielDoos(p.regelProfiel);
     const stripHandmatig = Number(p.stripBreedte) > 0 ? Number(p.stripBreedte) : 0;
@@ -1185,8 +1201,13 @@ export function padDelen(punten, gesloten, p) {
      * over de bedden voor de VULREGELS - een keuze. Het zadel is geen keuze:
      * zonder zadel staat de kop in de regel, en dat is geen constructie.
      */
+    // Een hoek in bovenaanzicht: twee velden die niet in elkaars verlengde
+    // liggen. Een knik op een trap (zelfde richting, andere helling) is er geen.
+    const isHoek = (s) => Boolean(s.naarVolgende && s.naarVorige
+        && lengte(kruis(s.naarVolgende, s.naarVorige)) > 1e-6);
+
     const zadelVoor = (s, i) => {
-        if (!zadelRond) return [];
+        if (!zadelRond && vullingSoort(p.vulling) !== 'knieregel') return [];
         // Twee velden die in elkaars VERLENGDE liggen krijgen één zadel. De
         // snijder loopt namelijk naar twee kanten ruim buiten de staander, dus
         // hij snijdt de tunnel al in zijn geheel; een tweede keer snijden langs
@@ -1205,11 +1226,44 @@ export function padDelen(punten, gesloten, p) {
                 lengte(kruis(g.langs, v.langs)) < 1e-9);
             if (!alEen) gekozen.push(v);
         }
-        return gekozen.map(v => ({
+        // Waar de regel ligt ten opzichte van het hart van deze staander, in
+        // zijn eigen assen: nul, of een halve diepte naar voren. Zie regelLijn.
+        const verschil = min(regelLijn[i], punten[i]);
+        const regelLokaal = [punt(verschil, s.deelhoek), punt(verschil, s.dwars), 0];
+        // HET GAT VOOR DE KNIEREGEL: dezelfde snijder als het zadel, maar op
+        // kniehoogte en dus helemaal binnen de staander - een tunnel.
+        // NIET IN EEN HOEK. Twee knieregels uit twee richtingen zouden twee
+        // gaten dwars op elkaar vragen, en daar valt een platte staander van
+        // uit elkaar. Daar komen ze er stomp tegenaan; zie de knieregel zelf.
+        const knie = vullingSoort(p.vulling) !== 'knieregel' || isHoek(s) ? [] : gekozen.map(v => ({
             langs: v.langs,
             op: v.op,
-            // De regel is even diep als de staander en staat dus in het hart.
-            opzij: 0,
+            opzij: punt(regelLokaal, kruis(v.op, v.langs)),
+            // Het hart van de knieregel ligt RECHT boven het punt van het pad,
+            // op knieHart. klinkSnijder zet de snijder een halve hoogte onder
+            // `top`, maar langs `op` - en die staat op een trap schuin, zodat
+            // het hart op de as van de staander een halve hoogte GEDEELD DOOR
+            // DE COSINUS onder `top` uitkomt. Met een gewone halve hoogte zat
+            // het gat op een trap 6,7 mm te laag, en stond de buis voor
+            // 2600 mm3 in elke staander. Vlak is cos 1 en verandert er niets.
+            top: knieHart - plaatDikte + handregelHoogte / 2 / v.cos,
+            breedte: dikte,
+            hoogte: handregelHoogte,
+            door: true,
+            diepte: staanderBreedte,
+            // Rond als de regel rond is; anders zijn omhullende, een blok -
+            // nooit de holle doorsnede, zie hieronder bij het zadel.
+            rond: zadelRond,
+            profiel: null,
+        }));
+        if (!zadelRond) return knie;
+        return [...knie, ...gekozen.map(v => ({
+            langs: v.langs,
+            op: v.op,
+            // Zonder regelVoor ligt de regel in het hart; anders zijwaarts,
+            // langs de dwarsrichting van DEZE snijder (die hangt van de kant
+            // van het veld af).
+            opzij: punt(regelLokaal, kruis(v.op, v.langs)),
             // De bovenkant van de snijder valt samen met de bovenkant van de
             // regel. Gerekend vanaf de VOET van de staander, want daar ligt
             // zijn nulpunt.
@@ -1230,7 +1284,7 @@ export function padDelen(punten, gesloten, p) {
             // Alleen nog voor de naam in de foutmelding van de bewaking; de
             // vorm van de snijder komt uit `rond` hierboven.
             profiel: p.handregelProfiel,
-        }));
+        }))];
     };
 
     /**
@@ -1249,9 +1303,31 @@ export function padDelen(punten, gesloten, p) {
         const richtingen = veldenBij(s, i).map(v => v.langs);
         if (richtingen.some(r => lengte(kruis(r, richtingen[0])) > 1e-6)) return null;
         const halfDwars = (stDoos ? stDoos[1] : staanderBreedte) / 2;
-        const uitsteek = halfDwars - dikte / 2;
-        if (!(uitsteek > 0.5)) return null;
-        return { straal: Math.min(AFRONDING.straal, uitsteek), halfDwars };
+        // Het hart van de regel in de dwarsrichting van de staander: nul, of
+        // naar voren geschoven (regelVoor). Per kant steekt de staander dan
+        // een ander stuk uit; aan de voorkant mogelijk niets.
+        const c = punt(min(regelLijn[i], punten[i]), s.dwars);
+        const kanten = [1, -1].map(kant => ({
+            // Een R2 van het zadel ervan af: dan blijft er een plat stukje
+            // tussen de uitsparing en de boog, zoals bij Marthijn, en past
+            // de R2 langs het zadel er nog in.
+            kant, straal: Math.min(AFRONDING.straal,
+                halfDwars - kant * c - dikte / 2 - AFRONDING.zadelStraal),
+        })).filter(k => k.straal > 0.5);
+        if (!kanten.length) return null;
+        // HET VLAK VAN DE KOP, in de assen van de staander. Op een vlak stuk
+        // horizontaal; op een trap loopt het mee met de helling, want daar is
+        // de kop schuin afgezaagd (zie staanderKop). `langs` is de richting
+        // van de regel, `op` er loodrecht op en omhoog, `punt` een punt van
+        // het vlak boven het hart van de staander, vanaf zijn voet.
+        const v = veldenBij(s, i)[0];
+        const op = v.op || [0, 0, 1];
+        const H = p.hoogte - plaatDikte;
+        return {
+            straal: Math.max(...kanten.map(k => k.straal)), halfDwars, kanten,
+            langs: v.langs, op,
+            punt: [-op[0] * kopOnder, -op[1] * kopOnder, H - op[2] * kopOnder],
+        };
     };
 
     const uitklinkenVoor = (s, i) => {
@@ -1420,7 +1496,10 @@ export function padDelen(punten, gesloten, p) {
             // zodat "hoeveel bedden heeft deze staander" ook blijft betekenen
             // wat het zegt. build-balustrade.js snijdt beide lijsten.
             zadel: onderDeRegel ? zadelVoor(s, i) : [],
-            afronden: onderDeRegel && !kopVlakken.length ? afrondenVoor(s, i) : null,
+            afronden: onderDeRegel ? afrondenVoor(s, i) : null,
+            // De keuring hoort de uitsteek achter de regel dan niet te melden:
+            // die is de bedoeling. Zie controle.js.
+            ...(regelVoor ? { regelVoor: true } : {}),
             groep: staanderGroep,
         });
 
@@ -1483,7 +1562,8 @@ export function padDelen(punten, gesloten, p) {
             const doosMaat = voetMaat * SIERPUNT.maxBreedte;
             // Bovenop de handregel: die eindigt op p.hoogte, en op een helling
             // aan de bergkant van de voet hoger. Zie regelTopOnder.
-            const kop = plus(s.positie, maal(omhoog,
+            // Op de regel, ook als die vóór de staander ligt (regelLijn).
+            const kop = plus(regelLijn[i], maal(omhoog,
                 regelTopOnder(s, i, voetMaat / 2, isRond(p.staanderProfiel))));
             sierpuntNr[i] = voegToe({
                 soort: 'sierpunt',
@@ -2137,8 +2217,9 @@ export function padDelen(punten, gesloten, p) {
     const handregelNr = [];      // per doorlopend stuk
     const stukken = handregelStukken(punten, gesloten);
     for (const stuk of stukken) {
-        const A = punten[stuk.begin];
-        const B = punten[stuk.eind];
+        // Met de regel vóór de staander langs de verschoven lijn; zie regelLijn.
+        const A = regelLijn[stuk.begin];
+        const B = regelLijn[stuk.eind];
         // Inzet 0: een stuk loopt van HART tot HART van de buitenste staanders
         // van dat stuk, en niet van binnenvlak tot binnenvlak zoals een veld.
         const r = veldGegevens(A, B, 0, 0);
@@ -2278,6 +2359,148 @@ export function padDelen(punten, gesloten, p) {
                     verbind(sn, nr, soort, delen[sn].oorsprong, omhoog);
                 }
             }
+        }
+    }
+
+    // --- de knieregel ----------------------------------------------------
+    //
+    // Dezelfde doorsnede als de handregel, met zijn HART op knieHart boven het
+    // pad, langs dezelfde lijn (dus ook vóór de staander als de handregel
+    // daar ligt). Per recht stuk één regel, door de staanders heen: die
+    // hebben er een gat voor (zie zadelVoor). Het verstek gaat door de
+    // hartlijn; aan een vrij eind stopt hij gelijk met de buitenkant van de
+    // eindstaander.
+    // GESLOTEN UITEINDEN: alleen met een ronde handregel, langs een vlak stuk.
+    const geslotenEind = vulling === 'knieregel' && Number(p.geslotenEind) > 0
+        && isRond(p.handregelProfiel);
+    const gesloten_eind = (stuk) => geslotenEind && Math.abs(stuk.langs[2]) < 1e-6;
+
+    /**
+     * Eén gesloten eind: bovenaan een lasbocht omlaag, een staande buis, en
+     * onderaan een lasbocht de knieregel in. `P` is het eindpunt van het pad
+     * (de lijn van de regel), `uit` wijst van de leuning af, naar buiten.
+     *
+     * Een bocht is een kwart torus om zijn middelpunt, in een vlak dat langs
+     * `uit` en omhoog loopt. Hij begint waar de regel ophoudt (een overstek
+     * voorbij P) en eindigt een bochtstraal verder naar buiten.
+     */
+    const maakEinde = (P, uit, dwarsRichting) => {
+        const D = dikte, ro = D / 2;
+        // De wanddikte staat in de naam: "CHS 48.3x2.6" -> 2,6.
+        const naamProfiel = p.handregelProfiel
+            ? (p.handregelProfiel.englishLabel || p.handregelProfiel.label || '') : '';
+        const wandMatch = /x\s*(\d+(?:[.,]\d+)?)\s*$/.exec(naamProfiel);
+        const wand = wandMatch ? Number(wandMatch[1].replace(',', '.')) : 0;
+        const ri = wand > 0 && wand < ro ? ro - wand : 0;
+        const Rb = LASBOCHT.straalFactor * D;
+        const boven = plus(plus(P, maal(uit, overstek)), [0, 0, p.hoogte - ro]);
+        const onder = plus(plus(P, maal(uit, overstek)), [0, 0, knieHart]);
+        if (boven[2] - onder[2] < 2 * Rb + 1) return;          // past er niet tussen
+        const N1 = eenheid(kruis(omhoog, uit));
+        const N2 = maal(N1, -1);
+        const naam = `Lasbocht Ø${D} R${Math.round(Rb)}`;
+        const bocht = (centrum, xAs, zAs) => voegToe({
+            soort: 'lasbocht', omschrijving: naam,
+            bocht: { straal: Rb, buiten: ro, binnen: ri },
+            oorsprong: centrum, xAs, yAs: kruis(zAs, xAs), zAs,
+            dx: Rb + ro, dy: Rb + ro, dz: D, lengteAs: 'x',
+            // De lengte langs de hartlijn, een kwart cirkel - niet de maat
+            // van het doosje eromheen.
+            zaaglengte: Math.PI / 2 * Rb,
+            besteld: true, bestelSoort: 'lasbocht',
+        });
+        // Boven: middelpunt een straal onder het eind van de regel; begint
+        // recht boven het middelpunt en draait naar buiten.
+        bocht(plus(boven, [0, 0, -Rb]), omhoog, N1);
+        // Onder: middelpunt een straal boven het eind van de knieregel.
+        bocht(plus(onder, [0, 0, Rb]), [0, 0, -1], N2);
+        // De staande buis ertussen, een bochtstraal naar buiten.
+        const voet = plus(plus(onder, maal(uit, Rb)), [0, 0, Rb]);
+        const lengte_ = boven[2] - onder[2] - 2 * Rb;
+        // Rechtsdraaiend: y = omhoog x uit. Met de dwarsrichting van het pad
+        // was het stelsel aan het begin gespiegeld, en dan zag de stuklijst
+        // twee gelijke buizen als twee verschillende onderdelen.
+        const dw = kruis(omhoog, uit);
+        voegToe({
+            soort: 'eindbuis',
+            oorsprong: plus(plus(voet, maal(uit, -D / 2)), maal(dw, -D / 2)),
+            xAs: uit, yAs: dw, zAs: omhoog,
+            dx: D, dy: D, dz: lengte_,
+            profiel: p.handregelProfiel || null, lengteAs: 'z',
+        });
+    };
+
+    if (vulling === 'knieregel') {
+        const halfLangsSt = (stDoos ? stDoos[0] : staanderBreedte) / 2;
+        for (const stuk of stukken) {
+            const A = regelLijn[stuk.begin];
+            const B = regelLijn[stuk.eind];
+            const r = veldGegevens(A, B, 0, 0);
+            if (r.schuineLengte < 1e-9) continue;
+            // Zover loopt een rand van de doorsnede voorbij het verstekvlak
+            // door de hartlijn: een halve breedte opzij, een halve hoogte op.
+            const uitloop = (n) => {
+                const langsN = punt(r.langs, n);
+                if (langsN < 1e-9) return 0;
+                return ((dikte / 2) * Math.abs(punt(r.dwars, n))
+                    + (handregelHoogte / 2) * Math.abs(punt(r.loodrecht, n))) / langsN;
+            };
+            // In een HOEK stomp tegen de hoekstaander aan, niet erdoorheen:
+            // dan begint hij pas aan de zijkant van die staander. Zie zadelVoor.
+            const hoekBegin = !stuk.beginVrij && isHoek(staanders[stuk.begin]);
+            const hoekEind = !stuk.eindVrij && isHoek(staanders[stuk.eind]);
+            // Een vrij eind: gelijk met de eindstaander, of bij een gesloten
+            // eind zo ver als de handregel, waar de lasbocht begint.
+            const vrijKnie = (gesloten_eind(stuk) ? overstek : halfLangsSt) / r.cos;
+            // Waar de hoekstaander ophoudt, langs de lijn van DEZE regel: het
+            // hart van de staander min zijn halve maat in die richting. Zo
+            // klopt het ook als de regel vóór de staander ligt (regelLijn) en
+            // dus niet door het hart van de staander loopt.
+            const halfDwarsSt = (stDoos ? stDoos[1] : staanderBreedte) / 2;
+            const tegenHoek = (k, P) => {
+                const st = staanders[k];
+                const l = r.langsVlak;
+                const half = Math.abs(punt(l, st.deelhoek)) * halfLangsSt
+                    + Math.abs(punt(l, st.dwars)) * halfDwarsSt;
+                return { verschil: punt(min(punten[k], P), l), half };
+            };
+            const bh = hoekBegin && tegenHoek(stuk.begin, A);
+            const eh = hoekEind && tegenHoek(stuk.eind, B);
+            const uitBegin = stuk.beginVrij ? vrijKnie
+                : hoekBegin ? -(bh.verschil + bh.half) / r.cos
+                : uitloop(stuk.beginNormaal);
+            const uitEind = stuk.eindVrij ? vrijKnie
+                : hoekEind ? (eh.verschil - eh.half) / r.cos
+                : uitloop(stuk.eindNormaal);
+            const naarAssen = (w, teken) => [teken * punt(w, r.langs),
+                                             teken * punt(w, r.dwars),
+                                             teken * punt(w, r.loodrecht)];
+            const verstek = [];
+            if (!stuk.beginVrij && !hoekBegin) {
+                verstek.push({ punt: [uitBegin, dikte / 2, handregelHoogte / 2],
+                               richting: naarAssen(stuk.beginNormaal, -1) });
+            }
+            if (!stuk.eindVrij && !hoekEind) {
+                verstek.push({ punt: [uitBegin + r.schuineLengte, dikte / 2, handregelHoogte / 2],
+                               richting: naarAssen(stuk.eindNormaal, 1) });
+            }
+            const hart = plus(A, [0, 0, knieHart]);
+            // De uiteinden dicht met lasbochten; zie maakEinde.
+            if (gesloten_eind(stuk)) {
+                if (stuk.beginVrij) maakEinde(A, maal(r.langs, -1), r.dwars);
+                if (stuk.eindVrij) maakEinde(B, r.langs, r.dwars);
+            }
+            voegToe({
+                soort: 'knieregel',
+                oorsprong: plus(plus(plus(hart, maal(r.loodrecht, -handregelHoogte / 2)),
+                                     maal(r.dwars, -dikte / 2)),
+                                maal(r.langs, -uitBegin)),
+                xAs: r.langs, yAs: r.dwars, zAs: r.loodrecht,
+                dx: r.schuineLengte + uitBegin + uitEind, dy: dikte, dz: handregelHoogte,
+                profiel: p.handregelProfiel || null,
+                lengteAs: 'x',
+                verstek,
+            });
         }
     }
 

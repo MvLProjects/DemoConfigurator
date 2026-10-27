@@ -1146,6 +1146,10 @@ function werkAfgeleideBij() {
         aantal: ['liggende regels', String(toon.aantal)],
         doorgang: ['opening verticaal', toon.doorgang.toFixed(1) + ' mm'],
         steek: ['hart op hart', toon.steek.toFixed(1) + ' mm'],
+    } : veld.vulling === 'knieregel' ? {
+        aantal: ['vulling', 'knieregel'],
+        doorgang: ['vrije doorgang', '–'],
+        steek: ['hart op hart', '–'],
     } : veld.vulling === 'geen' ? {
         aantal: ['vulling', 'geen'],
         doorgang: ['vrije doorgang', '–'],
@@ -1190,6 +1194,12 @@ function werkAfgeleideBij() {
             + 'dikte je nodig hebt hangt af van de ruitmaat en de belasting. '
             + 'De ruit wordt op maat besteld en staat daarom niet in de '
             + 'zaaglijst en niet bij de snijdelen.',
+        knieregel:
+            'Let op: een knieregel is GEEN kindveilige vulling - tussen de '
+            + 'regels blijft een opening van ruim 400 mm. Voor een werkvloer, '
+            + 'een bordes of een dak, niet waar kinderen komen. De knieregel '
+            + 'heeft dezelfde doorsnede als de handregel; met een schoprand '
+            + 'erbij is het de gewone industriële leuning.',
         glasvrij:
             'Glas zonder staanders: de ruiten staan in een aluminium '
             + 'bodemprofiel op de vloer, met een kaplijst erover. De app tekent '
@@ -1407,6 +1417,7 @@ function vullingTekstVan(gebouwd) {
             + `doorgang ${gebouwd.spijlen.doorgang.toFixed(1)} mm`;
     }
     if (eersteVeld.vulling === 'geen') return 'geen vulling';
+    if (eersteVeld.vulling === 'knieregel') return 'met knieregel';
     if (eersteVeld.vulling === 'glasvrij') {
         const n = gebouwd.velden.length;
         return `glas zonder staanders, ${n} ${n === 1 ? 'ruit' : 'ruiten'} van `
@@ -2312,6 +2323,7 @@ function offerteKeuzes() {
     const b = huidigeMaten();
     const vulling = { spijlen: 'verticale spijlen', horizontaal: 'liggende regels',
                       glas: 'glazen panelen', glasvrij: 'glas zonder staanders, in een bodemprofiel',
+                      knieregel: 'knieregel (industrieel)',
                       geen: 'zonder vulling' }[b.vulling]
         || b.vulling;
     const mm = (v) => `${Math.round(v)} mm`;
@@ -3306,6 +3318,8 @@ export const CHATVOORBEELDEN = [
     'kwartslagtrap naar rechts, 3 meter hoog, leuning rechts en wandleuning links',
     'wenteltrap van 3 meter hoog, diameter 1800, wandleuning rechts',
     'verzinkte trap van 3 meter hoog in antraciet met leuning links',
+    'balustrade van 4 meter, staanders FL 80x12, handregel CHS 48,3x2,6, buis voor de '
+        + 'staanders, knieregel, schoprand en dichte uiteinden',
 ];
 
 {

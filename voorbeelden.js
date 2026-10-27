@@ -14,6 +14,7 @@
 
 const CHS48 = 'DIN_EN_10210-2_R/Pipe_EN_10210-2_48.3x2.6.stp';
 const UNP220 = 'DIN_1026_U/U_220.stp';
+const FL80 = 'DIN_EN_10058/Fl_80x12.stp';
 
 export const VOORBEELDEN = [
     {
@@ -99,6 +100,15 @@ export const VOORBEELDEN = [
         uitleg: 'Balkon van 5 m: gehard glas in een zwart bodemprofiel, met een kaplijst',
         wat: 'balustrade',
         b: { lengte: 5000, hoogte: 1000, vulling: 'glasvrij', afwerking: '9005' },
+    },
+    {
+        id: 'industrieel-balk',
+        naam: 'Industriële leuning',
+        uitleg: 'Platte staanders met de buis ervoor, knieregel, schoprand en dichte uiteinden, verzinkt',
+        wat: 'balustrade',
+        b: { lengte: 3000, hoogte: 1100, vulling: 'knieregel', staanderProfiel: FL80,
+             handregelProfiel: CHS48, regelVoor: 1, schoprand: 1, geslotenEind: 1,
+             verzinken: true },
     },
     {
         id: 'hekwerk',

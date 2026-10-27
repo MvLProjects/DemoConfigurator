@@ -87,6 +87,12 @@ export const AFRONDING = regels.afronding;
 // De schoprand langs de vloer; zie regels.json.
 export const SCHOPRAND = regels.schoprand;
 
+// De knieregel halverwege; zie regels.json.
+export const KNIEREGEL = regels.knieregel;
+
+// Gesloten uiteinden met lasbochten; zie regels.json.
+export const LASBOCHT = regels.lasbocht;
+
 // Sierpunten en paalkoppen. De modellen zelf staan in sierpunten.js; hier
 // alleen wat de regels erover zeggen. Zie regels.json: de verhoudingen komen
 // uit twee gemeten maten, de rest is een keuze.

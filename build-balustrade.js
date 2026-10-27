@@ -12,7 +12,7 @@
 
 import { initOcct } from './brep-edges.js';
 import { berekenSpijlen, valideer, GRENZEN, CONTROLES,
-         ontleedVervolg } from './balustrade-rules.js';
+         ontleedVervolg, AFRONDING } from './balustrade-rules.js';
 import { maakPad, padDelen, beoordeelPad, verschuifPad, profielDoos } from './pad.js';
 import { maakSierpunt } from './sierpunten.js';
 import { maakBaluster } from './balusters.js';
@@ -227,6 +227,32 @@ export async function maakDeel(oc, d, opruimen) {
         let lokaal = lokaleVormen.get(sleutel);
         if (!lokaal) {
             lokaal = lokaleDekbandvorm(oc, d, opruimen);
+            onthoudVorm(sleutel, lokaal);
+        }
+        return { geplaatst: plaatsVorm(oc, d, lokaal, opruimen), lokaal };
+    }
+    if (d.bocht) {
+        // Een lasbocht: een kwart torus om zijn middelpunt, hol als de buis
+        // hol is. Lokaal om de oorsprong met de z-as als draaias en de x-as
+        // als begin; plaatsVorm zet hem met dezelfde assen op zijn plek.
+        const b = d.bocht;
+        const sleutel = JSON.stringify({ bocht: b });
+        let lokaal = lokaleVormen.get(sleutel);
+        if (!lokaal) {
+            const nul = new oc.gp_Pnt_3(0, 0, 0);
+            const as = new oc.gp_Ax2_2(nul, new oc.gp_Dir_4(0, 0, 1), new oc.gp_Dir_4(1, 0, 0));
+            const buiten = new oc.BRepPrimAPI_MakeTorus_6(as, b.straal, b.buiten, Math.PI / 2);
+            let vorm = buiten.Shape();
+            if (b.binnen > 0) {
+                const binnen = new oc.BRepPrimAPI_MakeTorus_6(as, b.straal, b.binnen, Math.PI / 2);
+                const snede = new oc.BRepAlgoAPI_Cut_3(vorm, binnen.Shape(),
+                    new oc.Message_ProgressRange_1());
+                snede.Build(new oc.Message_ProgressRange_1());
+                vorm = snede.Shape();
+                opruimen.push(binnen);
+            }
+            opruimen.push(nul, as, buiten);
+            lokaal = eigenVorm(oc, vorm);
             onthoudVorm(sleutel, lokaal);
         }
         return { geplaatst: plaatsVorm(oc, d, lokaal, opruimen), lokaal };
@@ -484,28 +510,100 @@ function rondDeel(oc, d, opruimen) {
 function metAfronding(oc, d, vorm, midden, opruimen) {
     const a = d.afronden;
     if (!a || !(a.straal > 0)) return vorm;
-    const r = a.straal;
-    const top = d.dz;
-    const lang = d.dx + 20;
-    for (const kant of [1, -1]) {
-        const rand = midden[1] + kant * a.halfDwars;
+    // Per kant een eigen straal: met de regel vóór de staander steekt alleen
+    // de achterkant uit. Zonder `kanten` aan beide kanten dezelfde.
+    const kanten = a.kanten || [{ kant: 1, straal: a.straal }, { kant: -1, straal: a.straal }];
+    // HET MES IN DE ASSEN VAN DE KOP: x langs de regel, y dwars (de y van de
+    // staander), z loodrecht op de kop. Op een vlak stuk is dat gewoon x, y
+    // en omhoog; op een trap kantelt het mee met de helling. Zonder `op` (een
+    // oudere beschrijving) een vlakke kop op dz.
+    const zAs = a.op || [0, 0, 1];
+    const yAs = [0, 1, 0];
+    const xAs = [yAs[1] * zAs[2] - yAs[2] * zAs[1], yAs[2] * zAs[0] - yAs[0] * zAs[2],
+                 yAs[0] * zAs[1] - yAs[1] * zAs[0]];
+    const p0 = a.punt || [0, 0, d.dz];
+    const plek = [midden[0] + p0[0], midden[1] + p0[1], p0[2]];
+    const lang = 3 * (d.dx + d.dy) + 100;
+    for (const { kant, straal: r } of kanten) {
+        // In de assen van de kop: de rand op y = kant * halfDwars, de kop op z = 0.
+        const rand = kant * a.halfDwars;
         const y0 = Math.min(rand - kant * r, rand + kant * 1);
-        const hoek = new oc.gp_Pnt_3(midden[0] - lang / 2, y0, top - r);
+        const hoek = new oc.gp_Pnt_3(-lang / 2, y0, -r);
         const blok = new oc.BRepPrimAPI_MakeBox_3(hoek, lang, r + 1, r + 1);
-        const asPunt = new oc.gp_Pnt_3(midden[0] - lang / 2, rand - kant * r, top - r);
+        const asPunt = new oc.gp_Pnt_3(-lang / 2, rand - kant * r, -r);
         const asRichting = new oc.gp_Dir_4(1, 0, 0);
-        const as = new oc.gp_Ax2_3(asPunt, asRichting);
+        // De naad recht omlaag, buiten het mes: dan ligt hij voor beide kanten
+        // even ver van de rand, en is een gespiegelde staander dezelfde vorm.
+        // Zie rondeStaaf.
+        const naad = new oc.gp_Dir_4(0, 0, -1);
+        const as = new oc.gp_Ax2_2(asPunt, asRichting, naad);
         const cilinder = new oc.BRepPrimAPI_MakeCylinder_3(as, r, lang);
         const mes = new oc.BRepAlgoAPI_Cut_3(blok.Shape(), cilinder.Shape(),
             new oc.Message_ProgressRange_1());
         mes.Build(new oc.Message_ProgressRange_1());
-        const snede = new oc.BRepAlgoAPI_Cut_3(vorm, mes.Shape(),
+        const t = plaatsing(oc, { xAs, yAs, zAs }, plek);
+        const gezet = new oc.BRepBuilderAPI_Transform_2(mes.Shape(), t, true);
+        const snede = new oc.BRepAlgoAPI_Cut_3(vorm, gezet.Shape(),
             new oc.Message_ProgressRange_1());
         snede.Build(new oc.Message_ProgressRange_1());
         vorm = snede.Shape();
-        opruimen.push(hoek, blok, asPunt, asRichting, as, cilinder, mes);
+        opruimen.push(hoek, blok, asPunt, asRichting, naad, as, cilinder, mes, t, gezet);
     }
     return vorm;
+}
+
+/**
+ * De randen langs het zadel afronden met R2, zoals bij Marthijn.
+ *
+ * Het zadel is een rond vlak met de straal van de buis. Waar het een plat vlak
+ * van de staander raakt - de kop, of de zijkant als de staander smaller is dan
+ * de buis - loopt een rechte rand evenwijdig aan de regel. Die randen, en
+ * alleen die, worden afgerond. Lukt het niet, dan blijft de vorm zoals hij
+ * was: een scherpe rand is beter dan een staander die niet gebouwd wordt.
+ */
+function metZadelRanden(oc, d, vorm, opruimen) {
+    const z = (d.zadel || []).find(u => u.rond);
+    const straal = AFRONDING.zadelStraal;
+    if (!z || !(straal > 0)) return vorm;
+    const r = z.hoogte / 2;
+    const ev = (e) => (e && typeof e === 'object' && 'value' in e) ? e.value : e;
+    const lang = Math.hypot(...z.langs);
+    const as = z.langs.map(c => c / lang);
+    try {
+        const randen = [];
+        const fe = new oc.TopExp_Explorer_2(vorm, oc.TopAbs_ShapeEnum.TopAbs_FACE,
+            oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+        for (; fe.More(); fe.Next()) {
+            const f = oc.TopoDS.Face_1(fe.Current());
+            const vlak = new oc.BRepAdaptor_Surface_2(f, true);
+            opruimen.push(vlak);
+            if (ev(vlak.GetType()) !== ev(oc.GeomAbs_SurfaceType.GeomAbs_Cylinder)) continue;
+            if (Math.abs(vlak.Cylinder().Radius() - r) > 0.05) continue;
+            const ee = new oc.TopExp_Explorer_2(f, oc.TopAbs_ShapeEnum.TopAbs_EDGE,
+                oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+            for (; ee.More(); ee.Next()) {
+                const e = oc.TopoDS.Edge_1(ee.Current());
+                const c = new oc.BRepAdaptor_Curve_2(e);
+                opruimen.push(c);
+                if (ev(c.GetType()) !== ev(oc.GeomAbs_CurveType.GeomAbs_Line)) continue;
+                const dir = c.Line().Direction();
+                if (Math.abs(dir.X() * as[0] + dir.Y() * as[1] + dir.Z() * as[2]) < 0.999) continue;
+                if (!randen.some(x => x.IsSame(e))) randen.push(e);
+            }
+            ee.delete();
+        }
+        fe.delete();
+        if (!randen.length) return vorm;
+        const rond = new oc.BRepFilletAPI_MakeFillet(vorm, oc.ChFi3d_FilletShape.ChFi3d_Rational);
+        for (const e of randen) rond.Add_2(straal, e);
+        rond.Build(new oc.Message_ProgressRange_1());
+        if (!rond.IsDone()) return vorm;
+        // `rond` niet opruimen: zijn resultaat is de vorm waar we mee verder gaan.
+        return rond.Shape();
+    } catch (err) {
+        console.warn('R2 langs het zadel lukte niet; de staander blijft zonder.', err);
+        return vorm;
+    }
 }
 
 async function metUitklinken(oc, d, vorm, midden, opruimen) {
@@ -898,9 +996,16 @@ async function klinkSnijder(oc, d, u, midden, opruimen) {
 function rondeStaaf(oc, diameter, lengte, opruimen) {
     const voet = new oc.gp_Pnt_3(0, 0, 0);
     const langs = new oc.gp_Dir_4(0, 0, 1);
-    const as = new oc.gp_Ax2_3(voet, langs);
+    // DE NAAD BOVENOP, langs +Y - en die wordt in klinkSnijder `op`. Een
+    // cilinder heeft een naad op zijn X-richting; zonder die te kiezen lag hij
+    // opzij, en een gespiegelde staander (de laatste van een rij, met de buis
+    // ervoor) kreeg hem dan aan de andere kant: een vlak meer of minder, en een
+    // eigen regel in de stuklijst voor een stuk dat er precies zo uitziet.
+    // Bovenop ligt hij in het spiegelvlak, en boven de kop van de staander.
+    const naad = new oc.gp_Dir_4(0, 1, 0);
+    const as = new oc.gp_Ax2_2(voet, langs, naad);
     const maker = new oc.BRepPrimAPI_MakeCylinder_3(as, diameter / 2, lengte);
-    opruimen.push(voet, langs, as, maker);
+    opruimen.push(voet, langs, naad, as, maker);
     return maker.Shape();
 }
 
@@ -986,8 +1091,8 @@ async function lokaleBlokvorm(oc, d, opruimen) {
     // Een blok wordt vanuit zijn hoek opgebouwd, dus het hart van de doorsnede
     // ligt op (dx/2, dy/2).
     const gezaagd = metVerstek(oc, d, maker.Shape(), opruimen);
-    const geklonken = metAfronding(oc, d, await metUitklinken(
-        oc, d, gezaagd, [d.dx / 2, d.dy / 2], opruimen), [d.dx / 2, d.dy / 2], opruimen);
+    const geklonken = metZadelRanden(oc, d, metAfronding(oc, d, await metUitklinken(
+        oc, d, gezaagd, [d.dx / 2, d.dy / 2], opruimen), [d.dx / 2, d.dy / 2], opruimen), opruimen);
     // En als laatste de gaten voor doorgestoken spijlen. Die zitten midden in
     // het onderdeel, ver van de koppen, dus de volgorde maakt voor de vorm
     // niets uit - maar als laatste is hij het veiligst: wat er dan nog
@@ -1089,8 +1194,8 @@ async function lokaleProfielvorm(oc, d, opruimen) {
     // Daarna het zadel om de handregel en de bedden voor de vulregels. De
     // doorsnede van een profiel staat al op de oorsprong, dus het hart ligt
     // op [0, 0].
-    const geklonken = metAfronding(oc, d,
-        await metUitklinken(oc, d, gezaagd, [0, 0], opruimen), [0, 0], opruimen);
+    const geklonken = metZadelRanden(oc, d, metAfronding(oc, d,
+        await metUitklinken(oc, d, gezaagd, [0, 0], opruimen), [0, 0], opruimen), opruimen);
     // En als laatste de gaten voor doorgestoken spijlen; zie lokaleBlokvorm.
     const vorm = metDoorsteken(oc, d, geklonken, opruimen);
 
