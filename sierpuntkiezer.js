@@ -127,15 +127,23 @@ export function kiesSierpunt(huidig, rond) {
 
     // --- afhandelen --------------------------------------------------------
     return new Promise((klaar) => {
+        // Net als de profielkiezer: niet alleen op het close-bericht wachten,
+        // dat kwam af en toe niet aan. Dicht is dicht, wat het eerst komt.
+        let gedaan = false;
+        const waarnemer = new MutationObserver(() => { if (!dialoog.open) sluit(null); });
         const sluit = (waarde) => {
+            if (gedaan) return;
+            gedaan = true;
             okKnop.removeEventListener('click', opOk);
             dialoog.removeEventListener('close', opDicht);
             dialoog.removeEventListener('keydown', opToets);
+            waarnemer.disconnect();
             if (dialoog.open) dialoog.close();
             klaar(waarde);
         };
         const opOk = () => sluit(gekozen);
-        const opDicht = () => sluit(null);
+        const opDicht = () => { if (!dialoog.open) sluit(null); };
+        waarnemer.observe(dialoog, { attributes: true, attributeFilter: ['open'] });
         const opToets = (e) => {
             if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
             e.preventDefault();

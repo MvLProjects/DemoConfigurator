@@ -558,6 +558,9 @@ export function kiesProfiel(catalogus, opties = {}) {
     teken();          // markeert de vorige keuze en vult dan het detailpaneel
     tekenVaak();      // en daarna pas de rij, die weet wat er gekozen staat
 
+    // Leeg beginnen: de uitkomst van de vorige keer bleef staan, en Escape zet
+    // hem niet opnieuw - dan leverde annuleren stil de vorige "ok" op.
+    dialoog.returnValue = '';
     dialoog.showModal();
     // Het voorbeeldvenster kan pas meten als het venster echt zichtbaar is:
     // daarvoor is clientWidth nul en wordt het canvas 0 bij 0 pixels.
@@ -568,15 +571,29 @@ export function kiesProfiel(catalogus, opties = {}) {
     zoekVeld.focus();
     zoekVeld.select();
 
+    // NIET ALLEEN OP HET CLOSE-BERICHT WACHTEN. Dat kwam af en toe niet aan -
+    // de zelftest bleef er drie keer op hangen, en één keer kwam een gekozen
+    // UPN 220 daardoor nooit in het paneel. Het venster dicht gaan IS het
+    // signaal: het `open`-attribuut verdwijnt meteen bij close(), en daar
+    // kijken we nu ook naar. Wat het eerst komt telt, één keer. Een verlaat
+    // close-bericht van een vorige keer, terwijl het venster alweer open is,
+    // telt niet mee.
     return new Promise((klaar) => {
-        dialoog.addEventListener('close', function eenmaal() {
-            dialoog.removeEventListener('close', eenmaal);
+        let gedaan = false;
+        const waarnemer = new MutationObserver(() => { if (!dialoog.open) af(); });
+        function af() {
+            if (gedaan || dialoog.open) return;
+            gedaan = true;
+            dialoog.removeEventListener('close', af);
+            waarnemer.disconnect();
             if (dialoog.returnValue !== 'ok' || !gekozen) {
                 klaar(null);        // annuleren of Escape levert niets op
                 return;
             }
             klaar(maakVerwijzing(gekozen, info, basis, versie));
-        });
+        }
+        dialoog.addEventListener('close', af);
+        waarnemer.observe(dialoog, { attributes: true, attributeFilter: ['open'] });
     });
 }
 

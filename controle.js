@@ -102,6 +102,9 @@ function keurDekking(delen, verbindingen, eisen) {
         if (v.soort !== 'ligt-op') continue;
         const boven = delen[v.a], onder = delen[v.b];
         if (!boven || !onder) continue;
+        // Een afgeronde staanderkop steekt wel uit, maar zonder scherpe hoek:
+        // zo bouwt Marthijn het ook. Zie _afronding in regels.json.
+        if (onder.afronden) continue;
 
         const as = dwarsVan(v.richting);
         const [bLaag, bHoog] = spanOp(boven, as);

@@ -66,7 +66,7 @@
 
 import { berekenSpijlen, spijlPosities, VOETPLAAT, VULRAAMWERK, PAALKAP,
          uitklinkDiepte, stripBreedte, profielDoos,
-         VULLING, vullingSoort, GLAS, SIERPUNT,
+         VULLING, vullingSoort, GLAS, SIERPUNT, AFRONDING,
          DEKBAND } from './balustrade-rules.js';
 // De modellenbibliotheek. pad.js bepaalt alleen WAAR het ornament komt en hoe
 // groot; de vorm zelf wordt pas bij het bouwen gemaakt, in build-balustrade.js.
@@ -74,7 +74,7 @@ import { modelVan, hoogteVoor, GEEN as SIERPUNT_GEEN } from './sierpunten.js';
 // Alleen om te weten of een profiel ROND is: een kap op een buis hoort rond te
 // zijn en op een koker vierkant. profielen.js importeert zelf niets, dus hier
 // ontstaat geen kringetje.
-import { isRond } from './profielen.js';
+import { isRond, categorieVan } from './profielen.js';
 import { stempelWerk } from './materialen.js';
 import { glasvrijDelen } from './glasvrij.js';
 
@@ -1223,6 +1223,27 @@ export function padDelen(punten, gesloten, p) {
         }));
     };
 
+    /**
+     * De bovenhoeken van de staander afronden waar hij naast de ronde regel
+     * uitsteekt; zie regels.json onder _afronding. Null als er niets uitsteekt,
+     * als de staander hol is, of in een hoek (twee regels uit twee richtingen).
+     *
+     * `halfDwars` is de halve ECHTE maat dwars op de regel: bij platstaal is
+     * dat de dikte, niet de grootste maat. `straal` is nooit ruimer dan wat er
+     * uitsteekt, zodat de boog buiten de buis blijft.
+     */
+    const staanderMassief = !p.staanderProfiel
+        || ['Flats', 'SquareBars'].includes(categorieVan(p.staanderProfiel).sleutel);
+    const afrondenVoor = (s, i) => {
+        if (!zadelRond || !staanderMassief) return null;
+        const richtingen = veldenBij(s, i).map(v => v.langs);
+        if (richtingen.some(r => lengte(kruis(r, richtingen[0])) > 1e-6)) return null;
+        const halfDwars = (stDoos ? stDoos[1] : staanderBreedte) / 2;
+        const uitsteek = halfDwars - dikte / 2;
+        if (!(uitsteek > 0.5)) return null;
+        return { straal: Math.min(AFRONDING.straal, uitsteek), halfDwars };
+    };
+
     const uitklinkenVoor = (s, i) => {
         const uit = [];
 
@@ -1389,6 +1410,7 @@ export function padDelen(punten, gesloten, p) {
             // zodat "hoeveel bedden heeft deze staander" ook blijft betekenen
             // wat het zegt. build-balustrade.js snijdt beide lijsten.
             zadel: onderDeRegel ? zadelVoor(s, i) : [],
+            afronden: onderDeRegel && !kopVlakken.length ? afrondenVoor(s, i) : null,
             groep: staanderGroep,
         });
 

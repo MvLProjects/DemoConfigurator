@@ -81,6 +81,9 @@ export const GLAS = regels.glas;
 // glasvrij.js; ook dit zijn aannames, geen berekening.
 export const GLASVRIJ = regels.glasvrij;
 
+// De staanderkop afronden naast een ronde handregel; zie regels.json.
+export const AFRONDING = regels.afronding;
+
 // Sierpunten en paalkoppen. De modellen zelf staan in sierpunten.js; hier
 // alleen wat de regels erover zeggen. Zie regels.json: de verhoudingen komen
 // uit twee gemeten maten, de rest is een keuze.

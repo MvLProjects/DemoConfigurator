@@ -465,6 +465,22 @@
     "klem": { "breedte": 50, "hoogte": 45, "wang": 8, "perRand": 2 }
   },
 
+  "_afronding": [
+    "DE STAANDERKOP AFRONDEN naast een ronde handregel. Is de staander breder",
+    "dan de buis, dan steken zijn bovenhoeken aan weerszijden naast de buis",
+    "uit - scherp, precies op de plek waar je hand langs de leuning glijdt.",
+    "",
+    "Zo doet Marthijn het in zijn voorbeeldbalustrade (HCW.stp): een plaat",
+    "van 12 x 80 onder een buis van 48,3, de kop tot op het hart van de buis",
+    "en de buitenhoek afgerond met R20. Die 20 is hier de bovengrens.",
+    "",
+    "NOOIT RUIMER DAN HET STUK DAT UITSTEEKT: dan blijft de boog helemaal",
+    "buiten de buis en raakt hij het zadel waar de buis in ligt niet. Alleen",
+    "bij massief staal - platstaal, vierkant, of een staander zonder profiel.",
+    "Een holle koker zou je er openzagen."
+  ],
+  "afronding": { "straal": 20 },
+
   "_glasvrij": [
     "GLAS ZONDER STAANDERS: de ruiten staan ingeklemd in een aluminium",
     "bodemprofiel op de vloer, met een kaplijst over de bovenrand. Geen",

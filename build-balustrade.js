@@ -317,6 +317,7 @@ function vormSleutel(d) {
             v: d.verstek || [],
             z: sneden(d.zadel),
             k: sneden(d.uitklinken),
+            a: d.afronden || null,
             g: d.doorsteken || [],
         });
     } catch {
@@ -471,6 +472,42 @@ function rondDeel(oc, d, opruimen) {
  * zonder uitklinken levert dan letterlijk dezelfde vorm op als voorheen - geen
  * extra compound eromheen, geen andere vingerafdruk.
  */
+/**
+ * De bovenhoeken van een staander afronden, aan beide kanten dwars op de
+ * regel. Zie `afronden` in pad.js en regels.json onder _afronding.
+ *
+ * Per kant een mes: een blok over de hoek, met een cilinder eruit die de boog
+ * vormt. Wat er van het mes overblijft gaat van de staander af. De cilinder
+ * loopt langs x, de richting van de regel. `midden` is het hart van de
+ * doorsnede in de lokale vorm, net als bij metUitklinken.
+ */
+function metAfronding(oc, d, vorm, midden, opruimen) {
+    const a = d.afronden;
+    if (!a || !(a.straal > 0)) return vorm;
+    const r = a.straal;
+    const top = d.dz;
+    const lang = d.dx + 20;
+    for (const kant of [1, -1]) {
+        const rand = midden[1] + kant * a.halfDwars;
+        const y0 = Math.min(rand - kant * r, rand + kant * 1);
+        const hoek = new oc.gp_Pnt_3(midden[0] - lang / 2, y0, top - r);
+        const blok = new oc.BRepPrimAPI_MakeBox_3(hoek, lang, r + 1, r + 1);
+        const asPunt = new oc.gp_Pnt_3(midden[0] - lang / 2, rand - kant * r, top - r);
+        const asRichting = new oc.gp_Dir_4(1, 0, 0);
+        const as = new oc.gp_Ax2_3(asPunt, asRichting);
+        const cilinder = new oc.BRepPrimAPI_MakeCylinder_3(as, r, lang);
+        const mes = new oc.BRepAlgoAPI_Cut_3(blok.Shape(), cilinder.Shape(),
+            new oc.Message_ProgressRange_1());
+        mes.Build(new oc.Message_ProgressRange_1());
+        const snede = new oc.BRepAlgoAPI_Cut_3(vorm, mes.Shape(),
+            new oc.Message_ProgressRange_1());
+        snede.Build(new oc.Message_ProgressRange_1());
+        vorm = snede.Shape();
+        opruimen.push(hoek, blok, asPunt, asRichting, as, cilinder, mes);
+    }
+    return vorm;
+}
+
 async function metUitklinken(oc, d, vorm, midden, opruimen) {
     // Het ZADEL eerst: dat is de ruimte die de handregel inneemt, en die moet
     // er altijd uit. De bedden daarna; die zijn een keuze (het vinkje
@@ -949,8 +986,8 @@ async function lokaleBlokvorm(oc, d, opruimen) {
     // Een blok wordt vanuit zijn hoek opgebouwd, dus het hart van de doorsnede
     // ligt op (dx/2, dy/2).
     const gezaagd = metVerstek(oc, d, maker.Shape(), opruimen);
-    const geklonken = await metUitklinken(
-        oc, d, gezaagd, [d.dx / 2, d.dy / 2], opruimen);
+    const geklonken = metAfronding(oc, d, await metUitklinken(
+        oc, d, gezaagd, [d.dx / 2, d.dy / 2], opruimen), [d.dx / 2, d.dy / 2], opruimen);
     // En als laatste de gaten voor doorgestoken spijlen. Die zitten midden in
     // het onderdeel, ver van de koppen, dus de volgorde maakt voor de vorm
     // niets uit - maar als laatste is hij het veiligst: wat er dan nog
@@ -1052,7 +1089,8 @@ async function lokaleProfielvorm(oc, d, opruimen) {
     // Daarna het zadel om de handregel en de bedden voor de vulregels. De
     // doorsnede van een profiel staat al op de oorsprong, dus het hart ligt
     // op [0, 0].
-    const geklonken = await metUitklinken(oc, d, gezaagd, [0, 0], opruimen);
+    const geklonken = metAfronding(oc, d,
+        await metUitklinken(oc, d, gezaagd, [0, 0], opruimen), [0, 0], opruimen);
     // En als laatste de gaten voor doorgestoken spijlen; zie lokaleBlokvorm.
     const vorm = metDoorsteken(oc, d, geklonken, opruimen);
 

@@ -11234,6 +11234,59 @@ try {
             /Afbeelding opgeslagen als \w+\.png/.test(biStatus.textContent), biStatus.textContent);
     }
 
+    // ============ DEEL BK: afgeronde staanderkop ==========================
+    log('\n\n======== DEEL BK: staanderkop afronden naast een ronde regel ========\n');
+    {
+        // Marthijns voorbeeld (HCW.stp): een plaat onder een buis van 48,3,
+        // de buitenhoek afgerond met R20. Een bredere staander dan de buis
+        // had in de app scherpe hoeken naast de buis: daar stoot je je hand.
+        const bkVoor = errors.length;
+        const bkBuis = cat.alleProfielen(catBoom).find(x => /48\.3x2\.6/.test(x.englishLabel || x.label || ''));
+        const bkMaten = { ...regelsNu.STANDAARD, lengte: 2000, staanderBreedte: 60,
+                          handregelProfiel: bkBuis, handregelOverstek: 0 };
+        const bkSt = bouwMod.balustradeDelen(bkMaten).filter(d => d.soort === 'staander');
+        const bkVerwacht = Math.min(20, 30 - 48.3 / 2);
+        check('een staander van 60 onder een buis van 48,3 krijgt afgeronde hoeken',
+            bkSt.length > 0 && bkSt.every(d => d.afronden
+                && Math.abs(d.afronden.straal - bkVerwacht) < 1e-6),
+            bkSt.map(d => d.afronden && d.afronden.straal.toFixed(2)).join(', '));
+        check('een smallere staander dan de buis niet: daar steekt niets uit',
+            bouwMod.balustradeDelen({ ...bkMaten, staanderBreedte: 40 })
+                .filter(d => d.soort === 'staander').every(d => !d.afronden));
+        check('en een staander onder een vlakke regel ook niet',
+            bouwMod.balustradeDelen({ ...bkMaten, handregelProfiel: null })
+                .filter(d => d.soort === 'staander').every(d => !d.afronden));
+        const bkBreed = { ...bkMaten, staanderBreedte: 100 };
+        check('bij veel uitsteek is de straal hooguit 20, zoals bij Marthijn',
+            bouwMod.balustradeDelen(bkBreed).filter(d => d.soort === 'staander')
+                .every(d => d.afronden && d.afronden.straal === 20));
+
+        const bkBouw = await bouwMod.bouwBalustrade(bkMaten);
+        adMeet('afgeronde staanderkop', bkBouw);
+        const bkCtl = await win.eval("import('/controle.js')");
+        check('de keuring meldt geen scherpe uitsteek meer',
+            bkCtl.keurGeometrie(bkBouw.delen, bkBouw.verbindingen).goed);
+        // De afronding haalt echt staal weg: per kant r^2 (1 - pi/4) over de
+        // lengte van de kop (60 mm langs de regel).
+        const bkVolume = async (deel) => {
+            const opruimen = [];
+            const { lokaal } = await bouwMod.maakDeel(adOc, deel, opruimen);
+            const g = new adOc.GProp_GProps_1();
+            adOc.BRepGProp.VolumeProperties_1(lokaal, g, false, false, false);
+            const v = g.Mass(); g.delete();
+            return v;
+        };
+        const bkMet = await bkVolume(bkSt[0]);
+        const bkKaal = await bkVolume({ ...bkSt[0], afronden: null });
+        const bkR = bkSt[0].afronden.straal;
+        const bkWeg = 2 * bkR * bkR * (1 - Math.PI / 4) * bkSt[0].dx;
+        check('de afronding haalt precies 2 x r² (1 - π/4) x 60 mm³ staal weg',
+            Math.abs((bkKaal - bkMet) - bkWeg) < 0.5,
+            `${(bkKaal - bkMet).toFixed(1)} tegen ${bkWeg.toFixed(1)} mm3`);
+        check('afronden geeft geen fout in de console',
+            errors.length === bkVoor, errors.slice(bkVoor).join(' | '));
+    }
+
     // ============ DEEL BJ: het trapgat ======================================
     log('\n\n======== DEEL BJ: hoe lang het trapgat moet zijn ========\n');
     {
