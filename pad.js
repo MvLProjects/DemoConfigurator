@@ -2680,7 +2680,10 @@ export function padDelen(punten, gesloten, p) {
 
     stempelWerk(delen, p);
 
-    return { delen, velden, staanders, verbindingen };
+    // `knieDoor` voor het paneel: of de knieregel door de staanders kan of
+    // ertussen zit. Dat zegt de gebruiker iets: dichte uiteinden kunnen alleen
+    // als hij erdoor kan.
+    return { delen, velden, staanders, verbindingen, knieDoor };
 }
 
 /**

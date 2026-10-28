@@ -1199,9 +1199,7 @@ function werkAfgeleideBij() {
             + 'regels blijft een opening van ruim 400 mm. Voor een werkvloer, '
             + 'een bordes of een dak, niet waar kinderen komen. De knieregel '
             + 'heeft dezelfde doorsnede als de handregel; met een schoprand '
-            + 'erbij is het de gewone industriële leuning. Door de staanders '
-            + 'heen kan alleen bij massief staal, zoals platstaal 80 × 12; bij '
-            + 'een buis of een smalle staander zit hij per veld ertussen.',
+            + 'erbij is het de gewone industriële leuning.',
         glasvrij:
             'Glas zonder staanders: de ruiten staan in een aluminium '
             + 'bodemprofiel op de vloer, met een kaplijst erover. De app tekent '
@@ -1211,8 +1209,19 @@ function werkAfgeleideBij() {
             + 'uit. Alleen op een vlakke rand; de staander- en spijlmaten doen '
             + 'hier niets.',
     }[veld.vulling];
+    // Bij de knieregel hangt het van de staander af of hij erdoor kan. Kan
+    // dat niet, dan zit hij per veld ertussen en doet "uiteinden dicht"
+    // niets - dat moet je hier lezen, niet raden.
+    const knieTussen = veld.vulling === 'knieregel' && !veld.knieDoor
+        ? ' Met deze staander kan de knieregel er niet doorheen: hij zit per '
+          + 'veld tussen de staanders' + (isRondProfiel(profielen.staander)
+              ? ', met een rond uitgesneden eind als de staander dikker is'
+              : '')
+          + '. Dichte uiteinden kunnen dan niet; neem daarvoor platstaal, '
+          + 'bijvoorbeeld 80 × 12.'
+        : '';
     vullingLetEl.style.display = let_ ? 'block' : 'none';
-    if (let_) vullingLetEl.textContent = let_;
+    if (let_) vullingLetEl.textContent = let_ + knieTussen;
     afgeleidEls.helling.textContent = veld.helling < 0.01
         ? 'vlak' : veld.helling.toFixed(1) + '°';
     // Uit het veld zelf en niet opnieuw uitgerekend: padDelen geeft de maat

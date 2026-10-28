@@ -1457,7 +1457,7 @@ export async function bouwBalustrade(p, melden = null) {
  * gebouwd wordt - en dat is erger dan geen voorbeeld.
  */
 export function voorspelBalustrade(p) {
-    const velden = padDelen(padVanMaten(p), false, p).velden;
+    const { velden, knieDoor } = padDelen(padVanMaten(p), false, p);
     // Het paneel toont het EERSTE veld. Bij een recht stuk zijn alle velden
     // even lang en geldt dat getal voor alle; met een hoek erin niet meer.
     //
@@ -1472,7 +1472,7 @@ export function voorspelBalustrade(p) {
         && Math.abs(v.spijlen.doorgang - eerste.spijlen.doorgang) < 1e-6
         && (v.glas ? Math.round(v.glas.lengte) : 0)
            === (eerste.glas ? Math.round(eerste.glas.lengte) : 0));
-    return { ...eerste, aantalVelden: velden.length, veldenVerschillen: !gelijk };
+    return { ...eerste, aantalVelden: velden.length, veldenVerschillen: !gelijk, knieDoor };
 }
 
 // --- balustrade op geselecteerde randen ------------------------------------

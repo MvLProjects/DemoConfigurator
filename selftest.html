@@ -11461,6 +11461,9 @@ try {
         check('en die staat precies tussen twee staanders: h.o.h. min een staander',
             bnTussenKnie.every(d => Math.abs(d.dx - (3000 / bnTussenKnie.length - 40)) < 1e-6),
             bnTussenKnie.map(d => d.dx.toFixed(1)).join(', '));
+        check('het paneel weet of de knieregel erdoor kan: niet bij 40 × 40, wel bij platstaal',
+            bouwMod.voorspelBalustrade({ ...regelsNu.STANDAARD, vulling: 'knieregel' }).knieDoor === false
+            && bouwMod.voorspelBalustrade(bnMaten).knieDoor === true);
         adMeet('knieregel tussen de staanders', await bouwMod.bouwBalustrade(
             { ...regelsNu.STANDAARD, vulling: 'knieregel', lengte: 3000 }));
         const bnBuisSt = { ...bnMaten, staanderProfiel: bnBuis, schoprand: 0 };
