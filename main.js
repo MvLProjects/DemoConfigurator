@@ -3332,6 +3332,7 @@ export const CHATVOORBEELDEN = [
     'verzinkte trap van 3 meter hoog in antraciet met leuning links',
     'balustrade van 4 meter, staanders FL 80x12, handregel CHS 48,3x2,6, buis voor de '
         + 'staanders, knieregel, schoprand en dichte uiteinden',
+    'roostertrap van 3 meter hoog, staanders FL 80x12, knieregel en dichte uiteinden',
 ];
 
 {

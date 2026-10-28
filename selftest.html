@@ -11406,6 +11406,18 @@ try {
         check('"met een knieregel en schoprand" wordt begrepen',
             bnA.params && bnA.params.vulling === 'knieregel' && bnA.params.schoprand === 1,
             bnA.fout || bnA.uitleg);
+        // Op een trap: "met roosters" en "roostertrap" zonder het woord trede,
+        // en de leuningkeuzes gaan mee naar de leuning.
+        const bnR1 = bnZin.parseer('trap van 3 meter hoog met roosters, knieregel en dichte uiteinden', null, {});
+        const bnR2 = bnZin.parseer('roostertrap van 3 meter hoog', null, {});
+        check('"trap met roosters, knieregel en dichte uiteinden" wordt begrepen',
+            bnR1.actie === 'trap' && bnR1.params.tredeMateriaal === 'rooster'
+            && bnR1.leuningMaten.vulling === 'knieregel' && bnR1.leuningMaten.geslotenEind === 1,
+            bnR1.fout || bnR1.uitleg);
+        check('en dan krijgt de trap ook een leuning, al staat het woord er niet',
+            bnR1.leuning === 'beide' && bnR2.leuning === 'geen', `${bnR1.leuning} / ${bnR2.leuning}`);
+        check('"roostertrap" is een trap met roostertreden',
+            bnR2.actie === 'trap' && bnR2.params.tredeMateriaal === 'rooster', bnR2.fout || bnR2.uitleg);
         // OP EEN TRAP: de knieregel loopt mee met de helling, en de koppen van
         // de platte staanders - daar schuin afgezaagd - worden ook afgerond.
         const bnTrap = await trapBouw.bouwTrap({ ...trapRegels.STANDAARD, tredeMateriaal: 'rooster',

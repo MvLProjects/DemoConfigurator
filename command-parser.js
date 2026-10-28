@@ -60,7 +60,7 @@ const GETAL = /(\d+(?:[.,]\d+)?)(?!\d)\s*(?:(millimeter|centimeter|meter|mm|cm|m
 const VORMEN = [
     { actie: 'trap', woorden: ['trap', 'steektrap', 'stairs', 'wenteltrap', 'spiltrap',
                                'spiraaltrap', 'kwartslagtrap', 'halfslagtrap', 'bordestrap',
-                               'hoektrap'] },
+                               'hoektrap', 'roostertrap'] },
     { actie: 'kubus', woorden: ['kubus', 'cube', 'dobbelsteen'] },
     { actie: 'blok', woorden: ['blok', 'balk', 'doos', 'plaat', 'box'] },
     { actie: 'balustrade', woorden: ['balustrade', 'leuning', 'hekwerk', 'reling', 'railing'] },
@@ -787,6 +787,14 @@ function leesTrapExtras(tekst) {
             rest = poets(rest, m.index, m.index + m[0].length);
         }
     }
+    // "roostertrap", "trap met roosters": zonder het woord trede is het toch
+    // duidelijk wat er bedoeld wordt - een trap heeft maar één soort rooster.
+    if (materiaalWoord === undefined) {
+        for (const m of [...rest.matchAll(/\b(?:roostertrap|(?:met\s+)?roosters|grating)\b/gi)]) {
+            materiaalWoord = 'rooster';
+            rest = poets(rest, m.index, m.index + m[0].length);
+        }
+    }
     for (const re of TREDEDIKTE) {
         for (const m of [...rest.matchAll(re)]) {
             dikte = naarMillimeter(m[1], m[2]);
@@ -1084,6 +1092,14 @@ export function parseer(invoer, vorige = null, opties = {}) {
             if (/\blinks\b/i.test(tekst)) leuning = 'links';
             else if (/\brechts\b/i.test(tekst)) leuning = 'rechts';
             else leuning = 'beide';
+        }
+        // Wie iets over de leuning zegt ("met knieregel", "dichte uiteinden",
+        // "spijloverstek"), wil er een: zonder leuning ging dat stil verloren.
+        // Geen kant genoemd, dan aan beide kanten - net als "met leuning".
+        if (leuning === 'geen' && Object.keys(extraMaten).length) {
+            leuning = /\blinks\b/i.test(tekst) && !/\bwandleuning\s+links\b/i.test(tekst) ? 'links'
+                : /\brechts\b/i.test(tekst) && !/\bwandleuning\s+rechts\b/i.test(tekst) ? 'rechts'
+                : 'beide';
         }
 
         const { maten: trapMaten, keuzes, gevonden, genegeerd } = trapExtra;
