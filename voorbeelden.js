@@ -28,6 +28,17 @@ export const VOORBEELDEN = [
         l: 'rechts',
     },
     {
+        id: 'industrieel-trap',
+        naam: 'Industriële trap',
+        uitleg: 'Roostertrap met platte staanders, knieregel en dichte uiteinden, verzinkt',
+        wat: 'trap',
+        t: { hoogte: 3000, breedte: 900, tredeMateriaal: 'rooster', tredeDikte: 30,
+             boomProfiel: UNP220 },
+        b: { vulling: 'knieregel', staanderProfiel: FL80, handregelProfiel: CHS48,
+             geslotenEind: 1, verzinken: true },
+        l: 'rechts',
+    },
+    {
         id: 'modern-glas',
         naam: 'Modern glas',
         uitleg: 'Kwartslagtrap met eiken treden en glazen panelen, zwart gecoat',
