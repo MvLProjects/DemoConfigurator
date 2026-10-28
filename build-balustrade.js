@@ -232,19 +232,21 @@ export async function maakDeel(oc, d, opruimen) {
         return { geplaatst: plaatsVorm(oc, d, lokaal, opruimen), lokaal };
     }
     if (d.bocht) {
-        // Een lasbocht: een kwart torus om zijn middelpunt, hol als de buis
-        // hol is. Lokaal om de oorsprong met de z-as als draaias en de x-as
-        // als begin; plaatsVorm zet hem met dezelfde assen op zijn plek.
+        // Een lasbocht: een deel van een torus om zijn middelpunt, hol als de
+        // buis hol is. Lokaal om de oorsprong met de z-as als draaias en de
+        // x-as als begin; plaatsVorm zet hem met dezelfde assen op zijn plek.
+        // Een kwart cirkel, tenzij `hoek` iets anders zegt (op een trap).
         const b = d.bocht;
+        const hoek = b.hoek || Math.PI / 2;
         const sleutel = JSON.stringify({ bocht: b });
         let lokaal = lokaleVormen.get(sleutel);
         if (!lokaal) {
             const nul = new oc.gp_Pnt_3(0, 0, 0);
             const as = new oc.gp_Ax2_2(nul, new oc.gp_Dir_4(0, 0, 1), new oc.gp_Dir_4(1, 0, 0));
-            const buiten = new oc.BRepPrimAPI_MakeTorus_6(as, b.straal, b.buiten, Math.PI / 2);
+            const buiten = new oc.BRepPrimAPI_MakeTorus_6(as, b.straal, b.buiten, hoek);
             let vorm = buiten.Shape();
             if (b.binnen > 0) {
-                const binnen = new oc.BRepPrimAPI_MakeTorus_6(as, b.straal, b.binnen, Math.PI / 2);
+                const binnen = new oc.BRepPrimAPI_MakeTorus_6(as, b.straal, b.binnen, hoek);
                 const snede = new oc.BRepAlgoAPI_Cut_3(vorm, binnen.Shape(),
                     new oc.Message_ProgressRange_1());
                 snede.Build(new oc.Message_ProgressRange_1());

@@ -504,7 +504,9 @@
     "Zoals in Marthijns voorbeeld (HCW.stp): de bocht begint 118,9 voorbij de",
     "eindstaander (hier: de handregeloverstek) en heeft een hartstraal van 57",
     "bij een buis van 48,3 - een factor 1,18. Alleen met een knieregel en een",
-    "ronde handregel, en alleen langs een vlakke rand. Een lasbocht koop je."
+    "ronde handregel. Op een trap zijn de bochten 90 graden plus en min de",
+    "helling, en eindigt de knieregel zo dat de staande buis recht staat. Een",
+    "lasbocht koop je."
   ],
   "lasbocht": { "straalFactor": 1.18 },
 

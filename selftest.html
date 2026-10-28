@@ -11444,6 +11444,32 @@ try {
             JSON.stringify(ks.hoeveelheden(bnDichtBouw.onderdelen).besteld));
         check('zonder knieregel geen lasbochten',
             !bouwMod.balustradeDelen({ ...bnDicht, vulling: 'spijlen' }).some(d => d.soort === 'lasbocht'));
+        // OOK OP EEN TRAP: de bochten zijn dan 90 plus en 90 min de helling, en
+        // de staande buis staat recht onder het eind van de bovenste bocht.
+        const bnTrapDicht = await trapBouw.bouwTrap({ ...trapRegels.STANDAARD, tredeMateriaal: 'rooster',
+                                                     tredeDikte: 30 }, bnDicht, 'rechts');
+        const bnTdBocht = bnTrapDicht.delen.filter(d => d.soort === 'lasbocht');
+        const bnTdBuis = bnTrapDicht.delen.filter(d => d.soort === 'eindbuis');
+        check('op een trap ook vier lasbochten en twee staande buizen',
+            bnTdBocht.length === 4 && bnTdBuis.length === 2,
+            bnTdBocht.map(d => d.omschrijving).join(', '));
+        const bnHoeken = bnTdBocht.map(d => (d.bocht.hoek || Math.PI / 2) * 180 / Math.PI);
+        check('twee bochten van 90 + helling en twee van 90 − helling',
+            bnHoeken.filter(h => h > 91).length === 2 && bnHoeken.filter(h => h < 89).length === 2
+            && bnHoeken.every(h => Math.abs(h - (180 - bnHoeken[0])) < 1e-6 || Math.abs(h - bnHoeken[0]) < 1e-6),
+            bnHoeken.map(h => h.toFixed(1)).join(', '));
+        // Het eind van elke bocht ligt precies op een eind van een staande buis.
+        const bnGat = Math.max(...bnTdBocht.map(b => {
+            const h = b.bocht.hoek || Math.PI / 2, R = b.bocht.straal;
+            const e = [0, 1, 2].map(k => b.oorsprong[k] + R * (Math.cos(h) * b.xAs[k] + Math.sin(h) * b.yAs[k]));
+            return Math.min(...bnTdBuis.flatMap(t => {
+                const voet = [0, 1, 2].map(k => t.oorsprong[k] + t.xAs[k] * t.dx / 2 + t.yAs[k] * t.dy / 2);
+                const top = voet.map((v, k) => v + t.zAs[k] * t.dz);
+                return [voet, top].map(q => Math.hypot(...q.map((v, k) => v - e[k])));
+            }));
+        }));
+        check('elke bocht sluit precies op een staande buis aan', bnGat < 1e-6, bnGat.toExponential(2));
+        adMeet('gesloten uiteinden op een trap', bnTrapDicht);
         check('knieregel geeft geen fout in de console',
             errors.length === bnVoor, errors.slice(bnVoor).join(' | '));
 

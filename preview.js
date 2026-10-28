@@ -56,7 +56,7 @@ export function maakVoorbeeld(delen) {
 
         if (d.bocht) {
             // Een lasbocht: een kwart torus, zoals de bouwer hem maakt.
-            const geo = new THREE.TorusGeometry(d.bocht.straal, d.bocht.buiten, 10, 12, Math.PI / 2);
+            const geo = new THREE.TorusGeometry(d.bocht.straal, d.bocht.buiten, 10, 12, d.bocht.hoek || Math.PI / 2);
             const mesh = new THREE.Mesh(geo, stofVoor(uit));
             mesh.applyMatrix4(new THREE.Matrix4().makeBasis(
                 new THREE.Vector3(...d.xAs), new THREE.Vector3(...d.yAs),
