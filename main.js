@@ -2190,11 +2190,16 @@ function toonZaaglijst(lijst) {
 
 document.getElementById('zaaglijstCsv').addEventListener('click', () => {
     if (!laatsteZaaglijst) return;
-    downloadBestand(zaaglijstAlsCsv(laatsteZaaglijst), 'zaaglijst.csv');
+    downloadBestand(EXCEL_UTF8 + zaaglijstAlsCsv(laatsteZaaglijst), 'zaaglijst.csv');
     statusEl.textContent = `zaaglijst.csv opgeslagen — `
         + `${laatsteZaaglijst.aantalStangen} stangen, `
         + `${(laatsteZaaglijst.afvalDeel * 100).toFixed(1)}% afval.`;
 });
+
+// De BOM-markering vooraan een CSV: zonder leest Excel de tekst niet als
+// UTF-8, en wordt "Ø48.3" "Ã˜48.3" en "80 × 12" "80 Ã— 12". Voor elke CSV
+// die de werkplaats krijgt, niet alleen de stuklijst.
+const EXCEL_UTF8 = String.fromCharCode(0xFEFF);
 
 /** De zaaglijst van het laatst gebouwde model, voor de zelftest. */
 export const laatsteZaaglijstNu = () => laatsteZaaglijst;
@@ -2494,8 +2499,8 @@ export async function maakProductiepakket(meld = () => {}) {
         }),
     });
 
-    bestanden.push({ naam: 'bom.csv', data: bomAlsCsv(bom) });
-    bestanden.push({ naam: 'zaaglijst.csv', data: zaaglijstAlsCsv(zaag) });
+    bestanden.push({ naam: 'bom.csv', data: EXCEL_UTF8 + bomAlsCsv(bom) });
+    bestanden.push({ naam: 'zaaglijst.csv', data: EXCEL_UTF8 + zaaglijstAlsCsv(zaag) });
 
     meld(`Productiepakket: ${bestanden.length} bestanden `
         + `(${platen} plaatdelen met DXF).`);
@@ -2536,7 +2541,7 @@ function bomAlsCsv(bom) {
 
 document.getElementById('bomCsv').addEventListener('click', () => {
     if (!laatsteOnderdelen) return;
-    downloadBestand(bomAlsCsv(laatsteOnderdelen.map(bomRegel)), 'bom.csv');
+    downloadBestand(EXCEL_UTF8 + bomAlsCsv(laatsteOnderdelen.map(bomRegel)), 'bom.csv');
     statusEl.textContent = 'Onderdelenlijst opgeslagen als bom.csv — '
         + `${laatsteOnderdelen.length} unieke onderdelen.`;
 });
@@ -2604,7 +2609,7 @@ document.getElementById('stuklijstCsv').addEventListener('click', () => {
 
     // De BOM vooraan zorgt dat Excel de tekst als UTF-8 leest, zodat accenten
     // en het maal-teken niet verhaspelen.
-    downloadBestand('﻿' + csv, 'stuklijst.csv');
+    downloadBestand(EXCEL_UTF8 + csv, 'stuklijst.csv');
 });
 
 // --- balustrade op een geselecteerde rand ----------------------------------

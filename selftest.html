@@ -6952,6 +6952,12 @@ try {
     check('de nummers van DXF, STEP en stuklijst horen bij hetzelfde stuk staal',
         agPakket.some(b => b.naam === `step/onderdeel_${agNr}.stp`)
         && agCsv.includes(`\n${agNr};`), `onderdeel_${agNr}`);
+    // Zonder de BOM vooraan leest Excel "Ø48.3" als "Ã˜48.3".
+    check('bom.csv en zaaglijst.csv beginnen met de UTF-8-markering voor Excel',
+        ['bom.csv', 'zaaglijst.csv'].every(n => {
+            const d = agPakket.find(b => b.naam === n).data;
+            return typeof d === 'string' && d.charCodeAt(0) === 0xFEFF;
+        }));
 
     const agZip = zipMod.maakZip(agPakket);
     log(`   ZIP: ${(agZip.length / 1024).toFixed(0)} kB, ${agPakket.length} bestanden`);
