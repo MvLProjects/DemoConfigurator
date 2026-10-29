@@ -11390,6 +11390,26 @@ try {
         check('een recht stuk krijgt één knieregel, met het hart op 500',
             bnKnie.length === 1 && Math.abs(bnKnie[0].oorsprong[2] + bnKnie[0].dz / 2 - 500) < 1e-6,
             bnKnie.map(d => (d.oorsprong[2] + d.dz / 2).toFixed(1)).join(', '));
+        // DE HOOGTE IS IN TE STELLEN, maar nooit boven de helft van de leuning.
+        const knieHartVan = (maten) => {
+            const k = bouwMod.balustradeDelen({ ...bnMaten, lengte: 2400, ...maten })
+                .find(d => d.soort === 'knieregel');
+            return k.oorsprong[2] + k.dz / 2;
+        };
+        check('knieregelhoogte 450 zet het hart op 450',
+            Math.abs(knieHartVan({ knieregelHoogte: 450 }) - 450) < 1e-6,
+            knieHartVan({ knieregelHoogte: 450 }).toFixed(1));
+        check('en 800 bij een leuning van 1000 blijft op de helft: 500',
+            Math.abs(knieHartVan({ knieregelHoogte: 800, hoogte: 1000 }) - 500) < 1e-6,
+            knieHartVan({ knieregelHoogte: 800, hoogte: 1000 }).toFixed(1));
+        adMeet('knieregel op 450', await bouwMod.bouwBalustrade({ ...bnMaten, lengte: 2400, knieregelHoogte: 450 }));
+        {
+            const zin = (await win.eval("import('/command-parser.js')"))
+                .parseer('balustrade van 3 meter met knieregel op 450', null, {});
+            check('"met knieregel op 450" wordt begrepen: knieregel, op 450, en 3 meter lang',
+                zin.params && zin.params.vulling === 'knieregel' && zin.params.knieregelHoogte === 450
+                && zin.params.lengte === 3000, zin.fout || zin.uitleg);
+        }
         check('geen spijlen en geen raam',
             !bnD.some(d => d.soort === 'spijl' || d.soort === 'vulregel'));
         check('elke staander krijgt een gat voor de knieregel',

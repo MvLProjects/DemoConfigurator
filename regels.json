@@ -218,7 +218,8 @@
     "schoprand": 0,
     "regelVoor": 0,
     "geslotenEind": 0,
-    "eindkappen": 0
+    "eindkappen": 0,
+    "knieregelHoogte": 500
   },
 
   "voetplaat": {
@@ -911,7 +912,8 @@
     "vulraamwerk": [0, 1],
     "uitklinken": [0, 1],
     "paalkapDikte": [0, 40],
-    "stripBreedte": [0, 200]
+    "stripBreedte": [0, 200],
+    "knieregelHoogte": [200, 900]
   },
 
   "_ijkpunten": [

@@ -412,6 +412,16 @@ function leesExtras(tekst, voorraad) {
         gevonden.push('blank, niet gecoat');
         rest = poets(rest, m.index, m.index + m[0].length);
     }
+    // "knieregel op 450", "knieregelhoogte 450 mm". VÓÓR de vulling, want die
+    // pakt het woord knieregel weg en dan blijft "op 450" als losse maat
+    // liggen. Alleen met "op" of "hoogte" erbij: "met knieregel 1100 hoog"
+    // gaat over de leuning, niet over de knieregel.
+    for (const m of [...rest.matchAll(/\bknie\s?(?:regel|leuning|stang)(?:\s?hoogte\s*(?:van|=|:)?|\s+op)\s*(\d+(?:[.,]\d+)?)\s*(millimeter|centimeter|mm|cm)?/gi)]) {
+        uit.knieregelHoogte = naarMillimeter(m[1], m[2]);
+        uit.vulling = 'knieregel';
+        gevonden.push(`knieregel op ${uit.knieregelHoogte} mm`);
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
     for (const [re, soort] of VULLINGZINNEN) {
         for (const m of [...rest.matchAll(re)]) {
             uit.vulling = soort;
@@ -999,6 +1009,7 @@ export function parseer(invoer, vorige = null, opties = {}) {
     if (extra.regelVoor !== undefined) extraMaten.regelVoor = extra.regelVoor;
     if (extra.geslotenEind !== undefined) extraMaten.geslotenEind = extra.geslotenEind;
     if (extra.eindkappen !== undefined) extraMaten.eindkappen = extra.eindkappen;
+    if (extra.knieregelHoogte !== undefined) extraMaten.knieregelHoogte = extra.knieregelHoogte;
     // Velden die bij naam genoemd zijn gaan er zo in; ze hebben hun eigen naam
     // dus er valt niets te raden.
     Object.assign(extraMaten, extra.velden || {});

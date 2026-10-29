@@ -617,7 +617,9 @@ export function padDelen(punten, gesloten, p) {
 
     // Het hart van de knieregel boven het pad: 500, of halverwege bij een lage
     // leuning. Zie regels.json onder _knieregel.
-    const knieHart = Math.min(KNIEREGEL.hoogte, p.hoogte / 2);
+    // Het hart van de knieregel: de gekozen hoogte (standaard 500), maar nooit
+    // boven de helft van de leuning - anders wordt de opening eronder te groot.
+    const knieHart = Math.min(Number(p.knieregelHoogte) || KNIEREGEL.hoogte, p.hoogte / 2);
     const delen = [];
     const velden = [];
 

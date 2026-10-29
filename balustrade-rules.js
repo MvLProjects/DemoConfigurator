@@ -230,6 +230,7 @@ const OMSCHRIJVING = {
     uitklinken: 'uitklinken',
     paalkapDikte: 'paalkapdikte',
     stripBreedte: 'stripbreedte',
+    knieregelHoogte: 'knieregelhoogte',
 };
 
 /**
