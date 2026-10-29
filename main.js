@@ -14,7 +14,7 @@ import { initOcct, laadStep, laadVorm, countMeshEdges, schrijfStep,
 import { maakNavigatie } from './navigation.js';
 import { bouwBalustrade, bouwBlok, bouwBalustradeOpRanden, beoordeelRanden,
     voorspelBalustrade } from './build-balustrade.js';
-import { STANDAARD, valideer, VULLING, GLAS, GLASVRIJ, vullingSoort } from './balustrade-rules.js';
+import { STANDAARD, valideer, VULLING, GLAS, GLASVRIJ, KNIEREGEL, vullingSoort } from './balustrade-rules.js';
 import { parseer, noemtProfiel } from './command-parser.js';
 import { bouwTrap, trapDelen, wandleuningFout, controleerWentel,
          controleerHoutBoom } from './build-trap.js';
@@ -2349,8 +2349,17 @@ function offerteKeuzes() {
     // Wat er ECHT gebouwd is, niet wat er aangevinkt staat: dichte uiteinden
     // met een buisstaander kunnen niet, en dan hoort de offerte ze ook niet
     // te beloven. Zie toonOnderdelen.
-    const gebouwd = (soort) => (laatsteOnderdelen || []).some(o => o.deel.soort === soort);
+    // Per EXEMPLAAR: een knieregel en een handregel van dezelfde buis zijn één
+    // productieonderdeel, en dat heet naar de eerste - de handregel.
+    const gebouwd = (soort) => (laatsteOnderdelen || []).some(o =>
+        (o.exemplaren || [o.deel]).some(d => d.soort === soort));
+    // De hoogte van de knieregel zoals hij gebouwd is: de gekozen hoogte, maar
+    // nooit boven de helft van de leuning (zie pad.js).
+    const knieregel = gebouwd('knieregel')
+        ? [['Knieregel', `hart op ${Math.round(Math.min(Number(b.knieregelHoogte) || KNIEREGEL.hoogte, b.hoogte / 2))} mm`]]
+        : [];
     const leuningExtra = [
+        ...knieregel,
         ...(gebouwd('lasbocht') ? [['Uiteinden', 'dicht, met lasbochten']] : []),
         ...(gebouwd('eindkap') ? [['Eindkappen', 'op de open buiseinden']] : []),
     ];
