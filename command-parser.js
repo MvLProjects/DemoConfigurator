@@ -371,6 +371,12 @@ function leesExtras(tekst, voorraad) {
         uit.geslotenEind = 1;
         rest = poets(rest, m.index, m.index + m[0].length);
     }
+    // "tegen de muur", "van muur tot muur", "met muurplaten".
+    for (const m of [...rest.matchAll(/\b(?:(?:uiteinden\s+)?tegen\s+de\s+muur|van\s+muur\s+tot\s+muur|muur\s?platen|muur\s?plaat|muuraansluiting)\b/gi)]) {
+        if (!uit.muurEind) gevonden.push('uiteinden tegen de muur, met muurplaat');
+        uit.muurEind = 1;
+        rest = poets(rest, m.index, m.index + m[0].length);
+    }
     // "met eindkappen", "doppen op de buis", "afdekdoppen".
     for (const m of [...rest.matchAll(/\b(?:eind\s?kap(?:pen|jes)?|(?:afdek|eind)?doppen|dopjes)\b/gi)]) {
         if (!uit.eindkappen) gevonden.push('eindkappen op open buiseinden');
@@ -1010,6 +1016,7 @@ export function parseer(invoer, vorige = null, opties = {}) {
     if (extra.geslotenEind !== undefined) extraMaten.geslotenEind = extra.geslotenEind;
     if (extra.eindkappen !== undefined) extraMaten.eindkappen = extra.eindkappen;
     if (extra.knieregelHoogte !== undefined) extraMaten.knieregelHoogte = extra.knieregelHoogte;
+    if (extra.muurEind !== undefined) extraMaten.muurEind = extra.muurEind;
     // Velden die bij naam genoemd zijn gaan er zo in; ze hebben hun eigen naam
     // dus er valt niets te raden.
     Object.assign(extraMaten, extra.velden || {});

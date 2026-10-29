@@ -219,7 +219,8 @@
     "regelVoor": 0,
     "geslotenEind": 0,
     "eindkappen": 0,
-    "knieregelHoogte": 500
+    "knieregelHoogte": 500,
+    "muurEind": 0
   },
 
   "voetplaat": {
@@ -520,6 +521,15 @@
     "buis; het deel dat erin steekt telt niet mee in de vorm."
   ],
   "eindkap": { "dikte": 3 },
+
+  "_muurplaat": [
+    "UITEINDEN TEGEN DE MUUR: bij een balkon tussen twee muren loopt de",
+    "handregel (en een knieregel) door tot de muur, op de handregeloverstek",
+    "voorbij de eindstaander, en krijgt daar een ronde muurplaat om tegen de",
+    "muur te schroeven. Alleen langs een vlakke rand; een lasbocht (dichte",
+    "uiteinden) gaat voor. In plaats van een eindkap."
+  ],
+  "muurplaat": { "diameter": 100, "dikte": 8 },
 
   "_schoprand": [
     "DE SCHOPRAND: een plaat langs de vloer, zodat er niets onder de leuning",

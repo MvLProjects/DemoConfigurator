@@ -258,6 +258,15 @@
       "hoog": 3,
       "bron": "schatting (2026-10-27), niet nagezocht",
       "toelichting": "SCHATTING. Een kunststof of stalen dop op een open buis- of kokereind, per stuk."
+    },
+    "muurplaat": {
+      "naam": "Muurplaat rond 100",
+      "eenheid": "stuk",
+      "eigen": null,
+      "laag": 3,
+      "hoog": 9,
+      "bron": "schatting (2026-10-29), niet nagezocht",
+      "toelichting": "SCHATTING. Een ronde stalen muurplaat 100 x 8 met gaten, per stuk."
     }
   },
   "_controle": [

@@ -66,7 +66,7 @@
 
 import { berekenSpijlen, spijlPosities, VOETPLAAT, VULRAAMWERK, PAALKAP,
          uitklinkDiepte, stripBreedte, profielDoos,
-         VULLING, vullingSoort, GLAS, SIERPUNT, AFRONDING, SCHOPRAND, KNIEREGEL, LASBOCHT, EINDKAP,
+         VULLING, vullingSoort, GLAS, SIERPUNT, AFRONDING, SCHOPRAND, KNIEREGEL, LASBOCHT, EINDKAP, MUURPLAAT,
          DEKBAND } from './balustrade-rules.js';
 // De modellenbibliotheek. pad.js bepaalt alleen WAAR het ornament komt en hoe
 // groot; de vorm zelf wordt pas bij het bouwen gemaakt, in build-balustrade.js.
@@ -2239,6 +2239,11 @@ export function padDelen(punten, gesloten, p) {
     // met `geslotenKanten` welke einden van dit pad de echte einden zijn.
     const gesloten_eind = (stuk, kant) => geslotenEind
         && (!Array.isArray(p.geslotenKanten) || Boolean(p.geslotenKanten[kant < 0 ? 0 : 1]));
+    // TEGEN DE MUUR: het vrije eind loopt door tot de muur (op de
+    // handregeloverstek) en krijgt een muurplaat. Alleen langs een vlak stuk -
+    // een muur staat recht - en niet waar een lasbocht het eind al sluit.
+    const muur_eind = (stuk, kant) => Number(p.muurEind) > 0 && !gesloten_eind(stuk, kant)
+        && Math.abs(stuk.langs[2]) < 1e-6;
     const bochtStraal = LASBOCHT.straalFactor * dikte;
     // De hartlijn van de handregel aan zijn twee einden, per stuk.
     const regelAsVan = new Map();
@@ -2522,6 +2527,9 @@ export function padDelen(punten, gesloten, p) {
             // Een vrij eind: gelijk met de eindstaander, of bij een gesloten
             // eind zo ver als de handregel, waar de lasbocht begint.
             const vrijKnie = halfLangsSt / r.cos;
+            // Tegen de muur loopt de knieregel net zo ver door als de handregel.
+            const vrijKnieMuur = (kant) => (muur_eind(stuk, kant) && overstek > halfLangsSt
+                ? overstek / r.cos : vrijKnie);
             // AAN EEN GESLOTEN EIND ligt het eind van de knieregel vast door de
             // handregel: de onderste bocht moet recht onder de bovenste
             // uitkomen, anders staat de buis ertussen scheef. Met `s` de
@@ -2600,10 +2608,10 @@ export function padDelen(punten, gesloten, p) {
             const recht = uitloop(r.langsVlak) > 1e-6 ? uitloop(r.langsVlak) + 0.5 : 0;
             const rechtBegin = hoekBegin && !bh.rondStomp ? recht : 0;
             const rechtEind = hoekEind && !eh.rondStomp ? recht : 0;
-            const uitBegin = ks.beginVrij ? (db ? -db.t : vrijKnie)
+            const uitBegin = ks.beginVrij ? (db ? -db.t : vrijKnieMuur(-1))
                 : hoekBegin ? -(bh.verschil + bh.half) / r.cos + rechtBegin
                 : uitloop(ks.beginNormaal);
-            const uitEind = ks.eindVrij ? (de ? de.t - r.schuineLengte : vrijKnie)
+            const uitEind = ks.eindVrij ? (de ? de.t - r.schuineLengte : vrijKnieMuur(1))
                 : hoekEind ? (eh.verschil - eh.half) / r.cos + rechtEind
                 : uitloop(ks.eindNormaal);
             const naarAssen = (w, teken) => [teken * punt(w, r.langs),
@@ -2684,11 +2692,29 @@ export function padDelen(punten, gesloten, p) {
     // in), zodat de twee kappen van één regel hetzelfde onderdeel zijn.
     const kapSoort = p.handregelProfiel && !houtRegel && !dekbandModel
         ? categorieVan(p.handregelProfiel).sleutel : null;
-    if (Number(p.eindkappen) > 0 && ['CHS', 'SHS', 'RHS'].includes(kapSoort)) {
+    const metKappen = Number(p.eindkappen) > 0 && ['CHS', 'SHS', 'RHS'].includes(kapSoort);
+    {
         const rondeKap = kapSoort === 'CHS';
         const naamKap = rondeKap ? `Eindkap Ø${dikte}` : `Eindkap ${dikte} × ${handregelHoogte}`;
+        const Dm = MUURPLAAT.diameter;
         for (const e of regelEinden) {
             const { r } = e;
+            // TEGEN DE MUUR: een ronde muurplaat op het eind, haaks op de
+            // regel en gecentreerd op zijn hartlijn. Gaat voor de eindkap.
+            const muurplaat = (hart, xAs, zAs) => voegToe({
+                soort: 'muurplaat', omschrijving: `Muurplaat Ø${Dm} × ${MUURPLAAT.dikte}`,
+                oorsprong: plus(plus(hart, maal(xAs, -Dm / 2)), maal(r.loodrecht, -Dm / 2)),
+                xAs, yAs: r.loodrecht, zAs,
+                dx: Dm, dy: Dm, dz: MUURPLAAT.dikte,
+                lengteAs: 'z', profiel: null, rond: true,
+                besteld: true, bestelSoort: 'muurplaat',
+            });
+            const hartBegin = plus(plus(e.oorsprong, maal(r.dwars, dikte / 2)),
+                                   maal(r.loodrecht, handregelHoogte / 2));
+            const hartEind = plus(hartBegin, maal(r.langs, e.lengte));
+            if (e.vrij[0] && muur_eind(e.stuk, -1)) muurplaat(hartBegin, maal(r.dwars, -1), maal(r.langs, -1));
+            if (e.vrij[1] && muur_eind(e.stuk, 1)) muurplaat(hartEind, r.dwars, r.langs);
+            if (!metKappen) continue;
             const kap = (oorsprong, xAs, zAs) => voegToe({
                 soort: 'eindkap', omschrijving: naamKap,
                 oorsprong, xAs, yAs: r.loodrecht, zAs,
@@ -2697,9 +2723,12 @@ export function padDelen(punten, gesloten, p) {
                 ...(rondeKap ? { rond: true } : {}),
                 besteld: true, bestelSoort: 'eindkap',
             });
-            if (e.vrij[0] && !gesloten_eind(e.stuk, -1)) kap(plus(e.oorsprong, maal(r.dwars, dikte)),
-                               maal(r.dwars, -1), maal(r.langs, -1));
-            if (e.vrij[1] && !gesloten_eind(e.stuk, 1)) kap(plus(e.oorsprong, maal(r.langs, e.lengte)), r.dwars, r.langs);
+            if (e.vrij[0] && !gesloten_eind(e.stuk, -1) && !muur_eind(e.stuk, -1)) {
+                kap(plus(e.oorsprong, maal(r.dwars, dikte)), maal(r.dwars, -1), maal(r.langs, -1));
+            }
+            if (e.vrij[1] && !gesloten_eind(e.stuk, 1) && !muur_eind(e.stuk, 1)) {
+                kap(plus(e.oorsprong, maal(r.langs, e.lengte)), r.dwars, r.langs);
+            }
         }
     }
 

@@ -2362,6 +2362,7 @@ function offerteKeuzes() {
         ...knieregel,
         ...(gebouwd('lasbocht') ? [['Uiteinden', 'dicht, met lasbochten']] : []),
         ...(gebouwd('eindkap') ? [['Eindkappen', 'op de open buiseinden']] : []),
+        ...(gebouwd('muurplaat') ? [['Uiteinden', 'tegen de muur, met muurplaat Ø100']] : []),
     ];
 
     if (laatsteNaam !== 'trap') {

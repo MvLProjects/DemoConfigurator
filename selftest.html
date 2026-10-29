@@ -11630,6 +11630,36 @@ try {
         const boZin = bnZin.parseer('balustrade van 3 meter met eindkappen', null, {});
         check('"met eindkappen" wordt begrepen',
             boZin.params && boZin.params.eindkappen === 1, boZin.fout || boZin.uitleg);
+
+        // UITEINDEN TEGEN DE MUUR: een muurplaat in plaats van een kap, en de
+        // knieregel loopt net zo ver door als de handregel.
+        log('\n--- uiteinden tegen de muur ---');
+        const bmMuur = bouwMod.balustradeDelen({ ...boKap, staanderProfiel: bnFl, vulling: 'knieregel', muurEind: 1 });
+        const bmPlaatjes = bmMuur.filter(d => d.soort === 'muurplaat');
+        const bmOverstek = regelsNu.STANDAARD.handregelOverstek;
+        check('handregel en knieregel krijgen aan beide einden een muurplaat, en geen kap',
+            bmPlaatjes.length === 4 && !bmMuur.some(d => d.soort === 'eindkap')
+            && bmPlaatjes.every(d => d.rond && d.besteld && d.dx === regelsNu.MUURPLAAT.diameter),
+            `${bmPlaatjes.length} muurplaten`);
+        check('de muurplaten liggen in één vlak: de muur, een overstek voorbij de eindstaander',
+            bmPlaatjes.every(d => Math.abs(d.oorsprong[0] + bmOverstek) < 1e-6
+                                  || Math.abs(d.oorsprong[0] - (2400 + bmOverstek)) < 1e-6),
+            bmPlaatjes.map(d => d.oorsprong[0].toFixed(1)).join(', '));
+        const bmMuurKnie = bmMuur.find(d => d.soort === 'knieregel');
+        check('de knieregel loopt door tot de muur',
+            Math.abs(bmMuurKnie.dx - (2400 + 2 * bmOverstek)) < 1e-6, bmMuurKnie.dx.toFixed(1));
+        const bmMuurBouw = await bouwMod.bouwBalustrade({ ...boKap, staanderProfiel: bnFl, vulling: 'knieregel', muurEind: 1 });
+        adMeet('uiteinden tegen de muur', bmMuurBouw);
+        check('de muurplaat staat als bestelde post, vier stuks',
+            ks.hoeveelheden(bmMuurBouw.onderdelen).besteld.muurplaat === 4,
+            JSON.stringify(ks.hoeveelheden(bmMuurBouw.onderdelen).besteld));
+        check('dichte uiteinden gaan voor: dan geen muurplaat',
+            !bouwMod.balustradeDelen({ ...boKap, staanderProfiel: bnFl, vulling: 'knieregel', muurEind: 1, geslotenEind: 1 })
+                .some(d => d.soort === 'muurplaat'));
+        const bmMuurZin = bnZin.parseer('balustrade van 3 meter van muur tot muur', null, {});
+        check('"van muur tot muur" wordt begrepen',
+            bmMuurZin.params && bmMuurZin.params.muurEind === 1 && bmMuurZin.params.lengte === 3000,
+            bmMuurZin.fout || bmMuurZin.uitleg);
     }
 
     // ============ DEEL BM: schoprand ========================================
