@@ -2346,6 +2346,14 @@ function offerteKeuzes() {
     // Een komma, zoals een Nederlandse klant een maat leest.
     const komma1 = (v) => `${(Math.round(v * 10) / 10).toString().replace('.', ',')} mm`;
     const profielNaam = (p, terug) => (p ? p.englishLabel || p.label : terug);
+    // Wat er ECHT gebouwd is, niet wat er aangevinkt staat: dichte uiteinden
+    // met een buisstaander kunnen niet, en dan hoort de offerte ze ook niet
+    // te beloven. Zie toonOnderdelen.
+    const gebouwd = (soort) => (laatsteOnderdelen || []).some(o => o.deel.soort === soort);
+    const leuningExtra = [
+        ...(gebouwd('lasbocht') ? [['Uiteinden', 'dicht, met lasbochten']] : []),
+        ...(gebouwd('eindkap') ? [['Eindkappen', 'op de open buiseinden']] : []),
+    ];
 
     if (laatsteNaam !== 'trap') {
         return [
@@ -2363,8 +2371,9 @@ function offerteKeuzes() {
                 ? [['Spijlen', profielNaam(b.spijlProfiel, `${b.spijlBreedte} × ${b.spijlBreedte}`)]]
                 : []),
             ['Materiaal', metaal],
+            ...(Number(b.regelVoor) > 0 ? [['Plaats handregel', 'vóór de staanders']] : []),
             ...(b.schoprand ? [['Schoprand', '100 mm, langs de vloer']] : []),
-            ...(b.eindkappen ? [['Eindkappen', 'op de open buiseinden']] : []),
+            ...leuningExtra,
             ['Afwerking', afwerking],
         ];
     }
@@ -2393,6 +2402,7 @@ function offerteKeuzes() {
     uit.push(['Leuning', leuning === 'geen' ? 'geen'
         : `${{ links: 'links', rechts: 'rechts', beide: 'aan beide kanten' }[leuning]}, `
           + (p.soort === 'wentel' ? 'spijlen' : vulling)]);
+    if (leuning !== 'geen') uit.push(...leuningExtra);
     if (p.wandleuning && p.wandleuning !== 'geen') uit.push(['Wandleuning', p.wandleuning]);
     if (p.stootborden) uit.push(['Stootborden', 'ja']);
     {
