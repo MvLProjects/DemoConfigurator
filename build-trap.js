@@ -732,8 +732,14 @@ export function trapDelen(p, balustradeMaten = null, leuning = 'geen') {
         if (!leuningMaten) break;
         const paden = draaiend ? draaiPaden(zijde)
             : [leuningPad(t, p, zijde * (halveBreedte + stBreedte / 2))];
-        for (const pad of paden) {
-            const leuningDeel = padDelen(pad, false, leuningMaten);
+        for (const [nr, pad] of paden.entries()) {
+            // Meer paden aan één kant (binnen bij een kwartslag): alleen het
+            // begin van het eerste en het eind van het laatste zijn echte
+            // einden. Waar ze in de hoek tegen elkaar staan geen lasbocht.
+            const maten = paden.length > 1
+                ? { ...leuningMaten, geslotenKanten: [nr === 0, nr === paden.length - 1] }
+                : leuningMaten;
+            const leuningDeel = padDelen(pad, false, maten);
             const verschuiving = delen.length;
             delen.push(...leuningDeel.delen);
             for (const v of leuningDeel.verbindingen) {

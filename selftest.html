@@ -11488,6 +11488,28 @@ try {
         }));
         check('elke bocht sluit precies op een staande buis aan', bnGat < 1e-6, bnGat.toExponential(2));
         adMeet('gesloten uiteinden op een trap', bnTrapDicht);
+        // DRAAIENDE TRAPPEN: binnen bij een kwartslag zijn het twee losse
+        // leuningen die in de hoek tegen elkaar staan. Daar hoort geen
+        // lasbocht - eerst kreeg elk los stuk er aan beide kanten een, en
+        // stonden ze in de staanders (5142 mm3).
+        for (const soort of ['kwartslag', 'halfslag']) {
+            const bnDraai = await trapBouw.bouwTrap({ ...trapRegels.STANDAARD, soort, draai: 'rechts',
+                tredeMateriaal: 'rooster', tredeDikte: 30 }, bnDicht, 'beide');
+            check(`${soort}, leuning aan beide kanten: alleen lasbochten aan de echte einden`,
+                bnDraai.delen.filter(d => d.soort === 'lasbocht').length === 8
+                && bnDraai.delen.filter(d => d.soort === 'eindbuis').length === 4,
+                `${bnDraai.delen.filter(d => d.soort === 'lasbocht').length} lasbochten`);
+            adMeet(`${soort} met knieregel en dichte uiteinden`, bnDraai);
+        }
+        // Met buisstaanders zit de knieregel ertussen; in een hoek en een knik
+        // stomp (geen vissebek: twee stukken uit verschillende richtingen
+        // zouden elkaar naast de staander raken).
+        const bnDraaiBuis = trapBouw.trapDelen({ ...trapRegels.STANDAARD, soort: 'kwartslag', draai: 'rechts',
+            tredeMateriaal: 'rooster', tredeDikte: 30 }, { ...bnDicht, staanderProfiel: cat.alleProfielen(catBoom)
+                .find(x => /^CHS 60\.3x/.test(x.englishLabel || x.label || '')) }, 'beide');
+        check('kwartslag met buisstaanders: geen vissebek in een hoek of knik, wel op een recht stuk',
+            bnDraaiBuis.delen.some(d => d.soort === 'knieregel' && (d.vissebek || []).length === 2)
+            && bnDraaiBuis.delen.some(d => d.soort === 'knieregel' && !(d.vissebek || []).length));
         check('knieregel geeft geen fout in de console',
             errors.length === bnVoor, errors.slice(bnVoor).join(' | '));
 
@@ -11517,8 +11539,11 @@ try {
         const bnTrapTussen = await trapBouw.bouwTrap({ ...trapRegels.STANDAARD, tredeMateriaal: 'rooster',
                                                       tredeDikte: 30 }, bnBuisSt, 'rechts');
         adMeet('trap, knieregel tussen buizen', bnTrapTussen);
-        check('op de trap staat het eind van de knieregel recht tegen de staander',
-            bnTrapTussen.delen.filter(d => d.soort === 'knieregel').every(d => d.verstek.length === 2));
+        // Tegen een RONDE staander geen verticale snede (daar liep OCCT op
+        // vast): het eind blijft haaks op de buis en stopt vrij van de
+        // staander. Dat het vrij blijft, meet adMeet hierboven.
+        check('op de trap blijft het eind van de knieregel haaks, zonder verticale snede tegen een buis',
+            bnTrapTussen.delen.filter(d => d.soort === 'knieregel').every(d => d.verstek.length === 0));
 
         // DE VISSEBEK: tegen een ronde staander die dikker is dan de knieregel
         // wordt het eind rond uitgesneden in plaats van recht afgezaagd.

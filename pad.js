@@ -2231,7 +2231,12 @@ export function padDelen(punten, gesloten, p) {
     // 90 graden. Zie maakEinde, en de knieregel voor waar die dan ophoudt.
     const geslotenEind = vulling === 'knieregel' && Number(p.geslotenEind) > 0
         && isRond(p.handregelProfiel) && knieDoor;
-    const gesloten_eind = () => geslotenEind;
+    // Per eind: `kant` -1 is het begin van het pad, +1 het eind. Een trap die
+    // om een bordes draait heeft aan de binnenkant twee losse leuningen die in
+    // de hoek tegen elkaar staan; daar hoort geen lasbocht. build-trap.js zegt
+    // met `geslotenKanten` welke einden van dit pad de echte einden zijn.
+    const gesloten_eind = (stuk, kant) => geslotenEind
+        && (!Array.isArray(p.geslotenKanten) || Boolean(p.geslotenKanten[kant < 0 ? 0 : 1]));
     const bochtStraal = LASBOCHT.straalFactor * dikte;
     // De hartlijn van de handregel aan zijn twee einden, per stuk.
     const regelAsVan = new Map();
@@ -2297,7 +2302,7 @@ export function padDelen(punten, gesloten, p) {
         // dan de handregel (zie de knieregel): onderaan een trap is dat
         // minder ver, en dan kan hij in de staander uitkomen. Dan loopt de
         // handregel zover extra door dat de knieregel vrij blijft.
-        if (gesloten_eind(stuk)) {
+        {
             const asOp = (t) => plus(plus(bovenA, maal(r.loodrecht, -handregelHoogte / 2)),
                                      maal(r.langs, t));
             const tekort = (kant, P, H) => {
@@ -2306,8 +2311,12 @@ export function padDelen(punten, gesloten, p) {
                     - 2 * bochtStraal * kant * r.langs[2];
                 return Math.max(0, nodig - punt(min(H, P), uitV)) / r.cos;
             };
-            if (stuk.beginVrij) uitBegin += tekort(-1, punten[stuk.begin], asOp(-uitBegin));
-            if (stuk.eindVrij) uitEind += tekort(1, punten[stuk.eind], asOp(r.schuineLengte + uitEind));
+            if (stuk.beginVrij && gesloten_eind(stuk, -1)) {
+                uitBegin += tekort(-1, punten[stuk.begin], asOp(-uitBegin));
+            }
+            if (stuk.eindVrij && gesloten_eind(stuk, 1)) {
+                uitEind += tekort(1, punten[stuk.eind], asOp(r.schuineLengte + uitEind));
+            }
         }
 
         // We hangen hem op aan zijn BOVENKANT, want dat is de maat die telt.
@@ -2519,7 +2528,7 @@ export function padDelen(punten, gesloten, p) {
             // verder, onderaan minder ver, vlak even ver. Komt hij dan niet
             // meer vrij van de staander, dan blijft dit eind open.
             const dichtEind = (kant) => {
-                if (!gesloten_eind(stuk) || !regelAsVan.has(stuk)) return null;
+                if (!gesloten_eind(stuk, kant) || !regelAsVan.has(stuk)) return null;
                 const H = kant < 0 ? regelAsVan.get(stuk).begin : regelAsVan.get(stuk).eind;
                 const uitV = maal(r.langsVlak, kant);
                 const sUit = kant * r.langs[2];
@@ -2544,29 +2553,56 @@ export function padDelen(punten, gesloten, p) {
             // als de staander duidelijk dikker is dan de knieregel: bij twee
             // buizen van dezelfde maat raakt de snede de zijkanten precies, en
             // daar loopt OCCT op vast.
-            const vis = isRond(p.staanderProfiel)
+            const visRond = isRond(p.staanderProfiel)
                 && dikte <= 2 * halfLangsSt - KNIEREGEL.vissebekMarge;
-            const tegenHoek = (k, P) => {
+            // Alleen waar de knieregel aan de andere kant RECHT doorloopt (of
+            // waar er geen andere kant is). In een hoek of een knik - van de
+            // trap op het bordes - komen twee stukken uit een andere richting
+            // tot het hart, en dan overlappen ze naast de staander.
+            const rechtDoor = (k) => {
+                const n = punten.length;
+                const v = k > 0 ? k - 1 : (gesloten ? n - 1 : null);
+                const w = k < n - 1 ? k + 1 : (gesloten ? 0 : null);
+                if (v === null || w === null) return true;
+                return lengte(kruis(eenheid(min(punten[k], punten[v])),
+                                    eenheid(min(punten[w], punten[k])))) < 1e-6;
+            };
+            const visBegin = visRond && rechtDoor(ks.begin);
+            const visEind = visRond && rechtDoor(ks.eind);
+            const tegenHoek = (k, P, vis) => {
                 const st = staanders[k];
                 const l = r.langsVlak;
+                // Tegen een RONDE staander stomp (in een hoek of een knik): een
+                // lasspleet, net als bij de vissebek, en GEEN verticale snede -
+                // tegen een cilinder liep OCCT daarop vast. Het eind blijft
+                // haaks op de buis en stopt zo ver dat ook zijn bovenrand vrij
+                // blijft; op een helling is er onderaan een paar mm meer kier.
+                const rondStomp = !vis && isRond(p.staanderProfiel);
                 const half = vis ? 0 : Math.abs(punt(l, st.deelhoek)) * halfLangsSt
-                    + Math.abs(punt(l, st.dwars)) * halfDwarsSt;
+                    + Math.abs(punt(l, st.dwars)) * halfDwarsSt
+                    + (rondStomp ? KNIEREGEL.vissebekSpeling + uitloop(l) * r.cos : 0);
                 return { verschil: punt(min(punten[k], P), l), half,
-                         opzij: punt(min(punten[k], P), r.dwars) };
+                         opzij: punt(min(punten[k], P), r.dwars), rondStomp };
             };
-            const bh = hoekBegin && tegenHoek(ks.begin, A);
-            const eh = hoekEind && tegenHoek(ks.eind, B);
+            const bh = hoekBegin && tegenHoek(ks.begin, A, visBegin);
+            const eh = hoekEind && tegenHoek(ks.eind, B, visEind);
             // STOMP OP EEN HELLING: het eind van de buis staat haaks op de
             // buis, de staander staat recht. Dan steekt de bovenkant de
             // staander in en blijft er onderaan een kier. Dus een stukje
             // langer (de uitloop door een verticaal vlak) en dat vlak er als
             // verstek af. Vlak is de uitloop nul en blijft alles zoals het was.
-            const recht = uitloop(r.langsVlak);
+            // Een halve millimeter extra: precies de uitloop laat de rand van
+            // de doorsnede het snijvlak RAKEN, en bij een ronde buis is dat
+            // een raaksnede - daar blijft OCCT in hangen (gezien op een
+            // kwartslagtrap met buisstaanders). Zo snijdt het vlak er echt door.
+            const recht = uitloop(r.langsVlak) > 1e-6 ? uitloop(r.langsVlak) + 0.5 : 0;
+            const rechtBegin = hoekBegin && !bh.rondStomp ? recht : 0;
+            const rechtEind = hoekEind && !eh.rondStomp ? recht : 0;
             const uitBegin = ks.beginVrij ? (db ? -db.t : vrijKnie)
-                : hoekBegin ? -(bh.verschil + bh.half) / r.cos + recht
+                : hoekBegin ? -(bh.verschil + bh.half) / r.cos + rechtBegin
                 : uitloop(ks.beginNormaal);
             const uitEind = ks.eindVrij ? (de ? de.t - r.schuineLengte : vrijKnie)
-                : hoekEind ? (eh.verschil - eh.half) / r.cos + recht
+                : hoekEind ? (eh.verschil - eh.half) / r.cos + rechtEind
                 : uitloop(ks.eindNormaal);
             const naarAssen = (w, teken) => [teken * punt(w, r.langs),
                                              teken * punt(w, r.dwars),
@@ -2580,24 +2616,24 @@ export function padDelen(punten, gesloten, p) {
                 verstek.push({ punt: [uitBegin + r.schuineLengte, dikte / 2, handregelHoogte / 2],
                                richting: naarAssen(ks.eindNormaal, 1) });
             }
-            if (recht > 1e-6 && hoekBegin) {
-                verstek.push({ punt: [recht, dikte / 2, handregelHoogte / 2],
+            if (rechtBegin > 1e-6) {
+                verstek.push({ punt: [rechtBegin, dikte / 2, handregelHoogte / 2],
                                richting: naarAssen(r.langsVlak, -1) });
             }
-            if (recht > 1e-6 && hoekEind) {
+            if (rechtEind > 1e-6) {
                 const lengteKnie = r.schuineLengte + uitBegin + uitEind;
-                verstek.push({ punt: [lengteKnie - recht, dikte / 2, handregelHoogte / 2],
+                verstek.push({ punt: [lengteKnie - rechtEind, dikte / 2, handregelHoogte / 2],
                                richting: naarAssen(r.langsVlak, 1) });
             }
             // De vissebek: de as van de staander, in de assen van de knieregel.
             const vissebek = [];
             const staanderAs = [r.langs[2], r.dwars[2], r.loodrecht[2]];
             const visStraal = halfLangsSt + KNIEREGEL.vissebekSpeling;
-            if (vis && hoekBegin) {
+            if (visBegin && hoekBegin) {
                 vissebek.push({ punt: [recht, dikte / 2 + bh.opzij, handregelHoogte / 2],
                                 as: staanderAs, straal: visStraal });
             }
-            if (vis && hoekEind) {
+            if (visEind && hoekEind) {
                 vissebek.push({ punt: [r.schuineLengte + uitBegin + uitEind - recht,
                                        dikte / 2 + eh.opzij, handregelHoogte / 2],
                                 as: staanderAs, straal: visStraal });
@@ -2650,7 +2686,6 @@ export function padDelen(punten, gesloten, p) {
         const rondeKap = kapSoort === 'CHS';
         const naamKap = rondeKap ? `Eindkap Ø${dikte}` : `Eindkap ${dikte} × ${handregelHoogte}`;
         for (const e of regelEinden) {
-            if (gesloten_eind(e.stuk)) continue;
             const { r } = e;
             const kap = (oorsprong, xAs, zAs) => voegToe({
                 soort: 'eindkap', omschrijving: naamKap,
@@ -2660,9 +2695,9 @@ export function padDelen(punten, gesloten, p) {
                 ...(rondeKap ? { rond: true } : {}),
                 besteld: true, bestelSoort: 'eindkap',
             });
-            if (e.vrij[0]) kap(plus(e.oorsprong, maal(r.dwars, dikte)),
+            if (e.vrij[0] && !gesloten_eind(e.stuk, -1)) kap(plus(e.oorsprong, maal(r.dwars, dikte)),
                                maal(r.dwars, -1), maal(r.langs, -1));
-            if (e.vrij[1]) kap(plus(e.oorsprong, maal(r.langs, e.lengte)), r.dwars, r.langs);
+            if (e.vrij[1] && !gesloten_eind(e.stuk, 1)) kap(plus(e.oorsprong, maal(r.langs, e.lengte)), r.dwars, r.langs);
         }
     }
 
