@@ -699,6 +699,10 @@
                      0 0 1 .57-.23z"/>
             <circle cx="11" cy="5.2" r="1.1"/>
         </symbol>
+        <symbol id="ic-sterkte" viewBox="0 0 16 16">
+            <path d="M2 13h12v1.4H2zM3.2 12V5.5L8 2l4.8 3.5V12h-1.4V6.2L8 3.7 4.6 6.2V12z"/>
+            <path d="M6.6 7.5h2.8V12H6.6z"/>
+        </symbol>
         <symbol id="ic-resultaat" viewBox="0 0 16 16">
             <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h6.5"/>
         </symbol>
@@ -1448,6 +1452,45 @@
              te staan, niet een leeg tabblad dat op een fout lijkt. -->
         <p class="hint" id="kostenLeeg">Bouw eerst iets; dan staat hier wat het
            ongeveer kost en waar je de onderdelen kunt kopen.</p>
+    </details>
+
+    <!-- STERKTE: een rekenhulp, geen keuring. Belastingen, factoren en de
+         doorbuigingsgrens vult de gebruiker in, met de bron: de app verzint
+         ze niet. Zie sterkte.js en PLAN-STERKTE.md. Alleen balustrades. -->
+    <details class="groep" data-icoon="sterkte">
+        <summary>Sterkte</summary>
+        <p class="hint" style="margin-top:0" id="sterkteWaarschuwing"><b>Rekenhulp, geen
+           keuring.</b> Een vereenvoudigde berekening met de waarden die je hieronder
+           invult. Hij zegt nooit dat een balustrade veilig of gecertificeerd is; laat
+           de constructie door een constructeur beoordelen. Alleen voor balustrades.</p>
+        <div class="veld"><label for="s_qk">lijnlast qk (kN/m)</label>
+            <input type="number" id="s_qk" step="0.1" min="0"></div>
+        <div class="veld"><label for="s_bronQk">bron qk</label>
+            <input type="text" id="s_bronQk" placeholder="bv. NEN-EN 1991-1-1 NB, tabel NB.A"></div>
+        <p class="hint">Puntlast is optioneel. De lijnlast komt uit NEN-EN 1991-1-1 met de Nationale Bijlage (bijlage NB.A),
+           naar de gebruiksfunctie. De app vult hier niets in: de officiële tabel
+           is niet openbaar en bronnen op internet spreken elkaar tegen.</p>
+        <div class="veld"><label for="s_Qk">puntlast Qk (kN)</label>
+            <input type="number" id="s_Qk" step="0.1" min="0"></div>
+        <div class="veld"><label for="s_gammaQ">factor γQ</label>
+            <input type="number" id="s_gammaQ" step="0.05" min="0"></div>
+        <div class="veld"><label for="s_gammaM0">factor γM0</label>
+            <input type="number" id="s_gammaM0" step="0.05" min="0"></div>
+        <button type="button" id="s_aanbevolen">Aanbevolen Eurocode-factoren invullen</button>
+        <p class="hint" id="s_factorBron">γ<sub>Q</sub> = 1,5 (NEN-EN 1990, tabel A1.2(B)) en
+           γ<sub>M0</sub> = 1,0 (NEN-EN 1993-1-1, 6.1) zijn de AANBEVOLEN waarden; de
+           Nationale Bijlage kan afwijken.</p>
+        <div class="veld"><label for="s_dMax">max. doorbuiging (mm)</label>
+            <input type="number" id="s_dMax" step="1" min="0"></div>
+        <p class="hint">Geen Eurocode-waarde voor balustrades: uit de NB, het bestek of
+           van de constructeur.</p>
+        <div class="veld"><label for="s_fy">fy rvs/alu (N/mm²)</label>
+            <input type="number" id="s_fy" step="5" min="0"></div>
+        <p class="hint">Alleen bij rvs of aluminium; bij staal volgt f<sub>y</sub> uit de
+           staalsoort van het profiel (NEN-EN 1993-1-1, tabel 3.1).</p>
+        <div id="sterkteInhoud"></div>
+        <p class="hint" id="sterkteLeeg">Bouw eerst een balustrade met gekozen profielen;
+           dan staan hier de controles.</p>
     </details>
 
     <!-- Het tekeningkader. De gegevens hiervoor kent de app niet uit zichzelf:

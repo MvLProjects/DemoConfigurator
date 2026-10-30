@@ -11662,6 +11662,91 @@ try {
             bmMuurZin.fout || bmMuurZin.uitleg);
     }
 
+    // ============ DEEL BS: sterkte (rekenhulp) ===============================
+    log('\n\n======== DEEL BS: sterkte en doorbuiging, alleen balustrades ========\n');
+    {
+        const bsVoor = errors.length;
+        const st = await win.eval("import('/sterkte.js')");
+        const prof = (re) => cat.alleProfielen(catBoom).find(x => re.test(x.englishLabel || x.label || ''));
+        const bsChs = prof(/^CHS 48\.3x2\.6$/), bsFl = prof(/^FL 80x12$/);
+        const bsShs = cat.alleProfielen(catBoom).find(x => /^SHS 40x40x3$/.test(x.englishLabel || x.label || ''));
+        const dicht = (a, b, rel = 1e-9) => Math.abs(a - b) <= rel * Math.max(1, Math.abs(b));
+
+        // 1. Doorsneden UIT DE MATEN, met de hand nagerekend.
+        const dChs = st.doorsnede(bsChs);
+        const iChs = Math.PI / 64 * (48.3 ** 4 - 43.1 ** 4);
+        check('CHS 48,3x2,6: A = 373,3 mm² en I = π/64·(D⁴−d⁴) = 9,78 cm⁴ (tabel EN 10210-2: 3,73 cm², 9,78 cm⁴)',
+            !dChs.fout && dicht(dChs.Ix, iChs) && Math.abs(dChs.A - 373.3) < 0.1 && Math.abs(iChs / 1e4 - 9.78) < 0.01,
+            dChs.fout || `A ${dChs.A.toFixed(1)}, I ${(dChs.Ix / 1e4).toFixed(3)} cm⁴`);
+        const dFl = st.doorsnede(bsFl);
+        check('FL 80x12 als staander: diepte 80 dwars, I = 12·80³/12 = 512 000 mm⁴, W = 12 800 mm³',
+            !dFl.fout && dicht(dFl.Ix, 512000) && dicht(dFl.Wx, 12800), dFl.fout || `I ${dFl.Ix.toFixed(0)}, W ${dFl.Wx.toFixed(0)}`);
+        if (bsShs) {
+            // Met hoekstralen kleiner dan zonder; zonder stralen exact de rechthoeken.
+            const dShs = st.doorsnede(bsShs);
+            const scherp = (40 ** 4 - 34 ** 4) / 12;
+            check('SHS 40x40x3: afgeronde hoeken geven iets minder dan scherpe (≤ 10 %)',
+                !dShs.fout && dShs.Ix < scherp && dShs.Ix > 0.9 * scherp, dShs.fout || `${(dShs.Ix / 1e4).toFixed(2)} tegen ${(scherp / 1e4).toFixed(2)} cm⁴`);
+        }
+        check('een profiel zonder maten geeft een fout, geen getal',
+            !!st.doorsnede({ category: 'RoundTubes', catalogus: {} }).fout);
+
+        // 2. Invloedsbreedtes: halve velden, aan een eind plus de overstek.
+        const bsB = st.invloedsbreedtes([[0, 0, 0], [750, 0, 0], [1500, 0, 0]], 100);
+        check('invloedsbreedte: 475, 750, 475 mm', bsB.join(',') === '475,750,475', bsB.join(','));
+
+        // 3. Zonder invoer: onvoldoende gegevens, niets aangenomen.
+        const bsM = { hoogte: 1100, overstek: 100, metaal: 'staal', staanderProfiel: bsFl,
+                      handregelProfiel: bsChs, staanders: [[0, 0, 0], [750, 0, 0], [1500, 0, 0]] };
+        const leeg = st.controleerBalustrade(bsM, {});
+        check('zonder lijnlast en factoren: alles onvoldoende gegevens of constructeur nodig',
+            leeg.every(r => r.status === st.STATUS.ONVOLDOENDE_GEGEVENS || r.status === st.STATUS.CONSTRUCTEUR));
+        check('alleen de vier statussen, en nergens "veilig" of "gecertificeerd" als oordeel',
+            leeg.every(r => Object.values(st.STATUS).includes(r.status))
+            && !leeg.some(r => /\b(?:is|zijn) (?:veilig|gecertificeerd)/i.test(r.toelichting)));
+
+        // 4. Met invoer: met de hand nagerekend.
+        //    F = 0,5 N/mm × 750 = 375 N; M_Ed = 1,5 × 375 × 1100 = 618 750 Nmm;
+        //    M_Rd = 12 800 × 235 / 1,0 = 3 008 000 Nmm.
+        const inv = { qk: 0.5, gammaQ: 1.5, gammaM0: 1.0, dMax: 30 };
+        const vol = st.controleerBalustrade(bsM, inv);
+        const stRij = vol.find(r => r.naam.startsWith('Staander'));
+        check('staander: M_Ed = 618 750 Nmm, M_Rd = 3 008 000 Nmm, voldoet',
+            !!stRij.exact && dicht(stRij.exact.MEd, 618750) && dicht(stRij.exact.MRd, 3008000) && stRij.status === st.STATUS.VOLDOET,
+            stRij.exact ? `${stRij.exact.MEd} / ${stRij.exact.MRd}` : stRij.toelichting);
+        //    δ staander = 375·1100³/(3·210000·512000) = 1,5469 mm;
+        //    δ handregel = 5·0,5·750⁴/(384·210000·I) met I van CHS 48,3x2,6.
+        const dRij = vol.find(r => r.naam.startsWith('Doorbuiging'));
+        const dVerwacht = 375 * 1100 ** 3 / (3 * 210000 * 512000) + 5 * 0.5 * 750 ** 4 / (384 * 210000 * iChs);
+        check('doorbuiging: staander + handregel, met de hand 1,65 mm',
+            Math.abs(dRij.waarde - Math.round(dVerwacht * 10) / 10) < 1e-9 && dRij.status === st.STATUS.VOLDOET,
+            `${dRij.waarde} mm (verwacht ${dVerwacht.toFixed(3)})`);
+        // Precies op de grens voldoet (≤), net erboven niet - met een voorstel.
+        const qGrens = 3008000 / (1.5 * 750 * 1100);
+        const opGrens = st.controleerBalustrade(bsM, { ...inv, qk: qGrens }).find(r => r.naam.startsWith('Staander'));
+        const erBoven = st.controleerBalustrade(bsM, { ...inv, qk: qGrens * 1.001 },
+            cat.alleProfielen(catBoom)).find(r => r.naam.startsWith('Staander'));
+        check('precies op de grens voldoet, 0,1 % erboven niet, en dan komt er een voorstel',
+            opGrens.status === st.STATUS.VOLDOET && erBoven.status === st.STATUS.VOLDOET_NIET && !!erBoven.voorstel,
+            erBoven.voorstel);
+        // RVS zonder ingevulde vloeigrens: niet raden.
+        const rvs = st.controleerBalustrade({ ...bsM, metaal: 'rvs' }, inv);
+        check('rvs zonder vloeigrens: onvoldoende gegevens',
+            rvs.find(r => r.naam.startsWith('Staander')).status === st.STATUS.ONVOLDOENDE_GEGEVENS);
+        // Zonder doorbuigingsgrens geen oordeel over de doorbuiging.
+        check('zonder toelaatbare doorbuiging: geen oordeel',
+            st.controleerBalustrade(bsM, { ...inv, dMax: '' }).find(r => r.naam.startsWith('Doorbuiging')).status
+            === st.STATUS.ONVOLDOENDE_GEGEVENS);
+        check('voetplaat/anker en slingerproef: altijd constructeur of proef nodig',
+            vol.filter(r => r.status === st.STATUS.CONSTRUCTEUR).length === 2);
+        // En snel: de hele controle met profielvoorstel in een paar ms.
+        const t0 = performance.now();
+        for (let i = 0; i < 10; i++) st.controleerBalustrade(bsM, { ...inv, qk: 3 }, cat.alleProfielen(catBoom));
+        const bsMs = (performance.now() - t0) / 10;
+        check('de controle met profielvoorstel kost minder dan 200 ms', bsMs < 200, `${bsMs.toFixed(1)} ms`);
+        check('sterkte geeft geen fout in de console', errors.length === bsVoor, errors.slice(bsVoor).join(' | '));
+    }
+
     // ============ DEEL BM: schoprand ========================================
     log('\n\n======== DEEL BM: schoprand langs de vloer ========\n');
     {

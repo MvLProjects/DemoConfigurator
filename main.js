@@ -68,6 +68,7 @@ import { maakIndex, zoek } from './zoeken.js';
 import { kiesSierpunt } from './sierpuntkiezer.js';
 import { modelVan, GEEN as SIERPUNT_GEEN } from './sierpunten.js';
 import { isRond as isRondProfiel } from './profielen.js';
+import * as sterkte from './sterkte.js';
 import { maakDxf } from './dxf.js';
 import { maakZip } from './zip.js';
 import { alleProfielen } from './profielen.js';
@@ -1902,6 +1903,97 @@ function toonOnderdelen(lijst, boom) {
     // Dezelfde onderdelenlijst, dus hier en niet apart aangeroepen - om
     // precies dezelfde reden als de zaaglijst hierboven.
     toonKosten(lijst);
+    toonSterkte();
+}
+
+// --- sterkte -------------------------------------------------------------------
+//
+// Een rekenhulp, geen keuring: zie sterkte.js. De invoer (belasting, factoren,
+// doorbuigingsgrens) is van de gebruiker en wordt per browser onthouden - het
+// is projectgegeven, geen ontwerp.
+const STERKTE_VELDEN = ['qk', 'bronQk', 'Qk', 'gammaQ', 'gammaM0', 'dMax', 'fy'];
+const STERKTE_SLEUTEL = 'railing-configurator/sterkte/1';
+const sterkteEl = (n) => document.getElementById('s_' + n);
+try {
+    const bewaard = JSON.parse(localStorage.getItem(STERKTE_SLEUTEL) || '{}');
+    for (const n of STERKTE_VELDEN) if (bewaard[n] !== undefined && sterkteEl(n)) sterkteEl(n).value = bewaard[n];
+} catch { /* geen opslag: dan maar leeg */ }
+const sterkteInvoer = () => Object.fromEntries(STERKTE_VELDEN.map(n => [n, sterkteEl(n) ? sterkteEl(n).value : '']));
+for (const n of STERKTE_VELDEN) {
+    sterkteEl(n)?.addEventListener('input', () => {
+        try { localStorage.setItem(STERKTE_SLEUTEL, JSON.stringify(sterkteInvoer())); } catch { /* geen opslag */ }
+        toonSterkte();
+    });
+}
+document.getElementById('s_aanbevolen')?.addEventListener('click', () => {
+    sterkteEl('gammaQ').value = sterkte.AANBEVOLEN_FACTOREN.gammaQ.waarde;
+    sterkteEl('gammaM0').value = sterkte.AANBEVOLEN_FACTOREN.gammaM0.waarde;
+    sterkteEl('gammaQ').dispatchEvent(new Event('input'));
+});
+
+/** De sterktecontroles van het laatst gebouwde model, als rijen in het paneel. */
+export function sterkteNu() {
+    if (laatsteNaam === 'trap' || !laatsteDelen) return null;
+    const b = huidigeMaten();
+    const hart = (d) => [0, 1, 2].map(i => d.oorsprong[i] + d.xAs[i] * d.dx / 2 + d.yAs[i] * d.dy / 2);
+    const staanders = laatsteDelen.filter(d => d.soort === 'staander').map(hart);
+    if (staanders.length < 2) return null;
+    return sterkte.controleerBalustrade({
+        hoogte: b.hoogte, overstek: b.handregelOverstek, metaal: b.metaal,
+        staanderProfiel: b.staanderProfiel, handregelProfiel: b.handregelProfiel, staanders,
+    }, sterkteInvoer(), catalogus ? alleProfielen(catalogus.boom) : []);
+}
+
+function toonSterkte() {
+    const inhoud = document.getElementById('sterkteInhoud');
+    const leeg = document.getElementById('sterkteLeeg');
+    if (!inhoud) return;
+    inhoud.textContent = '';
+    let rijen = null;
+    try { rijen = sterkteNu(); } catch (err) { console.error(err); }
+    if (leeg) {
+        leeg.style.display = rijen ? 'none' : 'block';
+        leeg.textContent = laatsteNaam === 'trap'
+            ? 'De sterktecontrole is er alleen voor balustrades, niet voor trappen.'
+            : 'Bouw eerst een balustrade met gekozen profielen; dan staan hier de controles.';
+    }
+    if (!rijen) return;
+    const kleur = { [sterkte.STATUS.VOLDOET]: '#1b7a3a', [sterkte.STATUS.VOLDOET_NIET]: '#b3261e',
+                    [sterkte.STATUS.ONVOLDOENDE_GEGEVENS]: '#8a6100',
+                    [sterkte.STATUS.CONSTRUCTEUR]: '#45607a' };
+    for (const r of rijen) {
+        const blok = document.createElement('div');
+        blok.className = 'sterkteRij';
+        blok.style.cssText = 'border-left:4px solid ' + kleur[r.status] + ';padding:4px 8px;margin:8px 0';
+        const kop = document.createElement('div');
+        const st = document.createElement('b');
+        st.style.color = kleur[r.status];
+        st.textContent = r.status.toUpperCase();
+        kop.append(st, ' — ' + r.naam);
+        blok.append(kop);
+        if (r.waarde !== undefined) {
+            const w = document.createElement('div');
+            w.textContent = `berekend ${String(r.waarde).replace('.', ',')} ${r.eenheid}, `
+                + `grens ${String(r.grens).replace('.', ',')} ${r.eenheid}`;
+            blok.append(w);
+        }
+        const t = document.createElement('div');
+        t.className = 'hint';
+        t.textContent = r.toelichting;
+        blok.append(t);
+        if (r.voorstel) {
+            const v = document.createElement('div');
+            v.textContent = 'Voorstel: ' + r.voorstel;
+            blok.append(v);
+        }
+        inhoud.append(blok);
+    }
+    const bron = sterkteEl('bronQk') && sterkteEl('bronQk').value.trim();
+    const slot = document.createElement('p');
+    slot.className = 'hint';
+    slot.textContent = 'Lijnlast volgens: ' + (bron || '(geen bron opgegeven)')
+        + '. Rekenhulp, geen keuring: geen verklaring van veiligheid of certificering.';
+    inhoud.append(slot);
 }
 
 /**
