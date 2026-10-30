@@ -1476,14 +1476,19 @@
             <input type="number" id="s_gammaQ" step="0.05" min="0"></div>
         <div class="veld"><label for="s_gammaM0">factor γM0</label>
             <input type="number" id="s_gammaM0" step="0.05" min="0"></div>
+        <div class="veld"><label for="s_gammaM2">factor γM2 (las)</label>
+            <input type="number" id="s_gammaM2" step="0.05" min="0"></div>
         <button type="button" id="s_aanbevolen">Aanbevolen Eurocode-factoren invullen</button>
         <p class="hint" id="s_factorBron">γ<sub>Q</sub> = 1,5 (NEN-EN 1990, tabel A1.2(B)) en
-           γ<sub>M0</sub> = 1,0 (NEN-EN 1993-1-1, 6.1) zijn de AANBEVOLEN waarden; de
-           Nationale Bijlage kan afwijken.</p>
+           γ<sub>M0</sub> = 1,0 (NEN-EN 1993-1-1, 6.1) en γ<sub>M2</sub> = 1,25 (NEN-EN 1993-1-8,
+           tabel 2.1) zijn de AANBEVOLEN waarden; de Nationale Bijlage kan afwijken.</p>
         <div class="veld"><label for="s_dMax">max. doorbuiging (mm)</label>
             <input type="number" id="s_dMax" step="1" min="0"></div>
         <p class="hint">Geen Eurocode-waarde voor balustrades: uit de NB, het bestek of
            van de constructeur.</p>
+        <div class="veld"><label for="s_aLas">keelhoogte las a (mm)</label>
+            <input type="number" id="s_aLas" step="0.5" min="0"></div>
+        <p class="hint">De hoeklas rondom de staander op de voetplaat, zoals op de tekening.</p>
         <div class="veld"><label for="s_fy">fy rvs/alu (N/mm²)</label>
             <input type="number" id="s_fy" step="5" min="0"></div>
         <p class="hint">Alleen bij rvs of aluminium; bij staal volgt f<sub>y</sub> uit de

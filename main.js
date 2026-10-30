@@ -1912,7 +1912,7 @@ function toonOnderdelen(lijst, boom) {
 // Een rekenhulp, geen keuring: zie sterkte.js. De invoer (belasting, factoren,
 // doorbuigingsgrens) is van de gebruiker en wordt per browser onthouden - het
 // is projectgegeven, geen ontwerp.
-const STERKTE_VELDEN = ['qk', 'bronQk', 'Qk', 'gammaQ', 'gammaM0', 'dMax', 'fy'];
+const STERKTE_VELDEN = ['qk', 'bronQk', 'Qk', 'gammaQ', 'gammaM0', 'gammaM2', 'dMax', 'aLas', 'fy'];
 const ANKER_VELDEN = ['plaat', 'fck', 'h', 'c', 'd', 'hef', 'tauRk', 'NRks', 'VRks', 'k1', 'ccr',
                       'gammaMs', 'gammaMp', 'gammaMc', 'hmin', 'cmin'];
 const ankerEl = (n) => document.getElementById('a_' + n);
@@ -1939,6 +1939,7 @@ for (const n of ANKER_VELDEN) {
 document.getElementById('s_aanbevolen')?.addEventListener('click', () => {
     sterkteEl('gammaQ').value = sterkte.AANBEVOLEN_FACTOREN.gammaQ.waarde;
     sterkteEl('gammaM0').value = sterkte.AANBEVOLEN_FACTOREN.gammaM0.waarde;
+    sterkteEl('gammaM2').value = sterkte.AANBEVOLEN_FACTOREN.gammaM2.waarde;
     sterkteEl('gammaQ').dispatchEvent(new Event('input'));
 });
 

@@ -40,7 +40,27 @@ const BRON_FY = 'NEN-EN 1993-1-1, tabel 3.1 (t ≤ 40 mm)';
 export const AANBEVOLEN_FACTOREN = {
     gammaQ: { waarde: 1.5, bron: 'NEN-EN 1990, tabel A1.2(B) - aanbevolen; de NB kan afwijken' },
     gammaM0: { waarde: 1.0, bron: 'NEN-EN 1993-1-1, 6.1 - aanbevolen; de NB kan afwijken' },
+    gammaM2: { waarde: 1.25, bron: 'NEN-EN 1993-1-8, tabel 2.1 - aanbevolen; de NB kan afwijken' },
 };
+
+// Voor de las: treksterkte fu (NEN-EN 1993-1-1 tabel 3.1, t ≤ 40 mm) en de
+// correlatiefactor βw (NEN-EN 1993-1-8 tabel 4.1). Bij S355 noemt tabel 3.1
+// 490 (EN 10025-2) en 510 (EN 10210-1); de laagste is aangehouden.
+const LAS_STAAL = { 235: { fu: 360, betaW: 0.8 }, 275: { fu: 430, betaW: 0.85 },
+                    355: { fu: 490, betaW: 0.9 } };
+
+/**
+ * De las rond de staander als LIJN: lengte, ∮y² ds en de verste vezel, voor
+ * buiging met de diepte langs y. Een buis is een cirkel met straal R; al het
+ * andere (koker, platstaal, staf) een rechthoek bx × by over de buitenomtrek.
+ */
+export function lasLijn(s) {
+    if (s.soort === 'CHS' || s.soort === 'RoundBars') {
+        const R = s.by / 2;
+        return { L: 2 * Math.PI * R, I: Math.PI * R ** 3, y: R };
+    }
+    return { L: 2 * (s.bx + s.by), I: s.bx * s.by ** 2 / 2 + s.by ** 3 / 6, y: s.by / 2 };
+}
 
 // --- doorsneden ----------------------------------------------------------
 
@@ -219,6 +239,43 @@ export function controleerBalustrade(m, invoer, catalogus = []) {
         });
     }
 
+    // --- las staander-voetplaat ------------------------------------------------
+    // Hoeklas rondom, vereenvoudigde methode NEN-EN 1993-1-8, 4.5.3.3:
+    // Fw,Rd = a·fu/(√3·βw·γM2) per mm las, tegen de kracht per mm uit het moment
+    // (M·y/∮y²ds) en de dwarskracht (V/L).
+    const voetRij = uit.find(r => r.voet);
+    const a = Number(invoer.aLas), gM2 = Number(invoer.gammaM2);
+    const grade = ((m.staanderProfiel && m.staanderProfiel.items) || [])
+        .map(i => /^S(\d{3})/i.exec((i.material || '').trim())).find(Boolean);
+    const las = grade && LAS_STAAL[grade[1]];
+    if (!voetRij) geenGegevens('Las staander-voetplaat', 'eerst de staandercontrole (lijnlast, factoren, profiel)');
+    else if ((m.metaal || 'staal') !== 'staal' || !las) {
+        uit.push({ naam: 'Las staander-voetplaat', status: STATUS.CONSTRUCTEUR,
+            toelichting: 'Alleen voor S235/S275/S355; bij rvs, aluminium of een onbekende staalsoort '
+                + 'hoort een constructeur de las te toetsen.' });
+    } else if (!(a > 0) || !(gM2 > 0)) {
+        geenGegevens('Las staander-voetplaat', [!(a > 0) && 'keelhoogte a van de hoeklas',
+            !(gM2 > 0) && 'factor γM2'].filter(Boolean).join(', '));
+    } else {
+        const lijn = lasLijn(st);
+        const fM = voetRij.voet.MEd * lijn.y / lijn.I;
+        const fV = voetRij.voet.VEd / lijn.L;
+        const f = Math.hypot(fM, fV);
+        const FwRd = a * las.fu / (Math.sqrt(3) * las.betaW * gM2);
+        const ok = f <= FwRd;
+        uit.push({
+            naam: 'Las staander-voetplaat (hoeklas rondom)',
+            status: ok ? STATUS.VOLDOET : STATUS.VOLDOET_NIET,
+            waarde: Math.round(f), grens: Math.round(FwRd), eenheid: 'N/mm', exact: { f, FwRd },
+            toelichting: `Vereenvoudigde methode NEN-EN 1993-1-8, 4.5.3.3: Fw,Rd = a·fu/(√3·βw·γM2) `
+                + `met a = ${a} mm, fu = ${las.fu} N/mm² (${grade[0]}, NEN-EN 1993-1-1 tabel 3.1), `
+                + `βw = ${las.betaW} (NEN-EN 1993-1-8 tabel 4.1). Las als lijn rond de staander, `
+                + `${Math.round(lijn.L)} mm lang. Aanname: de las loopt rondom en de plaat is stijf.`,
+            voorstel: ok ? null : `Keelhoogte minstens ${Math.ceil(f / FwRd * a * 10) / 10} mm, `
+                + 'of een staander met een grotere omtrek.',
+        });
+    }
+
     // --- handregel: buiging per veld ------------------------------------------
     if (hr.fout) geenGegevens('Handregel: buiging', `handregelprofiel - ${hr.fout}`);
     else if (matHr.ontbreekt) geenGegevens('Handregel: buiging', matHr.ontbreekt);
@@ -270,10 +327,11 @@ export function controleerBalustrade(m, invoer, catalogus = []) {
 
     // --- wat de app (nog) niet betrouwbaar kan -------------------------------
     uit.push({
-        naam: 'Voetplaat en las staander-voetplaat',
+        naam: 'Voetplaat (buiging) en lokale indeuking van dunne buizen',
         status: STATUS.CONSTRUCTEUR,
-        toelichting: 'Niet berekend: de buiging van de voetplaat en de las horen door een constructeur '
-            + 'getoetst te worden. De ankers zelf staan hieronder (NEN-EN 1992-4, vereenvoudigd).',
+        toelichting: 'Niet berekend: de buiging van de voetplaat en het lokaal indeuken van een '
+            + 'dunwandige buis onder een puntlast horen door een constructeur getoetst te worden. '
+            + 'Er zitten geen bouten in deze balustrade; de ankers staan hieronder.',
     });
     uit.push(slingerIndicatie({ st, hr, matSt, matHr, H, Lmax }));
     return uit;

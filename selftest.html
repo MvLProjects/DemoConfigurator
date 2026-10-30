@@ -11746,6 +11746,18 @@ try {
             !!sl.exact && dicht(sl.exact.F, Math.sqrt(2 * 500000 * kSl))
             && sl.status === st.STATUS.CONSTRUCTEUR && /vervangt de slingerproef niet/.test(sl.toelichting),
             sl.exact ? `${(sl.exact.F / 1000).toFixed(2)} kN` : sl.toelichting);
+        // Las rond FL 80x12: ∮y²ds = 12·80²/2 + 80³/6 = 123 733 mm³, y = 40,
+        // L = 184 mm. fM = 618 750·40/123 733 = 200,0 N/mm, fV = 562,5/184.
+        // Fw,Rd = 4·360/(√3·0,8·1,25) = 831,4 N/mm.
+        const lasRij = st.controleerBalustrade(bsM, { ...inv, aLas: 4, gammaM2: 1.25 })
+            .find(r => /^Las/.test(r.naam));
+        const fVerwacht = Math.hypot(618750 * 40 / (12 * 80 ** 2 / 2 + 80 ** 3 / 6), 1.5 * 375 / 184);
+        check('las staander-voetplaat: kracht per mm en Fw,Rd met de hand nagerekend',
+            !!lasRij.exact && dicht(lasRij.exact.f, fVerwacht)
+            && dicht(lasRij.exact.FwRd, 4 * 360 / (Math.sqrt(3) * 0.8 * 1.25)) && lasRij.status === st.STATUS.VOLDOET,
+            lasRij.exact ? `${lasRij.exact.f.toFixed(1)} / ${lasRij.exact.FwRd.toFixed(1)} N/mm` : lasRij.toelichting);
+        check('las zonder keelhoogte: onvoldoende gegevens',
+            vol.find(r => /^Las/.test(r.naam)).status === st.STATUS.ONVOLDOENDE_GEGEVENS);
         check('voetplaat/anker en slingerproef: altijd constructeur of proef nodig',
             vol.filter(r => r.status === st.STATUS.CONSTRUCTEUR).length === 2);
         // En snel: de hele controle met profielvoorstel in een paar ms.
