@@ -11778,6 +11778,16 @@ try {
         check('precies op de grens voldoet, 0,1 % erboven niet, en dan komt er een voorstel',
             opGrens.status === st.STATUS.VOLDOET && erBoven.status === st.STATUS.VOLDOET_NIET && !!erBoven.voorstel,
             erBoven.voorstel);
+        // En het voorstel is uitvoerbaar: een profiel dat zelf voldoet, en een
+        // staanderafstand op hele 10 mm die er net onder blijft.
+        const acProf = erBoven.acties.find(a => a.soort === 'profiel');
+        const acAfst = erBoven.acties.find(a => a.soort === 'afstand');
+        check('"Toepassen": een profiel dat voldoet en een staanderafstand die voldoet',
+            !!acProf && st.doorsnede(acProf.profiel).Wx * 235 >= erBoven.exact.MEd
+            && !!acAfst && acAfst.waarde % 10 === 0
+            && st.controleerBalustrade({ ...bsM, staanders: [[0, 0, 0], [acAfst.waarde, 0, 0], [2 * acAfst.waarde, 0, 0]] },
+                { ...inv, qk: qGrens * 1.001 }).find(r => r.naam.startsWith('Staander')).status === st.STATUS.VOLDOET,
+            erBoven.acties.map(a => a.tekst).join(' | '));
         // RVS zonder ingevulde vloeigrens: niet raden.
         const rvs = st.controleerBalustrade({ ...bsM, metaal: 'rvs' }, inv);
         check('rvs zonder vloeigrens: onvoldoende gegevens',

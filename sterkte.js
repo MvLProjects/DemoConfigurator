@@ -231,9 +231,15 @@ export function controleerBalustrade(m, invoer, catalogus = []) {
             toelichting: `Ingeklemd op de voetplaat; F = qk × ${Math.round(bMax)} mm invloedsbreedte `
                 + `op ${H} mm hoogte. M_Ed = γQ·F·H, M_Rd = Wel·fy/γM0. ${stBron(st, matSt)}. `
                 + 'Elastisch getoetst; normaalkracht en knik verwaarloosd.',
-            voorstel: ok ? null : voorstelProfiel(m.staanderProfiel, catalogus,
-                (s) => s.Wx * matSt.fy / gM0 >= MEd, 'staander')
-                || `Staanderafstand hooguit ${Math.floor(hohMax)} mm.`,
+            ...metVoorstel(ok, [
+                voorstelProfiel(m.staanderProfiel, catalogus, (s) => s.Wx * matSt.fy / gM0 >= MEd, 'staander'),
+                // Afgerond op 10 mm naar beneden, en alleen als het een
+                // redelijke afstand is (een staander om de 10 cm is geen oplossing).
+                Math.floor(hohMax / 10) * 10 >= 300 ? {
+                    tekst: `Staanderafstand hooguit ${Math.floor(hohMax / 10) * 10} mm.`,
+                    actie: { soort: 'afstand', waarde: Math.floor(hohMax / 10) * 10 },
+                } : null,
+            ]),
             // De rekenkrachten aan de voet, voor de ankers (anker.js).
             voet: { MEd, VEd: gQ * F },
         });
@@ -295,9 +301,10 @@ export function controleerBalustrade(m, invoer, catalogus = []) {
             toelichting: `Veld ${Math.round(Lmax)} mm als ligger op twee steunpunten (veilige kant). `
                 + `M_Ed = γQ·max(q·L²/8${Qk > 0 ? ', Q·L/4' : ''}). Wel = ${r1(hr.Wy / 1000)} cm³, `
                 + `fy = ${matHr.fy} N/mm² (${matHr.bronFy}).`,
-            voorstel: ok ? null : voorstelProfiel(m.handregelProfiel, catalogus,
-                (s) => s.Wy * matHr.fy / gM0 >= MEd, 'handregel')
-                || 'Kleinere staanderafstand.',
+            ...metVoorstel(ok, [
+                voorstelProfiel(m.handregelProfiel, catalogus, (s) => s.Wy * matHr.fy / gM0 >= MEd, 'handregel'),
+                { tekst: 'Of een kleinere staanderafstand.' },
+            ]),
         });
     }
 
@@ -383,8 +390,19 @@ export function slingerIndicatie({ st, hr, matSt, matHr, H, Lmax }) {
 }
 
 /**
+ * Voorstellen bij een rij die niet voldoet: `voorstel` als tekst (zoals
+ * eerst), en `acties` die het paneel als knop "Toepassen" kan tonen.
+ */
+function metVoorstel(ok, opties) {
+    if (ok) return { voorstel: null, acties: [] };
+    const echt = opties.filter(Boolean);
+    return { voorstel: echt.map(o => o.tekst).join(' ') || null,
+             acties: echt.filter(o => o.actie).map(o => ({ tekst: o.tekst, ...o.actie })) };
+}
+
+/**
  * Het lichtste profiel van dezelfde soort uit de catalogus dat voldoet, als
- * voorstel. null als er geen is of de catalogus leeg is.
+ * voorstel met een actie. null als er geen is of de catalogus leeg is.
  */
 function voorstelProfiel(huidig, catalogus, voldoet, rol) {
     if (!huidig || !catalogus || !catalogus.length) return null;
@@ -396,5 +414,6 @@ function voorstelProfiel(huidig, catalogus, voldoet, rol) {
         .sort((a, b) => a.s.A - b.s.A);
     if (!kandidaten.length) return null;
     const naam = (p) => p.englishLabel || p.label || 'profiel';
-    return `Lichtste ${soort}-profiel dat voldoet als ${rol}: ${naam(kandidaten[0].p)}.`;
+    return { tekst: `Lichtste ${soort}-profiel dat voldoet als ${rol}: ${naam(kandidaten[0].p)}.`,
+             actie: { soort: 'profiel', rol, profiel: kandidaten[0].p } };
 }

@@ -2043,6 +2043,25 @@ export function sterkteNu() {
     return [...rijen, ...ankerRijen];
 }
 
+/** Een voorstel uit de sterktecontrole toepassen, alsof je het zelf koos. */
+function pasSterkteVoorstelToe(a) {
+    if (a.soort === 'profiel' && catalogus) {
+        profielen[a.rol] = {
+            ...maakVerwijzing(a.profiel, catalogus.info, catalogus.basis, catalogus.versie),
+            label: a.profiel.label,
+        };
+        toonProfiel(a.rol);
+        statusEl.textContent = `${a.rol}: ${a.profiel.englishLabel || a.profiel.label} (voorstel sterkte).`;
+    } else if (a.soort === 'afstand') {
+        const veld = document.getElementById('p_maxStaanderAfstand');
+        veld.value = a.waarde;
+        statusEl.textContent = `Max. staanderafstand ${a.waarde} mm (voorstel sterkte).`;
+    } else return;
+    werkAfgeleideBij();
+    werkConfiguratiesBij();
+    if (!genereerKnop.disabled) genereerKnop.click();
+}
+
 function toonSterkte() {
     const inhoud = document.getElementById('sterkteInhoud');
     const leeg = document.getElementById('sterkteLeeg');
@@ -2084,6 +2103,17 @@ function toonSterkte() {
             const v = document.createElement('div');
             v.textContent = 'Voorstel: ' + r.voorstel;
             blok.append(v);
+        }
+        // EEN KLIK OM HET TOE TE PASSEN, en dan opnieuw bouwen en rekenen.
+        for (const a of r.acties || []) {
+            const knop = document.createElement('button');
+            knop.type = 'button';
+            knop.className = 'sterkteActie';
+            knop.textContent = a.soort === 'profiel'
+                ? `Toepassen: ${a.rol} ${a.profiel.englishLabel || a.profiel.label}`
+                : `Toepassen: staanderafstand ${a.waarde} mm`;
+            knop.addEventListener('click', () => pasSterkteVoorstelToe(a));
+            blok.append(knop);
         }
         inhoud.append(blok);
     }
