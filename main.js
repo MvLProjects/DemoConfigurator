@@ -1139,6 +1139,9 @@ function werkPaneelBij(m, veld = null) {
         const zichtbaar = toon(m);
         for (const el of rijVan(id)) el.style.display = zichtbaar ? '' : 'none';
     }
+    // Zonder staanders (glas in een bodemprofiel) heeft stap 3 geen velden.
+    const stap3 = document.getElementById('stapStaanders');
+    if (stap3) stap3.textContent = m.vulling === 'glasvrij' ? '3. Handregel' : '3. Staanders en handregel';
     // De reden als eigen regel ONDER het veld, niet in het label: in het label
     // duwde de tekst het vinkje uit de rij.
     for (const id of ['p_geslotenEind', 'p_eindkappen', 'p_regelVoor', 'p_muurEind']) {
@@ -3268,6 +3271,22 @@ async function zetStandaard(b = {}, t = {}, leuning = 'geen') {
                    wandleuning: 'geen', stootborden: false, platen: false, ...t };
     await pasInstellingenToe({ versie: INSTEL_VERSIE, balustrade, trap, leuning });
 }
+
+// OPNIEUW BEGINNEN: alles op de standaard en meteen bouwen. Het vorige ontwerp
+// is al onthouden (onthoudOntwerp na elke bouw), dus Terug haalt het terug.
+document.getElementById('opnieuwKnop')?.addEventListener('click', async () => {
+    if (startDialoog.open) startDialoog.close();
+    openGroep('Balustrade');
+    await zetStandaard();
+    statusEl.textContent = 'Standaardbalustrade - met Terug haal je je vorige ontwerp terug.';
+    genereerKnop.click();
+});
+
+// DE STATUSREGEL wordt afgekapt als hij te lang is. Met de muis erop staat
+// de hele tekst er; een MutationObserver zodat elke plek die de status zet
+// meedoet, zonder ze allemaal aan te passen.
+new MutationObserver(() => { statusEl.title = statusEl.textContent; })
+    .observe(statusEl, { childList: true, characterData: true, subtree: true });
 
 export async function openVoorbeeld(id) {
     const v = VOORBEELDEN.find(x => x.id === id);

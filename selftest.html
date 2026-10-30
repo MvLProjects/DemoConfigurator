@@ -11686,6 +11686,12 @@ try {
         check('bij spijlen: de spijlvelden terug, de knieregelhoogte weg',
             zichtbaar('p_spijlBreedte') && zichtbaar('p_spijlOverstek') && !zichtbaar('p_knieregelHoogte'));
         zet(bpOud);
+        check('er is een knop "Opnieuw" naast Terug, en het paneel heeft stappen',
+            !!doc.getElementById('opnieuwKnop') && doc.querySelectorAll('#panel .stap').length >= 3);
+        const bpStatus = doc.getElementById('status');
+        bpStatus.textContent = 'een lange statusregel om af te kappen';
+        await new Promise(r => setTimeout(r, 0));
+        check('de hele statusregel staat in de tooltip', bpStatus.title === 'een lange statusregel om af te kappen');
     }
 
     // ============ DEEL BN1: DSTV-NC1 voor de zaagstraat =======================

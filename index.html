@@ -96,6 +96,10 @@
     .zoekGevonden { animation: zoekAandacht 1.8s ease-out;
                     border-radius: 4px; }
 
+    /* De stappen in het balustradepaneel: klein, zodat ze ordenen zonder
+       ruimte te vragen. */
+    .stap { margin: 12px 0 2px; font-size: 12px; font-weight: 600; color: #4a555e;
+            letter-spacing: 0.02em; }
     #status { color: #4a555e; font-size: 13px; min-width: 0;
               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* De kijkschakelaars bij elkaar, rechts. */
@@ -811,6 +815,10 @@
             <button id="terugKnop" type="button" disabled
                     title="Terug naar het vorige ontwerp (Ctrl+Z)">
                 <svg aria-hidden="true"><use href="#ic-terug"></use></svg>Terug</button>
+            <!-- Opnieuw beginnen met de standaardbalustrade. Geen "weet je het
+                 zeker": het vorige ontwerp staat onder Terug. -->
+            <button id="opnieuwKnop" type="button"
+                    title="Opnieuw beginnen met de standaardbalustrade (je vorige ontwerp staat onder Terug)">Opnieuw</button>
             <button id="fotoKnop" type="button" title="Het beeld opslaan als afbeelding">
                 <svg aria-hidden="true"><use href="#ic-foto"></use></svg>Afbeelding</button>
             <!-- Een link met het hele ontwerp erin; zie "Ontwerp delen" bij
@@ -850,12 +858,14 @@
         <p class="hint">Geef de bedoeling op. Het aantal spijlen volgt uit de
            veiligheidsregel en is niet in te vullen.</p>
 
+        <h4 class="stap">1. Maten</h4>
         <div class="veld"><label for="p_lengte">lengte</label>
             <input type="number" id="p_lengte" step="10"></div>
         <div class="veld"><label for="p_hoogte">hoogte</label>
             <input type="number" id="p_hoogte" step="10"></div>
         <!-- Waarmee het veld tussen de staanders gevuld wordt. Staat vóór de
              spijlbreedte, want deze keuze bepaalt of dat veld er nog toe doet. -->
+        <h4 class="stap">2. Vulling</h4>
         <div class="veld"><label for="p_vulling">vulling</label>
             <select id="p_vulling">
                 <option value="spijlen">verticale spijlen</option>
@@ -876,6 +886,7 @@
             <input type="number" id="p_spijlBreedte" step="1"></div>
         <div class="veld"><label for="p_maxDoorgang">max. doorgang</label>
             <input type="number" id="p_maxDoorgang" step="5"></div>
+        <h4 class="stap" id="stapStaanders">3. Staanders en handregel</h4>
         <div class="veld"><label for="p_staanderBreedte">staanderbreedte</label>
             <input type="number" id="p_staanderBreedte" step="5"></div>
         <div class="veld"><label for="p_handregelHoogte">handregelhoogte</label>
@@ -890,7 +901,7 @@
              "Genereer balustrade" onder de vouw en moest je scrollen om te
              kunnen bouwen. Eén klik en ze staan er weer. -->
         <details class="subgroep">
-            <summary>meer opties</summary>
+            <summary>4. Meer opties: hoeken, uiteinden, sierpunten, afwerking van de kop</summary>
             <!-- De hoeken. De meetkunde hiervoor zat er al lang in - verstek,
                  een staander in de deelhoek, gesloten rondes - maar je kon er
                  alleen bij door randen in een ingeladen model aan te klikken.
