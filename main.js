@@ -72,6 +72,7 @@ import * as sterkte from './sterkte.js';
 import * as anker from './anker.js';
 import { maakDxf } from './dxf.js';
 import { maakNc1, waaromGeenNc1 } from './nc1.js';
+import { ncVoorOnderdelen } from './ncapi.js';
 import { maakZip } from './zip.js';
 import { alleProfielen } from './profielen.js';
 import { beschrijf, bestandsnaam, bomRegel } from './onderdelen.js';
@@ -2473,6 +2474,66 @@ document.getElementById('onderdelenAlles').addEventListener('click', async () =>
 // positie 003 in bom.csv gaan over hetzelfde stuk staal. Dat is het hele punt
 // van een pakket - zonder die koppeling moet iemand het uitzoeken.
 
+// --- DSTV-NC via MvL Progress ---------------------------------------------
+// De sleutel blijft in deze browser; zie ncapi.js.
+const NC_SLEUTEL = 'railing-configurator/ncsleutel/1';
+const ncSleutelEl = document.getElementById('ncSleutel');
+try { if (ncSleutelEl) ncSleutelEl.value = localStorage.getItem(NC_SLEUTEL) || ''; } catch { /* geen opslag */ }
+ncSleutelEl?.addEventListener('input', () => {
+    try { localStorage.setItem(NC_SLEUTEL, ncSleutelEl.value.trim()); } catch { /* geen opslag */ }
+});
+const ncSleutel = () => (ncSleutelEl ? ncSleutelEl.value.trim() : '');
+
+/** De NC-bestanden van alle gezaagde onderdelen, plus een verslag. */
+async function ncBestanden(meld = () => {}) {
+    const bom = laatsteOnderdelen.map(bomRegel);
+    const lijst = [];
+    for (const [i, u] of laatsteOnderdelen.entries()) {
+        const d = u.deel;
+        if (!d.profiel || d.besteld || d.plaat || d.bocht || d.rond || (d.gaten && d.gaten.length)) continue;
+        lijst.push({ nummer: u.nummer, naam: bestandsnaam(u.nummer), step: await schrijfStep(u.vorm),
+                     materiaal: bom[i].materiaal, profielNaam: d.profiel.englishLabel || d.profiel.label,
+                     aantal: u.aantal, zaaglengte: bom[i].zaaglengte, positie: bom[i].positie, soort: d.soort });
+    }
+    if (!lijst.length) throw new Error('er zijn geen gezaagde profielen in dit model');
+    const { bestanden, verslag } = await ncVoorOnderdelen(lijst, ncSleutel(), meld);
+    return [...bestanden, { naam: 'nc/VERSLAG.txt', data: [
+        'DSTV-NC via MvL Progress (cadapi.mvlprogress.nl).',
+        'Per onderdeel: het herkende profiel, de lengte, de gaten en of de dienst het betrouwbaar vindt.',
+        'Controleer elk bestand met CONTROLEREN erbij voor het op de machine gaat.',
+        '',
+        ...verslag,
+    ].join('\r\n') + '\r\n' }];
+}
+
+document.getElementById('ncKnop')?.addEventListener('click', async () => {
+    const knop = document.getElementById('ncKnop');
+    if (!laatsteOnderdelen || !laatsteOnderdelen.length) {
+        statusEl.textContent = 'Genereer eerst een balustrade of een trap.';
+        return;
+    }
+    if (!ncSleutel()) {
+        statusEl.textContent = 'Vul eerst de API-sleutel van MvL Progress in bij Instellingen.';
+        return;
+    }
+    knop.disabled = true;
+    try {
+        const bestanden = await ncBestanden((t) => { statusEl.textContent = t; });
+        const zip = maakZip(bestanden);
+        const naam = (kaderGegevens().nummer || 'nc').replace(/[^\w.-]+/g, '_') + '-nc.zip';
+        downloadBestand(zip, naam);
+        const aantal = bestanden.filter(b => b.naam.endsWith('.nc')).length;
+        const controleren = (bestanden.find(b => b.naam === 'nc/VERSLAG.txt').data.match(/CONTROLEREN|GEEN NC/g) || []).length;
+        statusEl.textContent = `${naam} opgeslagen - ${aantal} NC-bestanden`
+            + (controleren ? `, ${controleren} om te controleren (zie VERSLAG.txt).` : '.');
+    } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'NC-bestanden maken mislukt: ' + err.message;
+    } finally {
+        knop.disabled = false;
+    }
+});
+
 document.getElementById('productie').addEventListener('click', async () => {
     const knop = document.getElementById('productie');
     if (!laatsteOnderdelen || !laatsteOnderdelen.length) {
@@ -2705,6 +2766,15 @@ export async function maakProductiepakket(meld = () => {}) {
     const zaag = maakZaaglijst(laatsteOnderdelen);
     const k = kaderGegevens();
 
+    // MET EEN SLEUTEL: de NC-bestanden van de dienst van MvL Progress, die ook
+    // verstekken en zadels aankan. Zonder: de eigen, voorzichtige NC1 hieronder.
+    if (ncSleutel()) {
+        try {
+            bestanden.push(...await ncBestanden(meld));
+        } catch (err) {
+            bestanden.push({ naam: 'nc/VERSLAG.txt', data: 'Geen NC-bestanden: ' + err.message + '\r\n' });
+        }
+    }
     // DSTV-NC1 voor de zaagstraat: alleen wat zeker goed gaat (zie nc1.js),
     // en een LEESMIJ met wat er niet in zit en waarom.
     meld('Productiepakket: NC1 voor de zaagstraat...');
@@ -2722,6 +2792,9 @@ export async function maakProductiepakket(meld = () => {}) {
         '',
         'Niet als NC1 (met de reden):',
         ...(ncNiet.length ? ncNiet : ['(geen)']),
+        '',
+        ncSleutel() ? 'Met de API-sleutel staan alle gezaagde onderdelen ook in de map nc/ (MvL Progress).'
+            : 'Met een API-sleutel van MvL Progress (Instellingen) worden ook verstekken en zadels omgezet.',
     ].join('\r\n') + '\r\n' });
     const titel = {
         bedrijf: k.bedrijf, opdracht: k.opdracht, nummer: k.nummer,

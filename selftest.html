@@ -7229,7 +7229,7 @@ try {
     // op bestaan alleen vangt dat niet - die op PLAATS wel.
     const ahHoort = {
         // De offerte naast het productiepakket: allebei "wat er uitkomt".
-        onderdelenVak: ['onderdelenAlles', 'bomCsv', 'productie', 'offerte'],
+        onderdelenVak: ['onderdelenAlles', 'bomCsv', 'productie', 'ncKnop', 'offerte'],
         zaaglijstVak: ['zaaglijstCsv'],
         stuklijstVak: ['stuklijstCsv'],
     };
@@ -11715,6 +11715,50 @@ try {
             nc.maakNc1(verstek, { positie: '004', zaaglengte: 1000 }) === null
             && /verstek/.test(nc.waaromGeenNc1(verstek)));
         check('een gemeten schuine kop ook niet', nc.waaromGeenNc1({ ...recht, zaaghoeken: [45, 90] }) !== null);
+    }
+
+    // ============ DEEL BN2: DSTV-NC via de dienst van MvL Progress ============
+    // Zonder echte sleutel: een nagebootste dienst met de antwoorden uit de
+    // Swagger (ConvertResponse, ErrorResponse).
+    log('\n\n======== DEEL BN2: NC via cadapi.mvlprogress.nl (nagebootst) ========\n');
+    {
+        const api = await win.eval("import('/ncapi.js')");
+        const gezien = [];
+        const nep = async (url, init) => {
+            gezien.push({ url, sleutel: init.headers['X-Api-Key'], velden: [...init.body.keys()] });
+            const naam = init.body.get('File').name;
+            const betrouwbaar = !/002/.test(naam);
+            return { ok: true, status: 200, json: async () => ({
+                jobId: 'j' + naam, ncContent: 'ST\r\n  ' + naam + '\r\nEN\r\n', profile: 'RO48.3x2.6',
+                codeProfile: 'RO', length: 1000, holeCount: 0, profileRecognized: true,
+                reliability: { reliable: betrouwbaar, issues: betrouwbaar ? [] : [{ code: 'x', message: 'verstek onzeker' }] },
+            }) };
+        };
+        const lijst = [1, 2].map(n => ({ nummer: n, naam: `onderdeel_00${n}.stp`, step: new Uint8Array([1, 2, 3]),
+            materiaal: 'S235JRH', profielNaam: 'CHS 48.3x2.6', aantal: 2, zaaglengte: 1000,
+            positie: `00${n}`, soort: 'handregel' }));
+        const uitk = await api.ncVoorOnderdelen(lijst, 'test-sleutel', () => {}, nep);
+        check('NC-dienst: per onderdeel een .nc in de map nc/, op volgorde',
+            uitk.bestanden.map(b => b.naam).join(',') === 'nc/onderdeel_001.nc,nc/onderdeel_002.nc',
+            uitk.bestanden.map(b => b.naam).join(','));
+        check('NC-dienst: POST naar /api/v1/convert met de sleutel in X-Api-Key en File, Material, ProfileHint, Quantity',
+            gezien.every(g => g.url === 'https://cadapi.mvlprogress.nl/api/v1/convert' && g.sleutel === 'test-sleutel'
+                && ['File', 'Material', 'ProfileHint', 'Quantity', 'ProfileStandard'].every(v => g.velden.includes(v))));
+        check('NC-dienst: wat de dienst niet betrouwbaar vindt staat als CONTROLEREN in het verslag',
+            /002.*CONTROLEREN: verstek onzeker/.test(uitk.verslag.join('\n'))
+            && /001.*betrouwbaar volgens de dienst/.test(uitk.verslag.join('\n')), uitk.verslag.join(' | '));
+        const nee = async () => ({ ok: false, status: 401, json: async () => ({ error: 'unauthorized', message: 'API key missing.' }) });
+        let fout = '';
+        try { await api.zetOmNaarNc(lijst[0], 'fout', nee); } catch (e) { fout = e.message; }
+        check('NC-dienst: een 401 geeft een leesbare melding', /API-sleutel ontbreekt of is ongeldig: API key missing/.test(fout), fout);
+        let geen = '';
+        try { await api.zetOmNaarNc(lijst[0], '', nep); } catch (e) { geen = e.message; }
+        check('NC-dienst: zonder sleutel geen aanvraag', /Geen API-sleutel/.test(geen) && gezien.length === 2);
+        // Een ontwerp (link, bestand) bestaat uit de p_- en t_-velden; het
+        // sleutelveld heet anders en hoort dus nooit bij een ontwerp.
+        const sleutelVeld = doc.getElementById('ncSleutel');
+        check('het sleutelveld is geen ontwerpveld en een wachtwoordveld',
+            !!sleutelVeld && !/^[pt]_/.test(sleutelVeld.id) && sleutelVeld.type === 'password');
     }
 
     // ============ DEEL BS: sterkte (rekenhulp) ===============================

@@ -1405,6 +1405,12 @@
             <!-- Alles wat de werkplaats nodig heeft in één bestand. De losse
                  knoppen hierboven blijven: soms wil je alleen de BOM. -->
             <button id="productie" class="primair">Productiepakket (ZIP)</button>
+            <!-- DSTV-NC via de dienst van MvL Progress: alleen de NC-bestanden. -->
+            <button id="ncKnop">NC-bestanden (DSTV) via MvL Progress</button>
+            <p class="hint" id="ncUitleg">Stuurt de STEP van elk gezaagd onderdeel naar
+               cadapi.mvlprogress.nl en zet er een DSTV-NC-bestand van terug, ook met
+               verstekken en zadels. Vraagt een API-sleutel (Instellingen). Met sleutel
+               komen ze ook in het productiepakket.</p>
             <p class="hint">Eén ZIP met: de STEP van het geheel, een STEP per
                uniek onderdeel, een DXF van elk plaatdeel (voor de snijtafel),
                een PDF van twee bladen — vier aanzichten met maten, en het
@@ -1631,6 +1637,14 @@
                 <button id="instelLaden">Laden</button>
             </div>
             <input type="file" id="instelBestand" accept=".json" hidden>
+
+            <h4 style="margin:12px 0 4px">DSTV-NC (MvL Progress)</h4>
+            <p class="hint">De API-sleutel voor cadapi.mvlprogress.nl. Hij blijft in
+               deze browser: niet in een gedeelde link, niet in een ontwerpbestand en
+               niet in het pakket. Met de sleutel gaat per onderdeel de STEP, het
+               materiaal, het aantal en de profielnaam naar die dienst.</p>
+            <div class="veld"><label for="ncSleutel">API-sleutel</label>
+                <input type="password" id="ncSleutel" autocomplete="off"></div>
 
             <h4 style="margin:12px 0 4px">Ontwerp delen</h4>
             <p class="hint">Een link met het hele ontwerp erin: maten, profielen,
