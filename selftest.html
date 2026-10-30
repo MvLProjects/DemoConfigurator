@@ -11744,6 +11744,49 @@ try {
         for (let i = 0; i < 10; i++) st.controleerBalustrade(bsM, { ...inv, qk: 3 }, cat.alleProfielen(catBoom));
         const bsMs = (performance.now() - t0) / 10;
         check('de controle met profielvoorstel kost minder dan 200 ms', bsMs < 200, `${bsMs.toFixed(1)} ms`);
+        // 5. ANKERS (fase 2), met de hand nagerekend. Voorbeeldwaarden, geen ETA.
+        const ak = await win.eval("import('/anker.js')");
+        const vp = regelsNu.VOETPLAAT;
+        const plLangs = ak.plaatVoor('langs', vp), plDwars = ak.plaatVoor('dwars', vp);
+        //    Getekend: beide ankers op de hartlijn van 50 breed -> arm 25 mm.
+        //    M = 1 000 000 Nmm -> 40 000 N totaal, 20 000 N per anker.
+        const krL = ak.ankerKrachten(1e6, 3000, plLangs);
+        check('getekende plaat: arm 25 mm, 20 kN per anker, beide in trek',
+            dicht(krL.arm, 25) && dicht(krL.NEdPerAnker, 20000) && krL.aantalTrek === 2,
+            JSON.stringify(krL));
+        //    Dwars: ankers op ±45, plaat 150 breed -> arm 75 + 45 = 120 mm, één anker in trek.
+        const krD = ak.ankerKrachten(1e6, 3000, plDwars);
+        check('dwars gedraaid: arm 120 mm, één anker 8333 N',
+            dicht(krD.arm, 120) && dicht(krD.NEdPerAnker, 1e6 / 120) && krD.aantalTrek === 1,
+            JSON.stringify(krD));
+        const eta = { d: 12, hef: 110, tauRk: 10, NRks: 42, VRks: 21, k1: 7.7, gammaMs: 1.5,
+                      gammaMp: 1.8, gammaMc: 1.8, fck: 25, c: 1000, h: 250 };
+        //    Ver van de rand (c = 1000 ≥ ccr): N0Rk,p = π·12·110·10 = 41 469 N, /1,8.
+        const verD = ak.controleerAnkers({ MEd: 1e6, VEd: 3000 }, plDwars, eta);
+        const hecht = verD.find(r => /hechting/.test(r.naam));
+        check('hechting ver van de rand: π·d·hef·τRk/γMp = 23 038 N',
+            dicht(hecht.exact.Rd, Math.PI * 12 * 110 * 10 / 1.8), String(hecht.exact.Rd));
+        //    Kegel: 7,7·√25·110^1,5 = 44 418 N, /1,8.
+        const kegel = verD.find(r => /kegel/.test(r.naam));
+        check('kegeluitbraak ver van de rand: k1·√fck·hef^1,5/γMc = 24 677 N',
+            dicht(kegel.exact.Rd, 7.7 * 5 * 110 ** 1.5 / 1.8), String(kegel.exact.Rd));
+        //    Groep van twee op 90 mm (getekend): factor (330 + 90)/660 voor de kegel.
+        const verL = ak.controleerAnkers({ MEd: 1e6, VEd: 3000 }, plLangs, eta);
+        check('twee ankers op 90 mm delen hun kegel: (scr + s)/(2·scr)',
+            dicht(verL.find(r => /kegel/.test(r.naam)).exact.Rd, 7.7 * 5 * 110 ** 1.5 / 1.8 * (330 + 90) / 660));
+        //    Randafstand 100 < ccr 165: Ac/A0c = 265·330/330², ψs = 0,7 + 0,3·100/165.
+        const rand = ak.controleerAnkers({ MEd: 1e6, VEd: 3000 }, plDwars, { ...eta, c: 100 })
+            .find(r => /kegel/.test(r.naam));
+        check('randafstand 100 mm: Ac/A0c en ψs volgens de formule',
+            dicht(rand.exact.Rd, 7.7 * 5 * 110 ** 1.5 / 1.8 * (265 * 330) / (330 * 330) * (0.7 + 0.3 * 100 / 165)));
+        check('zonder ETA-waarden: onvoldoende gegevens, met de krachten erbij',
+            ak.controleerAnkers({ MEd: 1e6, VEd: 3000 }, plDwars, { fck: 25 })[0].status
+            === st.STATUS.ONVOLDOENDE_GEGEVENS);
+        check('randbreuk, splijten en interactie: altijd constructeur nodig',
+            verD.some(r => r.status === st.STATUS.CONSTRUCTEUR && /randbreuk/i.test(r.naam)));
+        check('de staandercontrole geeft de rekenkrachten aan de voet door',
+            !!vol.find(r => r.voet) && dicht(vol.find(r => r.voet).voet.MEd, 618750)
+            && dicht(vol.find(r => r.voet).voet.VEd, 1.5 * 375));
         check('sterkte geeft geen fout in de console', errors.length === bsVoor, errors.slice(bsVoor).join(' | '));
     }
 

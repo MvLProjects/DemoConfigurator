@@ -214,6 +214,8 @@ export function controleerBalustrade(m, invoer, catalogus = []) {
             voorstel: ok ? null : voorstelProfiel(m.staanderProfiel, catalogus,
                 (s) => s.Wx * matSt.fy / gM0 >= MEd, 'staander')
                 || `Staanderafstand hooguit ${Math.floor(hohMax)} mm.`,
+            // De rekenkrachten aan de voet, voor de ankers (anker.js).
+            voet: { MEd, VEd: gQ * F },
         });
     }
 
@@ -268,10 +270,10 @@ export function controleerBalustrade(m, invoer, catalogus = []) {
 
     // --- wat de app (nog) niet betrouwbaar kan -------------------------------
     uit.push({
-        naam: 'Voetplaat, las en bevestiging op de ondergrond',
+        naam: 'Voetplaat en las staander-voetplaat',
         status: STATUS.CONSTRUCTEUR,
-        toelichting: 'Nog niet berekend (fase 2: chemisch anker volgens NEN-EN 1992-4 met ETA-gegevens). '
-            + 'Laat de verbinding door een constructeur toetsen.',
+        toelichting: 'Niet berekend: de buiging van de voetplaat en de las horen door een constructeur '
+            + 'getoetst te worden. De ankers zelf staan hieronder (NEN-EN 1992-4, vereenvoudigd).',
     });
     uit.push({
         naam: 'Slingerproef (zandzak 50 kg, 0,5 kNm)',

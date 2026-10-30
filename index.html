@@ -1488,6 +1488,46 @@
             <input type="number" id="s_fy" step="5" min="0"></div>
         <p class="hint">Alleen bij rvs of aluminium; bij staal volgt f<sub>y</sub> uit de
            staalsoort van het profiel (NEN-EN 1993-1-1, tabel 3.1).</p>
+        <details class="subgroep" id="ankerVak">
+            <summary>Chemisch anker op beton</summary>
+            <p class="hint" style="margin-top:4px">Vereenvoudigd naar NEN-EN 1992-4. Alle
+               anker-waarden komen uit de ETA van het gekozen anker; de app vult er geen in.</p>
+            <div class="veld"><label for="a_plaat">ankers</label>
+                <select id="a_plaat">
+                    <option value="langs">zoals getekend (langs)</option>
+                    <option value="dwars">plaat dwars (voorstel)</option>
+                </select></div>
+            <p class="hint">Getekend liggen beide ankers op de hartlijn van een plaat van 50 breed:
+               tegen kantelen hebben ze maar 25 mm arm. Dwars gedraaid wordt dat 120 mm.
+               Deze keuze verandert alleen de berekening, nog niet het model.</p>
+            <div class="veld"><label for="a_fck">betonklasse</label>
+                <select id="a_fck">
+                    <option value="">kies</option>
+                    <option value="20">C20/25</option><option value="25">C25/30</option>
+                    <option value="30">C30/37</option><option value="35">C35/45</option>
+                    <option value="40">C40/50</option><option value="45">C45/55</option>
+                    <option value="50">C50/60</option>
+                </select></div>
+            <p class="hint">fck volgens NEN-EN 1992-1-1, tabel 3.1.</p>
+            <div class="veld"><label for="a_h">betondikte h (mm)</label><input type="number" id="a_h" min="0"></div>
+            <div class="veld"><label for="a_c">randafstand c (mm)</label><input type="number" id="a_c" min="0"></div>
+            <p class="hint">Van het anker tot de dichtstbijzijnde betonrand (de balkonrand).</p>
+            <div class="veld"><label for="a_d">anker d (mm)</label><input type="number" id="a_d" min="0"></div>
+            <div class="veld"><label for="a_hef">hef (mm)</label><input type="number" id="a_hef" min="0"></div>
+            <div class="veld"><label for="a_tauRk">τRk (N/mm²)</label><input type="number" id="a_tauRk" step="0.1" min="0"></div>
+            <div class="veld"><label for="a_NRks">NRk,s (kN)</label><input type="number" id="a_NRks" step="0.1" min="0"></div>
+            <div class="veld"><label for="a_VRks">VRk,s (kN)</label><input type="number" id="a_VRks" step="0.1" min="0"></div>
+            <div class="veld"><label for="a_k1">k1</label><input type="number" id="a_k1" step="0.1" min="0"></div>
+            <div class="veld"><label for="a_ccr">ccr,Np (mm)</label><input type="number" id="a_ccr" min="0"></div>
+            <div class="veld"><label for="a_gammaMs">γMs</label><input type="number" id="a_gammaMs" step="0.01" min="0"></div>
+            <div class="veld"><label for="a_gammaMp">γMp</label><input type="number" id="a_gammaMp" step="0.01" min="0"></div>
+            <div class="veld"><label for="a_gammaMc">γMc</label><input type="number" id="a_gammaMc" step="0.01" min="0"></div>
+            <div class="veld"><label for="a_hmin">hmin (mm)</label><input type="number" id="a_hmin" min="0"></div>
+            <div class="veld"><label for="a_cmin">cmin (mm)</label><input type="number" id="a_cmin" min="0"></div>
+            <p class="hint">τRk voor gescheurd of ongescheurd beton zoals in de ETA, en k1 daarbij
+               passend (bronnen noemen 7,7/11,0 voor nagemonteerde ankers). Leeg ccr,Np: dan
+               1,5·hef. hmin en cmin alleen voor de vergelijking met de ETA.</p>
+        </details>
         <div id="sterkteInhoud"></div>
         <p class="hint" id="sterkteLeeg">Bouw eerst een balustrade met gekozen profielen;
            dan staan hier de controles.</p>

@@ -14,7 +14,7 @@ import { initOcct, laadStep, laadVorm, countMeshEdges, schrijfStep,
 import { maakNavigatie } from './navigation.js';
 import { bouwBalustrade, bouwBlok, bouwBalustradeOpRanden, beoordeelRanden,
     voorspelBalustrade } from './build-balustrade.js';
-import { STANDAARD, valideer, VULLING, GLAS, GLASVRIJ, KNIEREGEL, vullingSoort } from './balustrade-rules.js';
+import { STANDAARD, valideer, VULLING, GLAS, GLASVRIJ, KNIEREGEL, VOETPLAAT, vullingSoort } from './balustrade-rules.js';
 import { parseer, noemtProfiel } from './command-parser.js';
 import { bouwTrap, trapDelen, wandleuningFout, controleerWentel,
          controleerHoutBoom } from './build-trap.js';
@@ -69,6 +69,7 @@ import { kiesSierpunt } from './sierpuntkiezer.js';
 import { modelVan, GEEN as SIERPUNT_GEEN } from './sierpunten.js';
 import { isRond as isRondProfiel } from './profielen.js';
 import * as sterkte from './sterkte.js';
+import * as anker from './anker.js';
 import { maakDxf } from './dxf.js';
 import { maakZip } from './zip.js';
 import { alleProfielen } from './profielen.js';
@@ -1912,18 +1913,28 @@ function toonOnderdelen(lijst, boom) {
 // doorbuigingsgrens) is van de gebruiker en wordt per browser onthouden - het
 // is projectgegeven, geen ontwerp.
 const STERKTE_VELDEN = ['qk', 'bronQk', 'Qk', 'gammaQ', 'gammaM0', 'dMax', 'fy'];
+const ANKER_VELDEN = ['plaat', 'fck', 'h', 'c', 'd', 'hef', 'tauRk', 'NRks', 'VRks', 'k1', 'ccr',
+                      'gammaMs', 'gammaMp', 'gammaMc', 'hmin', 'cmin'];
+const ankerEl = (n) => document.getElementById('a_' + n);
 const STERKTE_SLEUTEL = 'railing-configurator/sterkte/1';
 const sterkteEl = (n) => document.getElementById('s_' + n);
 try {
     const bewaard = JSON.parse(localStorage.getItem(STERKTE_SLEUTEL) || '{}');
     for (const n of STERKTE_VELDEN) if (bewaard[n] !== undefined && sterkteEl(n)) sterkteEl(n).value = bewaard[n];
+    for (const n of ANKER_VELDEN) if (bewaard['a_' + n] !== undefined && ankerEl(n)) ankerEl(n).value = bewaard['a_' + n];
 } catch { /* geen opslag: dan maar leeg */ }
 const sterkteInvoer = () => Object.fromEntries(STERKTE_VELDEN.map(n => [n, sterkteEl(n) ? sterkteEl(n).value : '']));
-for (const n of STERKTE_VELDEN) {
-    sterkteEl(n)?.addEventListener('input', () => {
-        try { localStorage.setItem(STERKTE_SLEUTEL, JSON.stringify(sterkteInvoer())); } catch { /* geen opslag */ }
-        toonSterkte();
-    });
+const ankerInvoer = () => Object.fromEntries(ANKER_VELDEN.map(n => [n, ankerEl(n) ? ankerEl(n).value : '']));
+const bewaarSterkte = () => {
+    const alles = { ...sterkteInvoer(),
+                    ...Object.fromEntries(Object.entries(ankerInvoer()).map(([k, v]) => ['a_' + k, v])) };
+    try { localStorage.setItem(STERKTE_SLEUTEL, JSON.stringify(alles)); } catch { /* geen opslag */ }
+    toonSterkte();
+};
+for (const n of STERKTE_VELDEN) sterkteEl(n)?.addEventListener('input', bewaarSterkte);
+for (const n of ANKER_VELDEN) {
+    ankerEl(n)?.addEventListener('input', bewaarSterkte);
+    ankerEl(n)?.addEventListener('change', bewaarSterkte);
 }
 document.getElementById('s_aanbevolen')?.addEventListener('click', () => {
     sterkteEl('gammaQ').value = sterkte.AANBEVOLEN_FACTOREN.gammaQ.waarde;
@@ -1938,10 +1949,18 @@ export function sterkteNu() {
     const hart = (d) => [0, 1, 2].map(i => d.oorsprong[i] + d.xAs[i] * d.dx / 2 + d.yAs[i] * d.dy / 2);
     const staanders = laatsteDelen.filter(d => d.soort === 'staander').map(hart);
     if (staanders.length < 2) return null;
-    return sterkte.controleerBalustrade({
+    const rijen = sterkte.controleerBalustrade({
         hoogte: b.hoogte, overstek: b.handregelOverstek, metaal: b.metaal,
         staanderProfiel: b.staanderProfiel, handregelProfiel: b.handregelProfiel, staanders,
     }, sterkteInvoer(), catalogus ? alleProfielen(catalogus.boom) : []);
+    // De ankers onder de zwaarst belaste staander, met de rekenkrachten uit
+    // de staandercontrole. Zonder die krachten valt er niets te toetsen.
+    const voet = (rijen.find(r => r.voet) || {}).voet;
+    const plaat = anker.plaatVoor(ankerInvoer().plaat, VOETPLAAT);
+    const ankerRijen = voet ? anker.controleerAnkers(voet, plaat, ankerInvoer())
+        : [{ naam: 'Ankers', status: sterkte.STATUS.ONVOLDOENDE_GEGEVENS,
+             toelichting: 'Eerst moet de staandercontrole kunnen rekenen (lijnlast, factoren, profiel).' }];
+    return [...rijen, ...ankerRijen];
 }
 
 function toonSterkte() {
