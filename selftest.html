@@ -11737,6 +11737,15 @@ try {
         check('zonder toelaatbare doorbuiging: geen oordeel',
             st.controleerBalustrade(bsM, { ...inv, dMax: '' }).find(r => r.naam.startsWith('Doorbuiging')).status
             === st.STATUS.ONVOLDOENDE_GEGEVENS);
+        // Slingerproef-indicatie: k = serie van 48EI/L³ (handregel) en 2·3EI/H³
+        // (staanders), F = √(2·500 000 Nmm·k). Met de hand nagerekend.
+        const sl = vol.find(r => /Slingerproef/.test(r.naam));
+        const kHr = 48 * 210000 * iChs / 750 ** 3, kSt = 6 * 210000 * 512000 / 1100 ** 3;
+        const kSl = 1 / (1 / kHr + 1 / kSt);
+        check('slingerproef: F = √(2·E·k) als bovengrens, en altijd "proef nodig"',
+            !!sl.exact && dicht(sl.exact.F, Math.sqrt(2 * 500000 * kSl))
+            && sl.status === st.STATUS.CONSTRUCTEUR && /vervangt de slingerproef niet/.test(sl.toelichting),
+            sl.exact ? `${(sl.exact.F / 1000).toFixed(2)} kN` : sl.toelichting);
         check('voetplaat/anker en slingerproef: altijd constructeur of proef nodig',
             vol.filter(r => r.status === st.STATUS.CONSTRUCTEUR).length === 2);
         // En snel: de hele controle met profielvoorstel in een paar ms.

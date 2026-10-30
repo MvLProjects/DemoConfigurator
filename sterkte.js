@@ -275,13 +275,53 @@ export function controleerBalustrade(m, invoer, catalogus = []) {
         toelichting: 'Niet berekend: de buiging van de voetplaat en de las horen door een constructeur '
             + 'getoetst te worden. De ankers zelf staan hieronder (NEN-EN 1992-4, vereenvoudigd).',
     });
-    uit.push({
-        naam: 'Slingerproef (zandzak 50 kg, 0,5 kNm)',
-        status: STATUS.CONSTRUCTEUR,
-        toelichting: 'Een berekening vervangt de slingerproef niet. Bron van de proefopzet: NB bij '
-            + 'NEN-EN 1991-1-1 (oorsprong NEN 6702).',
-    });
+    uit.push(slingerIndicatie({ st, hr, matSt, matHr, H, Lmax }));
     return uit;
+}
+
+/** De stootenergie van de slingerproef: 50 kg, 0,5 kNm (≈ 1 m val). */
+export const SLINGER = { massa: 50, energie: 500e3,      // Nmm
+    bron: 'NB bij NEN-EN 1991-1-1 (oorsprong NEN 6702); opzet volgens Peutz en AGC' };
+
+/**
+ * FASE 3: de slingerproef als INDICATIE, nooit als oordeel.
+ *
+ * Stoot midden in het grootste veld op handregelhoogte. De stijfheid op dat
+ * punt is de handregel als ligger op twee steunpunten (48EI/L³) in serie met
+ * de twee staanders die elk de helft opnemen (2 × 3EI/H³). Gaat alle energie
+ * in elastische vervorming, dan is de kracht F = √(2·E·k) - een bovengrens,
+ * want in werkelijkheid gaat er energie verloren in de zak, de verbindingen en
+ * plastische vervorming. Daarmee: blijven staander en handregel elastisch
+ * (σ ≤ fy), of vervormen ze blijvend? Blijvende vervorming mag bij de proef,
+ * bezwijken of doorvallen niet - en dat kan een berekening niet zeggen.
+ */
+export function slingerIndicatie({ st, hr, matSt, matHr, H, Lmax }) {
+    const naam = 'Slingerproef (zandzak 50 kg, 0,5 kNm) - indicatie';
+    if (!st || st.fout || !hr || hr.fout || !matSt || matSt.ontbreekt || !matHr || matHr.ontbreekt
+        || !(Lmax > 0) || !(H > 0)) {
+        return { naam, status: STATUS.CONSTRUCTEUR,
+            toelichting: 'Geen indicatie: profielen of materiaal ontbreken. Een berekening vervangt de '
+                + `slingerproef hoe dan ook niet (${SLINGER.bron}).` };
+    }
+    const kHr = 48 * matHr.E * hr.Iy / Lmax ** 3;
+    const kSt = 2 * 3 * matSt.E * st.Ix / H ** 3;
+    const k = 1 / (1 / kHr + 1 / kSt);
+    const F = Math.sqrt(2 * SLINGER.energie * k);
+    const sigmaSt = (F / 2) * H / st.Wx;
+    const sigmaHr = F * Lmax / 4 / hr.Wy;
+    const elastisch = sigmaSt <= matSt.fy && sigmaHr <= matHr.fy;
+    return {
+        naam, status: STATUS.CONSTRUCTEUR,
+        waarde: r1(F / 1000), grens: null, eenheid: 'kN',
+        exact: { F, k, sigmaSt, sigmaHr, verplaatsing: F / k },
+        toelichting: `Bovengrens als alle 0,5 kNm elastisch wordt opgenomen: F = √(2·E·k) = ${r1(F / 1000)} kN, `
+            + `verplaatsing ${r1(F / k)} mm. Spanning staander ${Math.round(sigmaSt)} N/mm², handregel `
+            + `${Math.round(sigmaHr)} N/mm² (fy ${matSt.fy}). `
+            + (elastisch ? 'Blijft volgens deze indicatie elastisch. '
+                : 'Vervormt volgens deze indicatie blijvend; dat mag bij de proef, bezwijken niet. ')
+            + 'Een berekening vervangt de slingerproef niet: de proef (of een constructeur) beslist. '
+            + `Proefopzet: ${SLINGER.bron}.`,
+    };
 }
 
 /**
