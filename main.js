@@ -67,10 +67,11 @@ import { werkplaatsblad, onderdelenbladen } from './tekening2d.js';
 import { maakIndex, zoek } from './zoeken.js';
 import { kiesSierpunt } from './sierpuntkiezer.js';
 import { modelVan, GEEN as SIERPUNT_GEEN } from './sierpunten.js';
-import { isRond as isRondProfiel } from './profielen.js';
+import { isRond as isRondProfiel, categorieVan } from './profielen.js';
 import * as sterkte from './sterkte.js';
 import * as anker from './anker.js';
 import { maakDxf } from './dxf.js';
+import { maakNc1, waaromGeenNc1 } from './nc1.js';
 import { maakZip } from './zip.js';
 import { alleProfielen } from './profielen.js';
 import { beschrijf, bestandsnaam, bomRegel } from './onderdelen.js';
@@ -1085,9 +1086,85 @@ startDialoog.showModal();
 // Meteen meerekenen tijdens het typen. Je ziet dan direct dat het aantal
 // spijlen geen invoer is maar een gevolg: maak het veld langer en er komen
 // spijlen bij, zonder dat je iets aanwijst.
+// --- het paneel: alleen wat bij de keuze hoort ------------------------------
+//
+// Een veld dat bij deze vulling niets doet staat er niet; een vinkje dat nu
+// niet kan, wordt grijs met de reden erbij. Een veld en de uitleg eronder (de
+// .hint-alinea's tot het volgende veld) horen bij elkaar en gaan samen weg.
+function rijVan(id) {
+    const el = document.getElementById(id);
+    const veld = el && el.closest('.veld');
+    if (!veld) return [];
+    const rij = [veld];
+    for (let n = veld.nextElementSibling; n && n.matches('p.hint') && !n.id; n = n.nextElementSibling) {
+        rij.push(n);
+    }
+    return rij;
+}
+
+// Wanneer een veld ertoe doet. Ontbreekt een veld hier, dan staat het er altijd.
+const PANEEL_ZICHTBAAR = {
+    p_spijlBreedte: (m) => m.vulling === 'spijlen',
+    p_maxDoorgang: (m) => m.vulling === 'spijlen' || m.vulling === 'horizontaal',
+    p_spijlModel: (m) => m.vulling === 'spijlen',
+    p_spijlMateriaal: (m) => m.vulling === 'spijlen' && Boolean(m.spijlModel),
+    p_spijlOverstek: (m) => m.vulling === 'spijlen',
+    p_vulraamwerk: (m) => m.vulling === 'spijlen' || m.vulling === 'horizontaal',
+    p_stripBreedte: (m) => (m.vulling === 'spijlen' || m.vulling === 'horizontaal') && Boolean(Number(m.vulraamwerk)),
+    p_knieregelHoogte: (m) => m.vulling === 'knieregel',
+    p_geslotenEind: (m) => m.vulling === 'knieregel',
+    p_handregelMateriaal: (m) => Boolean(m.handregelModel),
+    p_staanderBreedte: (m) => m.vulling !== 'glasvrij',
+    p_maxStaanderAfstand: (m) => m.vulling !== 'glasvrij',
+    p_regelVoor: (m) => m.vulling !== 'glasvrij',
+    p_voetplaatDikte: (m) => m.vulling !== 'glasvrij',
+};
+
+/** Waarom een vinkje nu niets doet, of null als het wel werkt. */
+function waaromNiet(id, m, veld) {
+    const hr = profielen.handregel;
+    const hol = hr && ['CHS', 'SHS', 'RHS'].includes(categorieVan(hr).sleutel);
+    if (id === 'p_geslotenEind') {
+        if (!hr || !isRondProfiel(hr)) return 'vraagt een ronde buis als handregel';
+        if (veld && veld.knieDoor === false) return 'vraagt een massieve staander, bv. platstaal 80 × 12';
+    }
+    if (id === 'p_eindkappen' && !hol) return 'alleen op een holle buis of koker als handregel';
+    if (id === 'p_regelVoor' && Number(m.spijlOverstek) > 0) return 'niet samen met spijlen door de handregel';
+    if (id === 'p_muurEind' && Number(m.handregelOverstek) <= 0) return 'vraagt een handregeloverstek (de afstand tot de muur)';
+    return null;
+}
+
+function werkPaneelBij(m, veld = null) {
+    for (const [id, toon] of Object.entries(PANEEL_ZICHTBAAR)) {
+        const zichtbaar = toon(m);
+        for (const el of rijVan(id)) el.style.display = zichtbaar ? '' : 'none';
+    }
+    // De reden als eigen regel ONDER het veld, niet in het label: in het label
+    // duwde de tekst het vinkje uit de rij.
+    for (const id of ['p_geslotenEind', 'p_eindkappen', 'p_regelVoor', 'p_muurEind']) {
+        const rij = document.getElementById(id) && document.getElementById(id).closest('.veld');
+        if (!rij) continue;
+        const label = rij.querySelector('label');
+        let reden = rij.nextElementSibling && rij.nextElementSibling.classList.contains('waaromNiet')
+            ? rij.nextElementSibling : null;
+        const tekst = waaromNiet(id, m, veld);
+        if (!tekst) { if (reden) reden.remove(); if (label) label.style.opacity = ''; continue; }
+        if (!reden) {
+            reden = document.createElement('p');
+            reden.className = 'hint waaromNiet';
+            reden.style.cssText = 'margin-top:-4px;color:#8a6100';
+            rij.after(reden);
+        }
+        reden.textContent = 'Werkt nu niet: ' + tekst + '.';
+        reden.style.display = rij.style.display;
+        if (label) label.style.opacity = '0.6';
+    }
+}
+
 function werkAfgeleideBij() {
     const maten = huidigeMaten();
     const fouten = valideer(maten);
+    werkPaneelBij(maten);
 
     // De melding bij de spijlpunt hangt af van de vulling en van het overstek,
     // en allebei kunnen hier net gewijzigd zijn. Vóór de foutafhandeling, want
@@ -1231,6 +1308,8 @@ function werkAfgeleideBij() {
     // een handmatige invoer. Zonder vulraamwerk zijn er geen strips.
     afgeleidEls.strip.textContent = veld.stripBreedte === null
         ? 'geen raamwerk' : veld.stripBreedte.toFixed(1) + ' mm';
+    // Nu ook met wat het model weet (kan de knieregel door de staander?).
+    werkPaneelBij(maten, veld);
     return maten;
 }
 
@@ -2592,6 +2671,25 @@ export async function maakProductiepakket(meld = () => {}) {
     // hetzelfde pakket of je het zaaglijstvak nu opengeklapt hebt of niet.
     const zaag = maakZaaglijst(laatsteOnderdelen);
     const k = kaderGegevens();
+
+    // DSTV-NC1 voor de zaagstraat: alleen wat zeker goed gaat (zie nc1.js),
+    // en een LEESMIJ met wat er niet in zit en waarom.
+    meld('Productiepakket: NC1 voor de zaagstraat...');
+    const ncNiet = [];
+    for (const [i, u] of laatsteOnderdelen.entries()) {
+        const nc = maakNc1(u, bom[i], { order: k.nummer || k.opdracht, tekening: k.omschrijving });
+        if (nc) bestanden.push({ naam: 'nc1/' + bestandsnaam(u.nummer).replace(/\.stp$/, '.nc1'), data: nc });
+        else ncNiet.push(`${bom[i].positie}  ${u.deel.soort}: ${waaromGeenNc1(u)}`);
+    }
+    bestanden.push({ naam: 'nc1/LEESMIJ.txt', data: [
+        'DSTV-NC1 voor de zaagstraat.',
+        '',
+        'Alleen buizen, kokers en rond staf met rechte koppen en zonder bewerking.',
+        'Controleer elk bestand in een NC1-viewer voor het op de machine gaat.',
+        '',
+        'Niet als NC1 (met de reden):',
+        ...(ncNiet.length ? ncNiet : ['(geen)']),
+    ].join('\r\n') + '\r\n' });
     const titel = {
         bedrijf: k.bedrijf, opdracht: k.opdracht, nummer: k.nummer,
         omschrijving: k.omschrijving, getekend: k.getekend, datum: k.datum,

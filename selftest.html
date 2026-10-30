@@ -7319,11 +7319,15 @@ try {
     const ahMist = ahHoortIn.filter(n => !ahPakket.some(b => b.naam === n));
     check('het pakket bevat alle vier de vaste bestanden',
         ahMist.length === 0, ahMist.join(', '));
-    check('plus een STEP per onderdeel en een DXF per plaatdeel, en niets anders',
+    // En de map nc1/: een LEESMIJ plus een NC1 per onderdeel dat het kan.
+    const ahNc1 = ahPakket.filter(b => b.naam.startsWith('nc1/'));
+    check('plus een STEP per onderdeel, een DXF per plaatdeel en de NC1-map, en niets anders',
         ahPakket.length === ahHoortIn.length + ahOnderdelen.length
-                          + ahEcht.platen.length,
+                          + ahEcht.platen.length + ahNc1.length
+        && ahNc1.some(b => b.naam === 'nc1/LEESMIJ.txt')
+        && ahNc1.every(b => b.naam === 'nc1/LEESMIJ.txt' || /^nc1\/onderdeel_\d{3}\.nc1$/.test(b.naam)),
         `${ahPakket.length} tegenover ${ahHoortIn.length} + `
-        + `${ahOnderdelen.length} + ${ahEcht.platen.length}`);
+        + `${ahOnderdelen.length} + ${ahEcht.platen.length} + ${ahNc1.length} (nc1)`);
 
     check('de hele zaaglijst geeft geen fout in de console',
         errors.length === agVoor, errors.slice(agVoor).join(' | '));
@@ -11660,6 +11664,51 @@ try {
         check('"van muur tot muur" wordt begrepen',
             bmMuurZin.params && bmMuurZin.params.muurEind === 1 && bmMuurZin.params.lengte === 3000,
             bmMuurZin.fout || bmMuurZin.uitleg);
+    }
+
+    // ============ DEEL BP: het paneel toont wat bij de keuze hoort ============
+    log('\n\n======== DEEL BP: alleen de velden die bij de keuze horen ========\n');
+    {
+        const bpVul = doc.getElementById('p_vulling');
+        const bpOud = bpVul.value;
+        const zichtbaar = (id) => doc.getElementById(id).closest('.veld').style.display !== 'none';
+        const zet = (v) => { bpVul.value = v; bpVul.dispatchEvent(new Event('change')); };
+        zet('knieregel');
+        check('bij een knieregel: geen spijlvelden, wel de knieregelhoogte',
+            !zichtbaar('p_spijlBreedte') && !zichtbaar('p_spijlOverstek') && zichtbaar('p_knieregelHoogte'));
+        const reden = doc.getElementById('p_eindkappen').closest('.veld').nextElementSibling;
+        check('een vinkje dat nu niet kan zegt waarom (eindkappen zonder holle handregel)',
+            mainMod.sterkteNu !== undefined
+            && (doc.getElementById('p_eindkappen').closest('.veld').querySelector('label').style.opacity === '0.6')
+            === (reden && reden.classList.contains('waaromNiet')),
+            reden && reden.classList.contains('waaromNiet') ? reden.textContent : '(werkt wel)');
+        zet('spijlen');
+        check('bij spijlen: de spijlvelden terug, de knieregelhoogte weg',
+            zichtbaar('p_spijlBreedte') && zichtbaar('p_spijlOverstek') && !zichtbaar('p_knieregelHoogte'));
+        zet(bpOud);
+    }
+
+    // ============ DEEL BN1: DSTV-NC1 voor de zaagstraat =======================
+    log('\n\n======== DEEL BN1: DSTV-NC1, alleen wat zeker goed gaat ========\n');
+    {
+        const nc = await win.eval("import('/nc1.js')");
+        const ncBuis = cat.alleProfielen(catBoom).find(x => /^CHS 48\.3x2\.6$/.test(x.englishLabel || x.label || ''));
+        const recht = { deel: { soort: 'handregel', profiel: ncBuis }, aantal: 2, zaaghoeken: [90] };
+        const tekst = nc.maakNc1(recht, { positie: '003', materiaal: 'S235JRH', zaaglengte: 3200 }, { order: 'P1' });
+        const r = (tekst || '').split('\r\n');
+        // ST + 24 kopregels + EN (+ lege regel na de laatste CRLF).
+        check('NC1: ST, 24 kopregels in de volgorde van DSTV.Net, EN',
+            r[0] === 'ST' && r[25] === 'EN' && r.length === 27 && r.slice(1, 25).every(x => x.startsWith('  ')),
+            `${r.length} regels`);
+        check('NC1: stuk 003, S235JRH, 2 stuks, profielcode RO, lengte 3200.00, Ø 48.30, wand 2.60',
+            r[4] === '  003' && r[5] === '  S235JRH' && r[6] === '  2' && r[8] === '  RO'
+            && r[9] === '  3200.00' && r[10] === '  48.30' && r[12] === '  2.60', r.slice(4, 13).join('|'));
+        check('NC1: rechte koppen, alle vier snedehoeken 0', r.slice(17, 21).every(x => x === '  0.00'));
+        const verstek = { ...recht, deel: { ...recht.deel, verstek: [{ punt: [0, 0, 0], richting: [1, 0, 1] }] } };
+        check('een verstek krijgt (nog) geen NC1, met de reden',
+            nc.maakNc1(verstek, { positie: '004', zaaglengte: 1000 }) === null
+            && /verstek/.test(nc.waaromGeenNc1(verstek)));
+        check('een gemeten schuine kop ook niet', nc.waaromGeenNc1({ ...recht, zaaghoeken: [45, 90] }) !== null);
     }
 
     // ============ DEEL BS: sterkte (rekenhulp) ===============================
