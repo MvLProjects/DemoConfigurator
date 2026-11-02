@@ -277,7 +277,7 @@ export function controleerBalustrade(m, invoer, catalogus = []) {
                 + `met a = ${a} mm, fu = ${las.fu} N/mm² (${grade[0]}, NEN-EN 1993-1-1 tabel 3.1), `
                 + `βw = ${las.betaW} (NEN-EN 1993-1-8 tabel 4.1). Las als lijn rond de staander, `
                 + `${Math.round(lijn.L)} mm lang. Aanname: de las loopt rondom en de plaat is stijf.`,
-            voorstel: ok ? null : `Keelhoogte minstens ${Math.ceil(f / FwRd * a * 10) / 10} mm, `
+            voorstel: ok ? null : `Keelhoogte minstens ${String(Math.ceil(f / FwRd * a * 10) / 10).replace('.', ',')} mm, `
                 + 'of een staander met een grotere omtrek.',
         });
     }
@@ -414,6 +414,9 @@ function voorstelProfiel(huidig, catalogus, voldoet, rol) {
         .sort((a, b) => a.s.A - b.s.A);
     if (!kandidaten.length) return null;
     const naam = (p) => p.englishLabel || p.label || 'profiel';
-    return { tekst: `Lichtste ${soort}-profiel dat voldoet als ${rol}: ${naam(kandidaten[0].p)}.`,
+    // In gewone woorden: "Flats" en "SHS" zijn catalogusnamen.
+    const woord = { CHS: 'buis', SHS: 'koker', RHS: 'koker', Flats: 'platstaal',
+                    RoundBars: 'rond staf', SquareBars: 'vierkant staf' }[soort] || soort;
+    return { tekst: `Lichtste ${woord} dat voldoet als ${rol}: ${naam(kandidaten[0].p)}.`,
              actie: { soort: 'profiel', rol, profiel: kandidaten[0].p } };
 }

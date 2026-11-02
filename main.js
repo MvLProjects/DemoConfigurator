@@ -2077,49 +2077,128 @@ function toonSterkte() {
         leeg.style.display = rijen ? 'none' : 'block';
         leeg.textContent = laatsteNaam === 'trap'
             ? 'De sterktecontrole is er alleen voor balustrades, niet voor trappen.'
-            : 'Bouw eerst een balustrade met gekozen profielen; dan staan hier de controles.';
+            : 'Bouw eerst een balustrade; dan staan hier de controles.';
     }
     if (!rijen) return;
-    const kleur = { [sterkte.STATUS.VOLDOET]: '#1b7a3a', [sterkte.STATUS.VOLDOET_NIET]: '#b3261e',
-                    [sterkte.STATUS.ONVOLDOENDE_GEGEVENS]: '#8a6100',
-                    [sterkte.STATUS.CONSTRUCTEUR]: '#45607a' };
-    for (const r of rijen) {
-        const blok = document.createElement('div');
-        blok.className = 'sterkteRij';
-        blok.style.cssText = 'border-left:4px solid ' + kleur[r.status] + ';padding:4px 8px;margin:8px 0';
-        const kop = document.createElement('div');
-        const st = document.createElement('b');
-        st.style.color = kleur[r.status];
-        st.textContent = r.status.toUpperCase();
-        kop.append(st, ' — ' + r.naam);
-        blok.append(kop);
-        if (r.waarde !== undefined) {
-            const w = document.createElement('div');
-            w.textContent = `berekend ${String(r.waarde).replace('.', ',')} ${r.eenheid}, `
-                + `grens ${String(r.grens).replace('.', ',')} ${r.eenheid}`;
-            blok.append(w);
+    const S = sterkte.STATUS;
+    const kleur = { [S.VOLDOET]: '#1b7a3a', [S.VOLDOET_NIET]: '#b3261e',
+                    [S.ONVOLDOENDE_GEGEVENS]: '#8a6100', [S.CONSTRUCTEUR]: '#45607a' };
+    const kaart = (kleurRand) => {
+        const k = document.createElement('div');
+        k.className = 'sterkteRij';
+        k.style.cssText = `border-left:4px solid ${kleurRand};padding:6px 10px;margin:8px 0;`
+            + 'background:rgba(127,127,127,0.06);border-radius:4px';
+        return k;
+    };
+    const knop = (tekst, doe) => {
+        const k = document.createElement('button');
+        k.type = 'button';
+        k.className = 'sterkteActie';
+        k.style.margin = '6px 6px 0 0';
+        k.textContent = tekst;
+        k.addEventListener('click', doe);
+        return k;
+    };
+    const regel = (tekst, opmaak = '') => {
+        const d = document.createElement('div');
+        d.textContent = tekst;
+        if (opmaak) d.style.cssText = opmaak;
+        return d;
+    };
+
+    // STAP 1 - ZONDER PROFIELEN VALT ER NIETS TE REKENEN. Eén melding met de
+    // weg erheen, in plaats van zes keer "onvoldoende gegevens".
+    const b = huidigeMaten();
+    if (!b.staanderProfiel || !b.handregelProfiel) {
+        const k = kaart(kleur[S.ONVOLDOENDE_GEGEVENS]);
+        k.append(regel('Kies eerst echte profielen', 'font-weight:600'),
+            regel('Om te kunnen rekenen moet de app weten welke buis of welk platstaal de '
+                + 'staander en de handregel zijn. De standaardbalustrade heeft nog geen profielen.'),
+            knop('Profielen kiezen', () => openGroep('Profielen')),
+            knop('Voorbeeld "Industriële leuning" laden', async () => {
+                await openVoorbeeld('industrieel-balk');
+                openGroep('Sterkte');
+            }));
+        inhoud.append(k);
+        return;
+    }
+
+    // STAP 2 - WAT ER NOG IN MOET, als lijstje met het stapnummer.
+    const inv = sterkteInvoer();
+    const nogNodig = [
+        !(Number(inv.qk) > 0) && 'de lijnlast bij stap 1',
+        !(Number(inv.gammaQ) > 0 && Number(inv.gammaM0) > 0) && 'de veiligheidsfactoren bij stap 2 (druk op de knop)',
+        !(Number(inv.dMax) > 0) && 'de toegestane doorbuiging bij stap 3',
+    ].filter(Boolean);
+    if (nogNodig.length) {
+        const k = kaart(kleur[S.ONVOLDOENDE_GEGEVENS]);
+        k.append(regel('Vul nog in', 'font-weight:600'));
+        for (const n of nogNodig) k.append(regel('• ' + n));
+        inhoud.append(k);
+        return;
+    }
+
+    // DE UITSLAG. Eerst een samenvatting, dan per controle één zin met een
+    // balk; de formules achter "Hoe berekend?".
+    const telling = (st) => rijen.filter(r => r.status === st).length;
+    const kop = kaart('#888');
+    kop.append(regel([
+        telling(S.VOLDOET) && `${telling(S.VOLDOET)} voldoen`,
+        telling(S.VOLDOET_NIET) && `${telling(S.VOLDOET_NIET)} voldoen niet`,
+        telling(S.ONVOLDOENDE_GEGEVENS) && `${telling(S.ONVOLDOENDE_GEGEVENS)} missen gegevens`,
+        telling(S.CONSTRUCTEUR) && `${telling(S.CONSTRUCTEUR)} voor de constructeur`,
+    ].filter(Boolean).join(' · '), 'font-weight:600'));
+    inhoud.append(kop);
+
+    const volgorde = [S.VOLDOET_NIET, S.VOLDOET, S.ONVOLDOENDE_GEGEVENS, S.CONSTRUCTEUR];
+    const komma = (v) => String(v).replace('.', ',');
+    for (const r of [...rijen].sort((x, y) => volgorde.indexOf(x.status) - volgorde.indexOf(y.status))) {
+        const k = kaart(kleur[r.status]);
+        const titel = regel('');
+        const chip = document.createElement('b');
+        chip.style.color = kleur[r.status];
+        chip.textContent = r.status === S.VOLDOET ? '✓ ' : r.status === S.VOLDOET_NIET ? '✗ '
+            : r.status === S.ONVOLDOENDE_GEGEVENS ? '? ' : '⚑ ';
+        titel.append(chip, r.naam.replace(/ - indicatie$/, ''));
+        k.append(titel);
+
+        const ex = r.exact || {};
+        const ed = ex.MEd ?? ex.Ed ?? ex.f;
+        const rd = ex.MRd ?? ex.Rd ?? ex.FwRd;
+        const deel = Number.isFinite(ed) && rd > 0 ? ed / rd
+            : (Number(r.grens) > 0 ? Number(r.waarde) / Number(r.grens) : null);
+        if (deel !== null && Number.isFinite(deel)) {
+            const pct = Math.round(deel * 100);
+            k.append(regel(r.eenheid === 'mm'
+                ? `Buigt ${komma(r.waarde)} mm door; toegestaan is ${komma(r.grens)} mm (${pct} %).`
+                : `Gebruikt ${pct} % van wat toegestaan is (${komma(r.waarde)} van ${komma(r.grens)} ${r.eenheid}).`));
+            const balk = document.createElement('div');
+            balk.style.cssText = 'height:6px;background:rgba(127,127,127,0.25);border-radius:3px;margin:4px 0';
+            const vul = document.createElement('div');
+            vul.style.cssText = `height:6px;border-radius:3px;width:${Math.min(100, pct)}%;background:${kleur[r.status]}`;
+            balk.append(vul);
+            k.append(balk);
+        } else {
+            // Geen getal tegen een grens: de eerste zin van de toelichting.
+            k.append(regel((r.toelichting || '').split(/(?<=\.)\s/)[0], 'font-size:0.92em'));
         }
-        const t = document.createElement('div');
-        t.className = 'hint';
-        t.textContent = r.toelichting;
-        blok.append(t);
-        if (r.voorstel) {
-            const v = document.createElement('div');
-            v.textContent = 'Voorstel: ' + r.voorstel;
-            blok.append(v);
-        }
-        // EEN KLIK OM HET TOE TE PASSEN, en dan opnieuw bouwen en rekenen.
+        if (r.voorstel) k.append(regel('Voorstel: ' + r.voorstel));
         for (const a of r.acties || []) {
-            const knop = document.createElement('button');
-            knop.type = 'button';
-            knop.className = 'sterkteActie';
-            knop.textContent = a.soort === 'profiel'
+            k.append(knop(a.soort === 'profiel'
                 ? `Toepassen: ${a.rol} ${a.profiel.englishLabel || a.profiel.label}`
-                : `Toepassen: staanderafstand ${a.waarde} mm`;
-            knop.addEventListener('click', () => pasSterkteVoorstelToe(a));
-            blok.append(knop);
+                : `Toepassen: staanderafstand ${a.waarde} mm`, () => pasSterkteVoorstelToe(a)));
         }
-        inhoud.append(blok);
+        if (r.toelichting) {
+            const hoe = document.createElement('details');
+            const sam = document.createElement('summary');
+            sam.textContent = 'Hoe berekend?';
+            sam.style.cssText = 'cursor:pointer;font-size:0.9em;opacity:0.8';
+            const t = regel(r.toelichting);
+            t.className = 'hint';
+            hoe.append(sam, t);
+            k.append(hoe);
+        }
+        inhoud.append(k);
     }
     const bron = sterkteEl('bronQk') && sterkteEl('bronQk').value.trim();
     const slot = document.createElement('p');
@@ -2495,7 +2574,10 @@ async function ncBestanden(meld = () => {}) {
                      materiaal: bom[i].materiaal, profielNaam: d.profiel.englishLabel || d.profiel.label,
                      aantal: u.aantal, zaaglengte: bom[i].zaaglengte, positie: bom[i].positie, soort: d.soort });
     }
-    if (!lijst.length) throw new Error('er zijn geen gezaagde profielen in dit model');
+    if (!lijst.length) {
+        throw new Error('dit model heeft geen echte profielen. Kies ze in het tabblad Profielen '
+            + '(of laad een voorbeeld, zoals "Industriële leuning") en bouw opnieuw');
+    }
     const { bestanden, verslag } = await ncVoorOnderdelen(lijst, ncSleutel(), meld);
     return [...bestanden, { naam: 'nc/VERSLAG.txt', data: [
         'DSTV-NC via MvL Progress (cadapi.mvlprogress.nl).',
@@ -2510,6 +2592,11 @@ document.getElementById('ncKnop')?.addEventListener('click', async () => {
     const knop = document.getElementById('ncKnop');
     if (!laatsteOnderdelen || !laatsteOnderdelen.length) {
         statusEl.textContent = 'Genereer eerst een balustrade of een trap.';
+        return;
+    }
+    if (laatsteOnderdelen.every(u => !u.deel.profiel)) {
+        statusEl.textContent = 'Dit model heeft geen echte profielen: kies ze in het tabblad Profielen '
+            + '(of laad een voorbeeld) en bouw opnieuw.';
         return;
     }
     if (!ncSleutel()) {
@@ -2784,9 +2871,18 @@ export async function maakProductiepakket(meld = () => {}) {
         if (nc) bestanden.push({ naam: 'nc1/' + bestandsnaam(u.nummer).replace(/\.stp$/, '.nc1'), data: nc });
         else ncNiet.push(`${bom[i].positie}  ${u.deel.soort}: ${waaromGeenNc1(u)}`);
     }
+    // Heeft NIETS een profiel (de standaardbalustrade), dan bovenaan wat je
+    // moet doen - en niet alleen per onderdeel "geen profiel uit de catalogus".
+    const geenEnkelProfiel = laatsteOnderdelen.every(u => !u.deel.profiel);
     bestanden.push({ naam: 'nc1/LEESMIJ.txt', data: [
         'DSTV-NC1 voor de zaagstraat.',
         '',
+        ...(geenEnkelProfiel ? [
+            'LET OP: dit model heeft geen echte profielen, dus er zijn geen NC-bestanden.',
+            'Kies in het tabblad Profielen een profiel voor de staander, de handregel en de',
+            'spijlen (of laad een voorbeeld, zoals "Industriele leuning") en maak het pakket opnieuw.',
+            '',
+        ] : []),
         'Alleen buizen, kokers en rond staf met rechte koppen en zonder bewerking.',
         'Controleer elk bestand in een NC1-viewer voor het op de machine gaat.',
         '',
