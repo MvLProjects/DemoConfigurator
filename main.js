@@ -3967,7 +3967,7 @@ chatInvoer.addEventListener('keydown', (e) => {
 });
 
 /**
- * De voorbeeldzinnen onder "Opdracht in woorden". Elk is een knop: één tik
+ * De voorbeeldzinnen onder "Of zeg het in woorden" (tabblad Voorbeelden). Elk is een knop: één tik
  * voert hem uit. Geëxporteerd, zodat de zelftest kan nagaan dat elke zin ook
  * echt begrepen wordt - een voorbeeld dat een foutmelding geeft is erger dan
  * geen voorbeeld.

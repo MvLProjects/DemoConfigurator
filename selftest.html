@@ -11716,6 +11716,13 @@ try {
         check('bij spijlen: de spijlvelden terug, de knieregelhoogte weg',
             zichtbaar('p_spijlBreedte') && zichtbaar('p_spijlOverstek') && !zichtbaar('p_knieregelHoogte'));
         zet(bpOud);
+        // MINDER TABBLADEN: de tekening hoort bij wat je eruit haalt, de zin
+        // bij de andere snelle start. Elf werd negen.
+        check('9 tabbladen: Tekening staat onder Resultaat, de zin onder Voorbeelden',
+            doc.querySelectorAll('#tabs .tabknop').length === 9
+            && doc.getElementById('k_maak').closest('details.groep').dataset.icoon === 'resultaat'
+            && doc.getElementById('chatInvoer').closest('details.groep').dataset.icoon === 'voorbeeld',
+            [...doc.querySelectorAll('#tabs .tabknop')].map(t => t.textContent.trim()).join('|'));
         check('het startvenster legt de drie stappen uit en wijst naar de voorbeelden',
             doc.querySelectorAll('#startDialoog .start_stappen li').length === 3
             && !!doc.getElementById('startVoorbeelden'));

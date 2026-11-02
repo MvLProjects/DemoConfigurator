@@ -1432,7 +1432,7 @@
             <button id="offerte" class="primair">Offerte (PDF)</button>
             <p class="hint">Eén blad voor de klant: het model, de keuzes en maten,
                de onderdelen en een prijsindicatie. Bedrijf, opdracht en nummer
-               komen uit het tabblad Tekening. De prijs is een schatting met een
+               komen uit "Tekening: printen of als PDF" hieronder. De prijs is een schatting met een
                prijs per kilo voor een afgewerkte constructie; zie tarieven.json.</p>
         </div>
 
@@ -1454,6 +1454,43 @@
              dat niet. Daarom staat er een bereik en geen bedrag, en daarom
              staat er bij elke post waar het getal vandaan komt. Zie
              tarieven.json en kosten.js. -->
+
+        <!-- Het tekeningkader. De gegevens hiervoor kent de app niet uit zichzelf:
+             een opdrachtnummer of een tekenaar staat nergens in de geometrie. -->
+        <details class="subgroep" id="tekeningVak">
+            <summary>Tekening: printen of als PDF</summary>
+            <p class="hint" style="margin-top:0">Zet het model, de stuklijst en een
+               titelblok op een blad om te printen of als PDF te bewaren.</p>
+            <div class="veld"><label for="k_blad">bladformaat</label>
+                <select id="k_blad">
+                    <option value="A4">A4 liggend</option>
+                    <option value="A3">A3 liggend</option>
+                </select></div>
+            <div class="veld"><label for="k_opdracht">opdracht</label>
+                <input type="text" id="k_opdracht" autocomplete="off"></div>
+            <div class="veld"><label for="k_nummer">tek.nummer</label>
+                <input type="text" id="k_nummer" autocomplete="off"></div>
+            <div class="veld"><label for="k_omschrijving">omschrijving</label>
+                <input type="text" id="k_omschrijving" autocomplete="off"></div>
+            <div class="veld"><label for="k_getekend">getekend door</label>
+                <input type="text" id="k_getekend" autocomplete="off"></div>
+
+            <details class="subgroep">
+                <summary>bedrijfsgegevens en logo</summary>
+                <label for="k_bedrijf" style="font-size:11px;color:#7a838c">
+                    naam en adres, zoals het in het titelblok moet staan</label>
+                <textarea id="k_bedrijf" rows="4" class="breed"></textarea>
+                <div class="veld"><label for="k_logo">logo</label>
+                    <input type="file" id="k_logo" accept="image/*"></div>
+                <p class="hint">Een PNG of SVG. Blijft in deze browser bewaard,
+                   net als een configuratie.</p>
+                <button id="k_logoWis" class="wis" title="logo weghalen">logo weghalen</button>
+            </details>
+
+            <button id="k_maak" class="primair">Tekening maken</button>
+            <p class="hint">Opent het blad in een nieuw venster. Daar kun je het
+               printen of met "Opslaan als PDF" bewaren.</p>
+        </details>
     </details>
 
     <!-- KOSTEN OP EEN EIGEN TABBLAD, en niet onderaan het resultaat. Het stond
@@ -1593,43 +1630,6 @@
         </details>
     </details>
 
-    <!-- Het tekeningkader. De gegevens hiervoor kent de app niet uit zichzelf:
-         een opdrachtnummer of een tekenaar staat nergens in de geometrie. -->
-    <details class="groep" data-icoon="tekening">
-        <summary>Tekening</summary>
-        <p class="hint" style="margin-top:0">Zet het model, de stuklijst en een
-           titelblok op een blad om te printen of als PDF te bewaren.</p>
-        <div class="veld"><label for="k_blad">bladformaat</label>
-            <select id="k_blad">
-                <option value="A4">A4 liggend</option>
-                <option value="A3">A3 liggend</option>
-            </select></div>
-        <div class="veld"><label for="k_opdracht">opdracht</label>
-            <input type="text" id="k_opdracht" autocomplete="off"></div>
-        <div class="veld"><label for="k_nummer">tek.nummer</label>
-            <input type="text" id="k_nummer" autocomplete="off"></div>
-        <div class="veld"><label for="k_omschrijving">omschrijving</label>
-            <input type="text" id="k_omschrijving" autocomplete="off"></div>
-        <div class="veld"><label for="k_getekend">getekend door</label>
-            <input type="text" id="k_getekend" autocomplete="off"></div>
-
-        <details class="subgroep">
-            <summary>bedrijfsgegevens en logo</summary>
-            <label for="k_bedrijf" style="font-size:11px;color:#7a838c">
-                naam en adres, zoals het in het titelblok moet staan</label>
-            <textarea id="k_bedrijf" rows="4" class="breed"></textarea>
-            <div class="veld"><label for="k_logo">logo</label>
-                <input type="file" id="k_logo" accept="image/*"></div>
-            <p class="hint">Een PNG of SVG. Blijft in deze browser bewaard,
-               net als een configuratie.</p>
-            <button id="k_logoWis" class="wis" title="logo weghalen">logo weghalen</button>
-        </details>
-
-        <button id="k_maak" class="primair">Tekening maken</button>
-        <p class="hint">Opent het blad in een nieuw venster. Daar kun je het
-           printen of met "Opslaan als PDF" bewaren.</p>
-    </details>
-
     <details class="groep" data-icoon="instellingen">
         <summary>Instellingen</summary>
         <div id="instellingen">
@@ -1695,19 +1695,6 @@
         </div>
     </details>
 
-    <details class="groep" data-icoon="chat">
-        <summary>Opdracht in woorden</summary>
-        <div id="chat">
-            <p class="hint">Typ wat je wilt. De zin wordt omgezet naar maten en
-               instellingen; het model wordt daarna exact berekend.</p>
-            <div id="chatLog"></div>
-            <div id="chatRij">
-                <input type="text" id="chatInvoer" autocomplete="off"
-                       placeholder="maak een kubus van 300 mm">
-                <button id="chatVerstuur">Ga</button>
-            </div>
-        </div>
-    </details>
 
     <!-- Kant-en-klare ontwerpen, met een plaatje erbij: zien wat je krijgt
          voordat je klikt. Gevuld vanuit voorbeelden.js. De plaatjes staan in
@@ -1718,6 +1705,17 @@
             <p class="hint">Klik op een voorbeeld: de maten komen in het paneel
                en het model wordt gebouwd. Daarna kun je alles aanpassen.</p>
             <div id="voorbeeldKaarten"></div>
+        </div>
+        <div id="chat">
+            <h4 style="margin:14px 0 4px">Of zeg het in woorden</h4>
+            <p class="hint">Typ wat je wilt. De zin wordt omgezet naar maten en
+               instellingen; het model wordt daarna exact berekend.</p>
+            <div id="chatLog"></div>
+            <div id="chatRij">
+                <input type="text" id="chatInvoer" autocomplete="off"
+                       placeholder="maak een kubus van 300 mm">
+                <button id="chatVerstuur">Ga</button>
+            </div>
         </div>
     </details>
     </div>
