@@ -2875,6 +2875,23 @@ export async function maakOfferteBlad() {
 }
 
 /**
+ * De sterkte op de offerte, als één regel - alleen als er echt gerekend is
+ * (profielen en een duwkracht). Nooit "veilig": wat de rekenhulp zegt, en dat
+ * het geen keuring is. Te zwak staat er ook, want dat verandert de prijs.
+ */
+function offerteSterkte() {
+    const b = huidigeMaten();
+    if (b.vulling === 'glasvrij' || !b.staanderProfiel || !b.handregelProfiel
+        || !(Number(sterkteInvoer().qk) > 0)) return [];
+    let rijen = null;
+    try { rijen = sterkteNu(); } catch (err) { console.error(err); }
+    const S = sterkte.STATUS;
+    if (!rijen || !rijen.some(r => r.status === S.VOLDOET || r.status === S.VOLDOET_NIET)) return [];
+    return [['Sterkte', rijen.some(r => r.status === S.VOLDOET_NIET)
+        ? 'rekenhulp: nog niet in orde' : 'rekenhulp: in orde, geen keuring']];
+}
+
+/**
  * De keuzes zoals een klant ze leest: wat het is, hoe groot, van wat. Uit het
  * paneel, dus dezelfde waarden waarmee net gebouwd is.
  */
@@ -2934,6 +2951,7 @@ function offerteKeuzes() {
             ...(b.schoprand ? [['Schoprand', '100 mm, langs de vloer']] : []),
             ...leuningExtra,
             ['Afwerking', afwerking],
+            ...offerteSterkte(),
         ];
     }
 

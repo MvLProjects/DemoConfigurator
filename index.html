@@ -654,6 +654,12 @@
         #main { flex-direction: column; }
         #viewport { order: -1; flex: 0 0 44vh; }
         #panel { flex: 1 1 auto; border-right: 0; border-top: 1px solid #dde3ea; }
+        /* Eén ding per regel past hier toch maar; dan over de hele breedte in
+           plaats van 250 px met een derde leeg ernaast. */
+        .groep > *, .subgroep > *, #trapVak > * { flex: 1 1 100%; }
+        .groep > .hint, .subgroep > .hint, #trapVak > .hint { max-width: none; }
+        /* Met de ruimte die er nu is: een keuzelijst die zijn keuze laat zien. */
+        #panel select { width: auto; max-width: 60%; }
         #startDialoog { max-width: calc(100vw - 32px); box-sizing: border-box;
                         padding: 18px 16px 18px; }
         .start_keuze { flex-direction: column; }

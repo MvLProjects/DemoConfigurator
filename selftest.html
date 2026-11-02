@@ -10906,6 +10906,19 @@ try {
                 !/mislukt/.test(bcStatus.textContent) && bcStatus.textContent !== ''
                 && errors.length === voor,
                 bcStatus.textContent.slice(0, 60) + ' ' + errors.slice(voor).join(' | '));
+            // DE STERKTE OP DE OFFERTE: bij een balustrade met profielen en
+            // een duwkracht één regel, nooit "veilig"; zonder duwkracht geen.
+            if (v.id === 'industrieel-balk') {
+                const sVoor = mainMod.sterkteInstellingen();
+                mainMod.zetSterkteInstellingen({});
+                const zonder = new TextDecoder('latin1').decode(await mainMod.maakOfferteBlad());
+                mainMod.zetSterkteInstellingen({ gebruik: 'woning', qk: '0.5' });
+                const met = new TextDecoder('latin1').decode(await mainMod.maakOfferteBlad());
+                check('offerte: zonder duwkracht geen sterkteregel, met wel - als rekenhulp, nooit "veilig"',
+                    !/\(rekenhulp: /.test(zonder) && /\(rekenhulp: (in orde, geen keuring|nog niet in orde)\)/.test(met)
+                    && !/veilig/i.test(met), (met.match(/\(rekenhulp[^)]*\)/) || ['geen regel'])[0]);
+                mainMod.zetSterkteInstellingen(sVoor);
+            }
         }
         doc.getElementById('t_soort').value = 'recht';
 
