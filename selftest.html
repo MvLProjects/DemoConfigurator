@@ -11686,6 +11686,9 @@ try {
         check('bij spijlen: de spijlvelden terug, de knieregelhoogte weg',
             zichtbaar('p_spijlBreedte') && zichtbaar('p_spijlOverstek') && !zichtbaar('p_knieregelHoogte'));
         zet(bpOud);
+        check('het startvenster legt de drie stappen uit en wijst naar de voorbeelden',
+            doc.querySelectorAll('#startDialoog .start_stappen li').length === 3
+            && !!doc.getElementById('startVoorbeelden'));
         check('er is een knop "Opnieuw" naast Terug, en het paneel heeft stappen',
             !!doc.getElementById('opnieuwKnop') && doc.querySelectorAll('#panel .stap').length >= 3);
         const bpStatus = doc.getElementById('status');

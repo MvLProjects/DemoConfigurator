@@ -1079,6 +1079,11 @@ document.getElementById('startTrap')
     .addEventListener('click', () => kiesStart('Trap'));
 document.getElementById('startBalustrade')
     .addEventListener('click', () => kiesStart('Balustrade'));
+// "Of bekijk eerst de voorbeelden": naar de kant-en-klare ontwerpen.
+document.getElementById('startVoorbeelden')?.addEventListener('click', () => {
+    startDialoog.close();
+    openGroep('Voorbeelden');
+});
 
 // Escape of buiten klikken sluit het venster ook; dan blijft het staan zoals de
 // pagina begint, met Balustrade open. Geen keuze is dus ook een keuze, en geen
