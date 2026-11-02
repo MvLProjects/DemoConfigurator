@@ -1995,7 +1995,21 @@ function toonOnderdelen(lijst, boom) {
 // Een rekenhulp, geen keuring: zie sterkte.js. De invoer (belasting, factoren,
 // doorbuigingsgrens) is van de gebruiker en wordt per browser onthouden - het
 // is projectgegeven, geen ontwerp.
-const STERKTE_VELDEN = ['qk', 'bronQk', 'Qk', 'gammaQ', 'gammaM0', 'gammaM2', 'dMax', 'aLas', 'fy'];
+const STERKTE_VELDEN = ['gebruik', 'qk', 'bronQk', 'Qk', 'gammaQ', 'gammaM0', 'gammaM2', 'dMax', 'aLas', 'fy'];
+
+// DE PLEK KIEZEN IN PLAATS VAN EEN GETAL. De officiële tabel (NEN-EN 1991-1-1
+// NB, bijlage NB.A) is niet openbaar; deze waarden zijn die van een
+// leverancier (UNIQ Balustrades), en dat staat er bij. Bij een woning noemen
+// bronnen 0,3 en 0,5 kN/m; de hoogste is genomen. Voor een echte opdracht het
+// getal van de constructeur ("zelf invullen").
+const GEBRUIK_LAST = {
+    woning: { qk: 0.5, tekst: 'woning' },
+    gedeeld: { qk: 0.5, tekst: 'gedeelde ruimte in een woongebouw' },
+    kantoor: { qk: 0.8, tekst: 'kantoor of winkel' },
+    publiek: { qk: 3.0, tekst: 'school, sporthal, theater' },
+};
+const GEBRUIK_BRON = 'indicatie volgens leverancier UNIQ Balustrades, niet de officiële NB-tabel '
+    + '- laat je constructeur het bevestigen';
 const ANKER_VELDEN = ['plaat', 'fck', 'h', 'c', 'd', 'hef', 'tauRk', 'NRks', 'VRks', 'k1', 'ccr',
                       'gammaMs', 'gammaMp', 'gammaMc', 'hmin', 'cmin'];
 const ankerEl = (n) => document.getElementById('a_' + n);
@@ -2006,7 +2020,25 @@ try {
     for (const n of STERKTE_VELDEN) if (bewaard[n] !== undefined && sterkteEl(n)) sterkteEl(n).value = bewaard[n];
     for (const n of ANKER_VELDEN) if (bewaard['a_' + n] !== undefined && ankerEl(n)) ankerEl(n).value = bewaard['a_' + n];
 } catch { /* geen opslag: dan maar leeg */ }
-const sterkteInvoer = () => Object.fromEntries(STERKTE_VELDEN.map(n => [n, sterkteEl(n) ? sterkteEl(n).value : '']));
+// Leeg bij de factoren = de aanbevolen Eurocode-waarden (zie het paneel).
+const sterkteInvoer = () => {
+    const ruw = Object.fromEntries(STERKTE_VELDEN.map(n => [n, sterkteEl(n) ? sterkteEl(n).value : '']));
+    const A = sterkte.AANBEVOLEN_FACTOREN;
+    for (const n of ['gammaQ', 'gammaM0', 'gammaM2']) if (!(Number(ruw[n]) > 0)) ruw[n] = A[n].waarde;
+    return ruw;
+};
+sterkteEl('gebruik')?.addEventListener('change', () => {
+    const g = GEBRUIK_LAST[sterkteEl('gebruik').value];
+    const uitleg = document.getElementById('s_gebruikUitleg');
+    if (g) {
+        sterkteEl('qk').value = g.qk;
+        sterkteEl('bronQk').value = `${g.tekst}: ${GEBRUIK_BRON}`;
+        if (uitleg) uitleg.textContent = `${String(g.qk).replace('.', ',')} kN per meter - ${GEBRUIK_BRON}.`;
+    } else if (uitleg) {
+        uitleg.textContent = 'Vul het getal van je constructeur in bij "duwkracht", met de bron erbij.';
+    }
+    sterkteEl('qk').dispatchEvent(new Event('input'));
+});
 const ankerInvoer = () => Object.fromEntries(ANKER_VELDEN.map(n => [n, ankerEl(n) ? ankerEl(n).value : '']));
 const bewaarSterkte = () => {
     const alles = { ...sterkteInvoer(),
@@ -2065,6 +2097,23 @@ function pasSterkteVoorstelToe(a) {
     werkConfiguratiesBij();
     if (!genereerKnop.disabled) genereerKnop.click();
 }
+
+// De controles als een vraag in gewone woorden.
+const VRAAG_VAN = (naam) => [
+    [/^Staander/, 'is de staander sterk genoeg?'],
+    [/^Las/, 'houdt de las tussen staander en voetplaat?'],
+    [/^Handregel/, 'is de handregel sterk genoeg?'],
+    [/^Doorbuiging/, 'buigt de handregel niet te ver door?'],
+    [/staalbreuk op trek/, 'breekt de ankerstaaf niet?'],
+    [/uittrekken/, 'blijft het anker in het beton zitten?'],
+    [/kegeluitbraak/, 'breekt er geen stuk beton uit?'],
+    [/staalbreuk op afschuiving/, 'schuift het anker niet af?'],
+    [/ETA-voorwaarden/, 'is het beton dik genoeg en de rand ver genoeg?'],
+    [/^Ankers/, 'houden de ankers?'],
+    [/Voetplaat/, 'voetplaat en dunne buizen'],
+    [/Slingerproef/, 'de slingerproef (iemand die er hard tegenaan valt)'],
+    [/randbreuk/, 'betonrand, splijten'],
+].find(([re]) => re.test(naam))?.[1] || naam;
 
 function toonSterkte() {
     const inhoud = document.getElementById('sterkteInhoud');
@@ -2125,15 +2174,11 @@ function toonSterkte() {
 
     // STAP 2 - WAT ER NOG IN MOET, als lijstje met het stapnummer.
     const inv = sterkteInvoer();
-    const nogNodig = [
-        !(Number(inv.qk) > 0) && 'de lijnlast bij stap 1',
-        !(Number(inv.gammaQ) > 0 && Number(inv.gammaM0) > 0) && 'de veiligheidsfactoren bij stap 2 (druk op de knop)',
-        !(Number(inv.dMax) > 0) && 'de toegestane doorbuiging bij stap 3',
-    ].filter(Boolean);
-    if (nogNodig.length) {
+    if (!(Number(inv.qk) > 0)) {
         const k = kaart(kleur[S.ONVOLDOENDE_GEGEVENS]);
-        k.append(regel('Vul nog in', 'font-weight:600'));
-        for (const n of nogNodig) k.append(regel('• ' + n));
+        k.append(regel('Nog één ding', 'font-weight:600'),
+            regel('Kies bij stap 1 waar de balustrade komt (woning, kantoor, school...). '
+                + 'Dan rekent de app alles uit.'));
         inhoud.append(k);
         return;
     }
@@ -2141,13 +2186,12 @@ function toonSterkte() {
     // DE UITSLAG. Eerst een samenvatting, dan per controle één zin met een
     // balk; de formules achter "Hoe berekend?".
     const telling = (st) => rijen.filter(r => r.status === st).length;
-    const kop = kaart('#888');
-    kop.append(regel([
-        telling(S.VOLDOET) && `${telling(S.VOLDOET)} voldoen`,
-        telling(S.VOLDOET_NIET) && `${telling(S.VOLDOET_NIET)} voldoen niet`,
-        telling(S.ONVOLDOENDE_GEGEVENS) && `${telling(S.ONVOLDOENDE_GEGEVENS)} missen gegevens`,
-        telling(S.CONSTRUCTEUR) && `${telling(S.CONSTRUCTEUR)} voor de constructeur`,
-    ].filter(Boolean).join(' · '), 'font-weight:600'));
+    const teZwak = telling(S.VOLDOET_NIET);
+    const kop = kaart(teZwak ? kleur[S.VOLDOET_NIET] : kleur[S.VOLDOET]);
+    kop.append(regel(teZwak
+        ? `${teZwak} ${teZwak === 1 ? 'onderdeel is' : 'onderdelen zijn'} te zwak - zie de voorstellen hieronder.`
+        : 'Alles wat de app kan uitrekenen is in orde.', 'font-weight:600'),
+        regel('Laat de constructie altijd ook door een constructeur beoordelen.', 'font-size:0.9em;opacity:0.85'));
     inhoud.append(kop);
 
     const volgorde = [S.VOLDOET_NIET, S.VOLDOET, S.ONVOLDOENDE_GEGEVENS, S.CONSTRUCTEUR];
@@ -2157,9 +2201,9 @@ function toonSterkte() {
         const titel = regel('');
         const chip = document.createElement('b');
         chip.style.color = kleur[r.status];
-        chip.textContent = r.status === S.VOLDOET ? '✓ ' : r.status === S.VOLDOET_NIET ? '✗ '
-            : r.status === S.ONVOLDOENDE_GEGEVENS ? '? ' : '⚑ ';
-        titel.append(chip, r.naam.replace(/ - indicatie$/, ''));
+        chip.textContent = r.status === S.VOLDOET ? '✓ Goed - ' : r.status === S.VOLDOET_NIET ? '✗ Te zwak - '
+            : r.status === S.ONVOLDOENDE_GEGEVENS ? '? Nog niet te beoordelen - ' : '⚑ Laat een constructeur kijken - ';
+        titel.append(chip, VRAAG_VAN(r.naam));
         k.append(titel);
 
         const ex = r.exact || {};
