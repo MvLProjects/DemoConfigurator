@@ -11723,6 +11723,41 @@ try {
             && doc.getElementById('k_maak').closest('details.groep').dataset.icoon === 'resultaat'
             && doc.getElementById('chatInvoer').closest('details.groep').dataset.icoon === 'voorbeeld',
             [...doc.querySelectorAll('#tabs .tabknop')].map(t => t.textContent.trim()).join('|'));
+        // GEBRUIKSVRIENDELIJK: een maat zegt zijn eenheid, het lege beeld zegt
+        // wat je moet doen, en de randkeuze-melding staat er alleen als er
+        // een rand gekozen is.
+        const mmVak = doc.getElementById('p_hoogte').parentElement;
+        check('de maten tonen "mm" in het vak; "bordes na stap" niet',
+            mmVak.classList.contains('metEenheid') && mmVak.dataset.eenheid === 'mm'
+            && !doc.getElementById('t_bordesNa').parentElement.classList.contains('metEenheid')
+            && doc.getElementById('p_hoogte').closest('.veld') !== null);
+        // PROFIELEN: eerst kiezen, dan pas bewaren; en de knopjes zijn
+        // knopjes - "#panel button { width: 100% }" rekte ze uit tot balken
+        // en drukte het naamveld bij Bewaar weg.
+        const pfGroep = doc.getElementById('kies_staander').closest('details.groep');
+        const pfOud = pfGroep.open;
+        pfGroep.open = true;
+        doc.getElementById('cfgVak').open = true;
+        await sleep(30);
+        check('Profielen: de keuzes staan vóór het bewaren, en de knopjes zijn smal',
+            !!(doc.getElementById('kies_staander').compareDocumentPosition(doc.getElementById('cfg_keuze'))
+               & Node.DOCUMENT_POSITION_FOLLOWING)
+            && doc.getElementById('kies_staander').offsetWidth < 90
+            && doc.getElementById('cfg_naam').offsetWidth > 60,
+            `kies ${doc.getElementById('kies_staander').offsetWidth} px, naamveld ${doc.getElementById('cfg_naam').offsetWidth} px`);
+        doc.getElementById('cfgVak').open = false;
+        pfGroep.open = pfOud;
+        const snel = [...doc.querySelectorAll('#snelVak [data-doel]')];
+        check('Resultaat begint met Downloaden: offerte, pakket en tekening, naar de echte knoppen',
+            doc.getElementById('snelVak').style.display === 'block' && snel.length === 3
+            && snel.every(k => !!doc.getElementById(k.dataset.doel))
+            && doc.getElementById('resultaatGroep').querySelector(':scope > div') === doc.getElementById('snelVak'),
+            snel.map(k => k.dataset.doel).join(','));
+        check('met een model in beeld is de hint "Nog geen model" weg',
+            doc.getElementById('leegBeeld').hidden === true);
+        const esEl = doc.getElementById('edgeStatus');
+        check('"Geen rand geselecteerd" staat er alleen als er een rand gekozen is',
+            esEl.classList.contains('on') || win.getComputedStyle(esEl).display === 'none');
         check('het startvenster legt de drie stappen uit en wijst naar de voorbeelden',
             doc.querySelectorAll('#startDialoog .start_stappen li').length === 3
             && !!doc.getElementById('startVoorbeelden'));

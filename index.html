@@ -108,6 +108,27 @@
                   border-radius: 10px; background: #eef1f4; color: #55606a;
                   white-space: nowrap; }
     #edgeStatus.on { background: #ff8a2b; color: #fff; }
+    /* "Geen rand geselecteerd" zegt niets tegen wie geen rand zoekt: alleen
+       tonen als er iets geselecteerd is. */
+    #edgeStatus:not(.on) { display: none; }
+    /* DE EENHEID IN HET VAK, rechts, zodat de velden in één kolom blijven.
+       Het vak wordt smaller zodat het geheel even breed blijft (72 + 12). */
+    .metEenheid { position: relative; display: inline-block; }
+    .metEenheid::after { content: attr(data-eenheid); position: absolute; right: 6px;
+        top: 50%; transform: translateY(-50%); font-size: 11px; color: #8a939b;
+        pointer-events: none; }
+    #panel .metEenheid input[type=number] { width: 50px; padding-right: 27px; }
+    #leegBeeld { position: absolute; inset: 0; display: flex; align-items: center;
+        justify-content: center; pointer-events: none; z-index: 1; }
+    #leegBeeld[hidden] { display: none; }
+    #leegBeeld .leegKaart { pointer-events: auto; background: #fff; border: 1px solid #dde3ea;
+        border-radius: 8px; padding: 18px 22px; max-width: 340px; text-align: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06); font-size: 13px; color: #333; }
+    #leegBeeld .leegKaart b:first-child { font-size: 15px; }
+    #leegBeeld .leegKaart p { margin: 8px 0 14px; color: #5a636c; }
+    #leegBeeld button { margin: 0 4px; padding: 6px 14px; font: inherit; cursor: pointer;
+        border: 1px solid #c6ccd2; border-radius: 4px; background: #fff; color: #333; }
+    #leegBeeld button.primair { background: #2d6cdf; border-color: #2d6cdf; color: #fff; }
     label { color: #4a555e; font-size: 13px; display: flex; gap: 5px;
             align-items: center; white-space: nowrap; }
 
@@ -290,6 +311,8 @@
        kolom. Naast elkaar zou in 236 px niet passen - dan wordt een stuklijst
        drie kolommen van 78 px. */
     #resultaatGroep > div { flex: 1 1 100%; min-width: 0; max-width: none; }
+    .snelRij { display: flex; flex-wrap: wrap; gap: 6px; }
+    #panel .snelRij button { width: auto; flex: 1 1 auto; margin-top: 0; padding: 6px 8px; }
     /* Een uitklapper BINNEN een groep, voor instellingen die er wel toe doen
        maar niet bij elke leuning. Bewust onopvallender dan een groepskop. */
     .subgroep > summary { font-size: 11px; color: #7a838c; cursor: pointer;
@@ -304,7 +327,7 @@
     /* De configuratiebalk: een keuzelijst over de volle breedte, met daaronder
        een naamveld en twee knoppen. Op één regel zou het naamveld tot niets
        worden samengedrukt - het paneel is maar 216 px breed. */
-    #panel select.breed { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+    #panel select.breed { width: 100%; max-width: none; box-sizing: border-box; margin-bottom: 6px; }
     #panel textarea.breed { width: 100%; box-sizing: border-box; margin-bottom: 6px;
                             padding: 4px 5px; font: inherit; resize: vertical;
                             border: 1px solid #c6ccd2; border-radius: 3px; }
@@ -314,6 +337,8 @@
     .cfg_rij { display: flex; gap: 5px; margin-bottom: 8px; }
     .cfg_rij input { flex: 1; min-width: 0; padding: 3px 5px; font: inherit;
                      border: 1px solid #c6ccd2; border-radius: 3px; }
+    #panel .cfg_rij button { width: auto; margin-top: 0; padding: 3px 10px; }
+    #panel .cfg_rij button.wis { color: #8c2b2b; }
 
     /* Het startscherm. */
     /* --- hulp vragen --- */
@@ -377,7 +402,9 @@
     /* Een vinkje rechts uitlijnen met de getalvelden erboven, anders staat hij
        los van de kolom. */
     #panel input[type=checkbox] { width: 72px; margin: 0; }
-    #panel select { width: 84px; padding: 3px 4px; font: inherit;
+    /* Breed genoeg om de keuze te lezen ("verticale spijlen", niet
+       "verticale s"), maar nooit breder dan de helft van het paneel. */
+    #panel select { width: auto; min-width: 84px; max-width: 140px; padding: 3px 4px; font: inherit;
                     border: 1px solid #c6ccd2; border-radius: 3px; background: #fff; }
     #panel button { width: 100%; margin-top: 10px; padding: 7px; font: inherit;
                     cursor: pointer; border: 1px solid #c6ccd2; border-radius: 4px;
@@ -503,8 +530,10 @@
     .profielrij > b { display: block; margin-top: 1px; font-weight: 600;
                       font-size: 11.5px; overflow-wrap: anywhere; }
     .profielrij > b.leeg { font-weight: 400; color: #949ca3; }
-    .profielrij button { width: auto; margin: 0; padding: 2px 8px; font-size: 11px; }
-    .profielrij button.wis { padding: 2px 7px; color: #8c2b2b; }
+    /* Met #panel ervoor: anders wint "#panel button { width: 100% }" en
+       worden de knopjes uitgerekte balken die het naamveld wegdrukken. */
+    #panel .profielrij button { width: auto; margin: 0; padding: 2px 8px; font-size: 11px; }
+    #panel .profielrij button.wis { padding: 2px 7px; color: #8c2b2b; }
     #stuklijstTabel tfoot td { font-weight: 600; border-top: 1px solid #dde3ea;
                                border-bottom: none; padding-top: 4px; }
     /* --- instellingen bewaren --- */
@@ -1152,40 +1181,6 @@
            profielcatalogus. Laat je er een leeg, dan wordt dat onderdeel een
            massief blok van de maat bij Balustrade.</p>
 
-        <!-- Bewaarde configuraties: de vijf keuzes die bij een werkplaats
-             meestal vastliggen, onder een naam. -->
-        <div class="veld"><label for="cfg_keuze">configuratie</label></div>
-        <select id="cfg_keuze" class="breed"></select>
-        <div class="cfg_rij">
-            <input type="text" id="cfg_naam" placeholder="naam om te bewaren"
-                   autocomplete="off">
-            <button id="cfg_bewaar" title="de huidige keuzes onder deze naam bewaren">Bewaar</button>
-            <button id="cfg_wis" class="wis" title="de gekozen configuratie verwijderen" disabled>×</button>
-        </div>
-        <p class="hint">Bewaart alle vier de profielen — staander, handregel,
-           spijl en trapboom — plus het trede-materiaal en de coatkleur. Blijft
-           in deze browser staan, dus niet in het instellingenbestand — dat is
-           voor één ontwerp.</p>
-
-        <!-- MIJN STANDAARD: niet een configuratie die je zelf een naam geeft,
-             maar wat de app van je afkeek. Zie gewoonten.js voor wat er geteld
-             wordt en waarom pas bij het bouwen.
-
-             Hij staat hier en niet bovenaan het paneel, vlak bij de
-             configuraties: het zijn twee antwoorden op dezelfde vraag - "zet
-             alles op wat wij altijd doen" - en dan horen ze bij elkaar te
-             staan in plaats van elkaar te beconcurreren vanaf twee plekken. -->
-        <div class="cfg_rij" style="margin-top:9px">
-            <button id="gw_toepassen" type="button"
-                    title="alle velden zetten op wat je het vaakst gebruikt"
-                    disabled>Mijn standaard</button>
-            <button id="gw_vergeet" type="button" class="wis"
-                    title="vergeten wat de app van je geleerd heeft"
-                    disabled>×</button>
-        </div>
-        <p class="hint" id="gw_hint">De app kijkt af wat je het vaakst kiest en
-           zet dat hier klaar. Nog niets geleerd — bouw eerst een paar keer
-           iets.</p>
         <!-- Naam op een EIGEN regel onder de knoppen. Het paneel is maar 188 px
              breed; zet je label, naam en twee knoppen op één regel, dan wordt de
              naam tot nul samengedrukt en zie je niet wat je gekozen hebt. -->
@@ -1213,6 +1208,47 @@
             </div>
             <b id="pr_spijl" class="leeg">— massief blok</b>
         </div>
+
+        <!-- EERST DE PROFIELEN, dan het bewaren. Dit stond andersom: wie hier
+             kwam om een buis te kiezen moest eerst langs configuraties en
+             "Mijn standaard" - dingen voor wie al vaker gebouwd heeft. -->
+        <details class="subgroep" id="cfgVak">
+            <summary>Keuzes bewaren en terughalen</summary>
+            <!-- Bewaarde configuraties: de vijf keuzes die bij een werkplaats
+                 meestal vastliggen, onder een naam. -->
+            <div class="veld"><label for="cfg_keuze">configuratie</label></div>
+            <select id="cfg_keuze" class="breed"></select>
+            <div class="cfg_rij">
+                <input type="text" id="cfg_naam" placeholder="naam om te bewaren"
+                       autocomplete="off">
+                <button id="cfg_bewaar" title="de huidige keuzes onder deze naam bewaren">Bewaar</button>
+                <button id="cfg_wis" class="wis" title="de gekozen configuratie verwijderen" disabled>×</button>
+            </div>
+            <p class="hint">Bewaart alle vier de profielen — staander, handregel,
+               spijl en trapboom — plus het trede-materiaal en de coatkleur. Blijft
+               in deze browser staan, dus niet in het instellingenbestand — dat is
+               voor één ontwerp.</p>
+
+            <!-- MIJN STANDAARD: niet een configuratie die je zelf een naam geeft,
+                 maar wat de app van je afkeek. Zie gewoonten.js voor wat er geteld
+                 wordt en waarom pas bij het bouwen.
+
+                 Hij staat hier en niet bovenaan het paneel, vlak bij de
+                 configuraties: het zijn twee antwoorden op dezelfde vraag - "zet
+                 alles op wat wij altijd doen" - en dan horen ze bij elkaar te
+                 staan in plaats van elkaar te beconcurreren vanaf twee plekken. -->
+            <div class="cfg_rij" style="margin-top:9px">
+                <button id="gw_toepassen" type="button"
+                        title="alle velden zetten op wat je het vaakst gebruikt"
+                        disabled>Mijn standaard</button>
+                <button id="gw_vergeet" type="button" class="wis"
+                        title="vergeten wat de app van je geleerd heeft"
+                        disabled>×</button>
+            </div>
+            <p class="hint" id="gw_hint">De app kijkt af wat je het vaakst kiest en
+               zet dat hier klaar. Nog niets geleerd — bouw eerst een paar keer
+               iets.</p>
+        </details>
     </details>
 
     <details class="groep" data-icoon="afwerking">
@@ -1388,6 +1424,18 @@
         <!-- De samenstellingsboom. Dezelfde onderdelen als in de lijsten
              hieronder, maar gegroepeerd zoals je ze in elkaar zet: een
              staander met zijn voetplaat, een vulveld als paneel. -->
+        <!-- DOWNLOADEN BOVENAAN. De offerte en het productiepakket stonden
+             onder de samenstelling, de stuklijst en de onderdelentabel: wie
+             alleen een offerte wil moest langs alles heen. Deze knoppen doen
+             hetzelfde als die verderop; zie main.js. -->
+        <div id="snelVak" style="display:none">
+            <h3>Downloaden</h3>
+            <div class="snelRij">
+                <button type="button" data-doel="offerte">Offerte (PDF)</button>
+                <button type="button" data-doel="productie">Productiepakket (ZIP)</button>
+                <button type="button" data-doel="k_maak">Tekening</button>
+            </div>
+        </div>
         <div id="boomVak">
             <h3>Samenstelling</h3>
             <p class="hint" style="margin-top:0">Hoe het in elkaar zit. Een
@@ -1721,6 +1769,17 @@
     </div>
 
     <div id="viewport">
+        <!-- HET LEGE BEELD zegt wat je moet doen, in plaats van een grijs vlak.
+             Weg zodra er een model staat; zie werkLeegBeeldBij in main.js. -->
+        <div id="leegBeeld">
+            <div class="leegKaart">
+                <b>Nog geen model</b>
+                <p>Vul links de maten in en druk op <b>Genereer</b>. Of begin met een
+                   kant-en-klaar ontwerp.</p>
+                <button type="button" id="leegGenereer" class="primair">Genereer</button>
+                <button type="button" id="leegVoorbeelden">Voorbeelden bekijken</button>
+            </div>
+        </div>
         <!-- BEZIG MET BOUWEN.
              De rekenkern werkt SYNCHROON op de hoofddraad: zolang hij bezig is
              tekent de browser niets. Een spinner die je met javascript
@@ -1805,7 +1864,8 @@
              zonder vaktermen. -->
         <ol class="start_stappen">
             <li><b>Maten.</b> Kies hierboven wat je maakt en vul de lengte en hoogte in.
-                Het model staat meteen in beeld.</li>
+                Druk op <b>Genereer</b> en het model staat in beeld; daarna past het zich
+                aan zodra je een maat verandert.</li>
             <li><b>Profielen.</b> Kies bij het tabblad Profielen de buis of koker voor de
                 staander en de handregel. Liever eerst kijken? Neem een kant-en-klaar
                 ontwerp bij <b>Voorbeelden</b>.</li>

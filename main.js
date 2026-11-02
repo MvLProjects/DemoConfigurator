@@ -1941,6 +1941,7 @@ function toonOnderdelen(lijst, boom) {
 
     if (!lijst || lijst.length === 0) {
         onderdelenVak.style.display = 'none';
+        document.getElementById('snelVak').style.display = 'none';
         heeftResultaat = false;
         werkTabsBij();
         return;
@@ -1986,6 +1987,7 @@ function toonOnderdelen(lijst, boom) {
             () => exporteerOnderdeel(Number(knop.dataset.nr)));
     }
     onderdelenVak.style.display = 'block';
+    document.getElementById('snelVak').style.display = 'block';
 
     // Hier en niet op vijf plekken: elke bouwer komt via toonOnderdelen langs,
     // dus de zaaglijst hoort niet apart aangeroepen te worden. Dat is precies
@@ -4822,6 +4824,7 @@ function toonVoorbeeld(delen, naam) {
     scene.remove(modelRoot);
     modelRoot = maakVoorbeeld(delen);
     scene.add(modelRoot);
+    werkLeegBeeldBij();
 
     // Randen horen bij een gebouwd model; die van de vorige bouw kloppen niet
     // meer bij wat er nu staat.
@@ -4895,6 +4898,7 @@ function showResult(result, fileName, materialen = null) {
         modelRoot.add(mesh);
     }
     scene.add(modelRoot);
+    werkLeegBeeldBij();
 
     const size = fitCameraToObject(modelRoot);
     statusEl.textContent =
@@ -5367,6 +5371,43 @@ function buildHighlight(points, radius) {
 // Zie openOntwerpUitLink.
 if (document.readyState === 'complete') openOntwerpUitLink();
 else window.addEventListener('load', openOntwerpUitLink);
+
+// De knoppen bovenaan Resultaat: dezelfde als verderop, zodat er maar één
+// stuk code is dat een offerte of pakket maakt.
+for (const knop of document.querySelectorAll('#snelVak [data-doel]')) {
+    knop.addEventListener('click', () => document.getElementById(knop.dataset.doel).click());
+}
+
+// --- het lege beeld en de eenheden ------------------------------------------
+// Zonder model zegt het beeld wat je moet doen. Na elke wissel van modelRoot
+// bijgewerkt (zie de aanroepen bij scene.add(modelRoot)).
+function werkLeegBeeldBij() {
+    const leeg = document.getElementById('leegBeeld');
+    if (leeg) leeg.hidden = modelRoot.children.length > 0;
+}
+werkLeegBeeldBij();
+document.getElementById('leegGenereer')?.addEventListener('click', () => {
+    (watStaatErIn() === 'trap' ? trapKnop : genereerKnop).click();
+});
+document.getElementById('leegVoorbeelden')?.addEventListener('click', () => openGroep('Voorbeelden'));
+
+// DE EENHEID BIJ DE MAAT. "hoogte 1000" - millimeter of centimeter? In het
+// vak zelf, zodat de velden in één kolom blijven staan. Alleen de velden die
+// echt in mm zijn; "bordes na stap" is een aantal.
+const MM_VELDEN = ['p_lengte', 'p_hoogte', 'p_spijlBreedte', 'p_maxDoorgang', 'p_staanderBreedte',
+    'p_handregelHoogte', 'p_maxStaanderAfstand', 'p_sierpuntHoogte', 'p_spijlOverstek',
+    'p_handregelOverstek', 'p_voetplaatDikte', 'p_knieregelHoogte', 'p_stripBreedte', 'p_paalkapDikte',
+    'p_hoogteverschil', 'p_verschuiving', 't_hoogte', 't_breedte', 't_diameter', 't_vloerdikte',
+    't_tredeDikte', 't_tredeOverstek', 't_boomHoogte', 't_boomDikte', 't_bordesLengte'];
+for (const id of MM_VELDEN) {
+    const veld = document.getElementById(id);
+    if (!veld || veld.parentElement.classList.contains('metEenheid')) continue;
+    const omhulsel = document.createElement('span');
+    omhulsel.className = 'metEenheid';
+    omhulsel.dataset.eenheid = 'mm';
+    veld.replaceWith(omhulsel);
+    omhulsel.append(veld);
+}
 
 // --- een nieuwe versie online -------------------------------------------------
 // Zie nieuweversie.js. Even na het laden (niet tegelijk met OpenCascade), en
