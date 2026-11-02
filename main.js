@@ -70,6 +70,7 @@ import { modelVan, GEEN as SIERPUNT_GEEN } from './sierpunten.js';
 import { isRond as isRondProfiel, categorieVan } from './profielen.js';
 import * as sterkte from './sterkte.js';
 import * as anker from './anker.js';
+import { maakSterkterapport } from './sterkterapport.js';
 import { maakDxf } from './dxf.js';
 import { maakNc1, waaromGeenNc1 } from './nc1.js';
 import { ncVoorOnderdelen } from './ncapi.js';
@@ -2250,6 +2251,51 @@ function toonSterkte() {
     slot.textContent = 'Lijnlast volgens: ' + (bron || '(geen bron opgegeven)')
         + '. Rekenhulp, geen keuring: geen verklaring van veiligheid of certificering.';
     inhoud.append(slot);
+    // Om door te sturen: alles hierboven, met de uitgangspunten, als PDF.
+    inhoud.append(knop('Sterkterapport (PDF) voor de constructeur', () => {
+        try {
+            downloadBestand(sterkterapportNu(), 'sterkterapport.pdf');
+            statusEl.textContent = 'sterkterapport.pdf opgeslagen - geef het aan je constructeur.';
+        } catch (err) {
+            console.error(err);
+            statusEl.textContent = 'Sterkterapport maken mislukt: ' + err.message;
+        }
+    }));
+}
+
+/** Het sterkterapport van wat er nu staat, als PDF-bytes. Geëxporteerd voor de zelftest. */
+export function sterkterapportNu() {
+    const rijen = sterkteNu();
+    if (!rijen) throw new Error('bouw eerst een balustrade');
+    const b = huidigeMaten();
+    const inv = sterkteInvoer();
+    const ruw = (n) => (sterkteEl(n) ? sterkteEl(n).value.trim() : '');
+    const k = kaderGegevens();
+    const iso = AANZICHTEN.find(a => /isometr/i.test(a.naam));
+    const naam = (p) => (p ? p.englishLabel || p.label : 'geen profiel gekozen');
+    const komma = (v) => String(v).replace('.', ',');
+    const plek = sterkteEl('gebruik') && sterkteEl('gebruik').selectedOptions[0];
+    return maakSterkterapport({
+        titel: { nummer: k.nummer, omschrijving: k.omschrijving, datum: k.datum },
+        beeld: iso ? rendersAanzicht(iso.richting, 1400, 800, { voorKlant: true }) : null,
+        uitgangspunten: [
+            ['Plek', plek && plek.value ? plek.textContent : '(niet gekozen)'],
+            ['Duwkracht qk', `${komma(inv.qk)} kN/m`],
+            ['Bron duwkracht', inv.bronQk || '(geen bron opgegeven)'],
+            ['Puntlast Qk', Number(inv.Qk) > 0 ? `${komma(inv.Qk)} kN` : 'niet meegerekend'],
+            ['Factoren', `γQ ${komma(inv.gammaQ)}, γM0 ${komma(inv.gammaM0)}, γM2 ${komma(inv.gammaM2)}`
+                + (ruw('gammaQ') || ruw('gammaM0') || ruw('gammaM2') ? '' : ' (aanbevolen Eurocode-waarden)')],
+            ['Max. doorbuiging', Number(inv.dMax) > 0 ? `${komma(inv.dMax)} mm` : 'niet opgegeven'],
+            ['Keelhoogte las', Number(inv.aLas) > 0 ? `${komma(inv.aLas)} mm` : 'niet opgegeven'],
+            ['Staander', naam(b.staanderProfiel)],
+            ['Handregel', naam(b.handregelProfiel)],
+            ['Hoogte / lengte', `${b.hoogte} mm / ${b.lengte} mm`],
+            ['Max. staanderafstand', `${b.maxStaanderAfstand} mm`],
+            ['Metaal', b.metaal || 'staal'],
+        ],
+        rijen,
+        vraag: VRAAG_VAN,
+    });
 }
 
 /**

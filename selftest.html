@@ -11917,6 +11917,19 @@ try {
         check('de staandercontrole geeft de rekenkrachten aan de voet door',
             !!vol.find(r => r.voet) && dicht(vol.find(r => r.voet).voet.MEd, 618750)
             && dicht(vol.find(r => r.voet).voet.VEd, 1.5 * 375));
+        // HET RAPPORT voor de constructeur: een echte PDF, met de rijen erin,
+        // en zonder "?" waar een Griekse letter stond.
+        const sr = await win.eval("import('/sterkterapport.js')");
+        const pdf = sr.maakSterkterapport({ titel: { nummer: 'T1' }, uitgangspunten: [['Duwkracht qk', '0,5 kN/m']],
+                                            rijen: vol });
+        const pdfTekstInhoud = new TextDecoder('latin1').decode(pdf);
+        check('sterkterapport: een PDF met de controles erin',
+            pdfTekstInhoud.startsWith('%PDF') && pdfTekstInhoud.includes('STERKTECONTROLE')
+            && pdfTekstInhoud.includes('Staander') && pdfTekstInhoud.includes('geen keuring'));
+        check('sterkterapport: Griekse letters uitgeschreven (de PDF-letter kent ze niet)',
+            sr.pdfTekst('γQ ≤ 1,5 en τRk, I in cm⁴') === 'gammaQ <= 1,5 en tauRk, I in cm^4');
+        check('sterkterapport: lange tekst wordt afgebroken binnen de bladbreedte',
+            sr.breekAf('woord '.repeat(80), 100, 8).every(r => r.length <= Math.floor(100 / (8 * 0.5 * 25.4 / 72))));
         check('sterkte geeft geen fout in de console', errors.length === bsVoor, errors.slice(bsVoor).join(' | '));
     }
 
