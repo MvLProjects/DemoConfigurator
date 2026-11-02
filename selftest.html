@@ -10857,6 +10857,23 @@ try {
             terug.wat === 'trap' && terug.t.soort === 'wentel'
             && terug.b.vulling === 'glas' && terug.l === 'rechts',
             JSON.stringify({ wat: terug.wat, soort: terug.t.soort, vulling: terug.b.vulling }));
+        // De STERKTE-INVOER reist mee, zodat de constructeur dezelfde uitkomst
+        // ziet - maar de NC-sleutel nooit.
+        const sVoor = mainMod.sterkteInstellingen();
+        doc.getElementById('s_qk').value = '0.8';
+        doc.getElementById('a_plaat').value = 'dwars';
+        doc.getElementById('ncSleutel').value = 'GEHEIM-TEST-123';
+        const sLink = await mainMod.codeAlsOntwerp((await mainMod.linkNaarOntwerp()).split('#ontwerp=')[1]);
+        check('de sterkte-invoer gaat mee in de link, de NC-sleutel niet',
+            sLink.s && sLink.s.qk === '0.8' && sLink.s.a_plaat === 'dwars'
+            && !JSON.stringify(sLink).includes('GEHEIM'), JSON.stringify(sLink.s));
+        doc.getElementById('s_qk').value = '';
+        doc.getElementById('a_plaat').value = 'langs';
+        mainMod.zetSterkteInstellingen(sLink.s);
+        check('en wordt uit de link weer ingevuld',
+            doc.getElementById('s_qk').value === '0.8' && doc.getElementById('a_plaat').value === 'dwars');
+        doc.getElementById('ncSleutel').value = '';
+        mainMod.zetSterkteInstellingen(sVoor);
         doc.getElementById('p_vulling').value = 'spijlen';
         doc.getElementById('t_soort').value = 'recht';
 
@@ -11723,6 +11740,36 @@ try {
     // ============ DEEL BN2: DSTV-NC via de dienst van MvL Progress ============
     // Zonder echte sleutel: een nagebootste dienst met de antwoorden uit de
     // Swagger (ConvertResponse, ErrorResponse).
+    log('\n\n======== DEEL BV: een nieuwe versie online (nagebootst) ========\n');
+    {
+        const nv = await win.eval("import('/nieuweversie.js')");
+        const nepWin = { location: { origin: 'https://x.nl', pathname: '/app/' },
+            performance: { getEntriesByType: () => [{ name: 'https://x.nl/app/main.js' },
+                { name: 'https://x.nl/app/pad.js' }, { name: 'https://cdn.nl/three.js' },
+                { name: 'https://x.nl/app/beeld.jpg' }] } };
+        check('alleen eigen code telt: de pagina, main.js en pad.js',
+            nv.eigenBestanden(nepWin).join(',') === 'https://x.nl/app/,https://x.nl/app/main.js,https://x.nl/app/pad.js',
+            nv.eigenBestanden(nepWin).join(','));
+        const opgehaald = [];
+        const nep = (server) => async (url, init) => {
+            opgehaald.push(init.cache);
+            const tag = init.cache === 'no-store' ? (server[url] ?? 'v1') : 'v1';
+            return { ok: true, headers: new Headers(tag ? { ETag: tag } : {}) };
+        };
+        let getoond = 0;
+        const zelfde = await nv.kijkOfErEenNieuweVersieIs({ win: nepWin, haal: nep({}), toon: () => getoond++ });
+        check('niets veranderd: geen melding', zelfde.length === 0 && getoond === 0);
+        opgehaald.length = 0;
+        const anders = await nv.kijkOfErEenNieuweVersieIs({ win: nepWin,
+            haal: nep({ 'https://x.nl/app/pad.js': 'v2' }), toon: () => getoond++ });
+        check('pad.js nieuw: melding, en alles opnieuw in de cache',
+            anders.join() === 'https://x.nl/app/pad.js' && getoond === 1
+            && opgehaald.filter(c => c === 'reload').length === 3, `${anders} ${opgehaald}`);
+        const zonder = await nv.kijkOfErEenNieuweVersieIs({ win: nepWin,
+            haal: nep({ 'https://x.nl/app/pad.js': '' }), toon: () => getoond++ });
+        check('een server zonder ETag geeft geen valse melding', zonder.length === 0 && getoond === 1);
+    }
+
     log('\n\n======== DEEL BN2: NC via cadapi.mvlprogress.nl (nagebootst) ========\n');
     {
         const api = await win.eval("import('/ncapi.js')");
@@ -11872,6 +11919,31 @@ try {
             vol.find(r => /^Las/.test(r.naam)).status === st.STATUS.ONVOLDOENDE_GEGEVENS);
         check('voetplaat/anker en slingerproef: altijd constructeur of proef nodig',
             vol.filter(r => r.status === st.STATUS.CONSTRUCTEUR).length === 2);
+        // DE VULLING: een spijl van 900 mm onder een puntlast in het midden,
+        // ligger op twee steunpunten. CHS 48,3x2,6 als spijl (W uit I/(D/2)),
+        // Q = 0,5 kN: M_Ed = 1,5·500·900/4 = 168 750 Nmm.
+        const vSp = { soort: 'spijlen', onderdeel: 'spijl', profiel: bsChs, overspanning: 900, diepte: 48.3 };
+        const vRij = st.controleerVulling(vSp, 'staal', { ...inv, QkVul: 0.5 }, 750);
+        check('vulling: spijl als ligger met puntlast, M_Ed = 168 750 Nmm, M_Rd = W·235',
+            !!vRij.exact && dicht(vRij.exact.MEd, 168750) && dicht(vRij.exact.MRd, iChs / 24.15 * 235)
+            && vRij.status === st.STATUS.VOLDOET, vRij.exact ? `${vRij.exact.MEd} / ${vRij.exact.MRd}` : vRij.toelichting);
+        check('vulling zonder puntlast: niet geraden maar onvoldoende gegevens',
+            st.controleerVulling(vSp, 'staal', inv, 750).status === st.STATUS.ONVOLDOENDE_GEGEVENS
+            && st.controleerBalustrade({ ...bsM, vulling: vSp }, inv).some(r => /^Vulling/.test(r.naam)));
+        // Een platstaal 30x6 als knieregel: plat (diepte 30 dwars) is sterker
+        // dan op zijn kant (6 dwars) - de stand komt uit het model.
+        const fl30 = cat.alleProfielen(catBoom).find(x => /^FL 30x6$/.test(x.englishLabel || x.label || ''));
+        if (fl30) {
+            const kn = (diepte) => st.controleerVulling({ soort: 'knieregel', onderdeel: 'knieregel', profiel: fl30,
+                overspanning: 0, diepte }, 'staal', { ...inv, QkVul: 0.5 }, 750).exact;
+            check('vulling: welke kant van een platstaal dwars staat volgt uit het model',
+                kn(30) && kn(6) && kn(30).MRd > 4 * kn(6).MRd && dicht(kn(30).MEd, 1.5 * 500 * 750 / 4),
+                kn(30) ? `${kn(30).MRd} / ${kn(6).MRd}` : 'geen uitkomst');
+        }
+        check('glas en liggende strippen zonder profiel: constructeur nodig, geen getal',
+            st.controleerVulling({ soort: 'glas' }, 'staal', inv, 750).status === st.STATUS.CONSTRUCTEUR
+            && st.controleerVulling({ soort: 'horizontaal', onderdeel: 'regel', profiel: null, maat: '30 × 6 mm' },
+                'staal', { ...inv, QkVul: 0.5 }, 750).status === st.STATUS.CONSTRUCTEUR);
         // En snel: de hele controle met profielvoorstel in een paar ms.
         const t0 = performance.now();
         for (let i = 0; i < 10; i++) st.controleerBalustrade(bsM, { ...inv, qk: 3 }, cat.alleProfielen(catBoom));

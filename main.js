@@ -75,6 +75,7 @@ import { maakDxf } from './dxf.js';
 import { maakNc1, waaromGeenNc1 } from './nc1.js';
 import { ncVoorOnderdelen } from './ncapi.js';
 import { maakZip } from './zip.js';
+import { kijkOfErEenNieuweVersieIs } from './nieuweversie.js';
 import { alleProfielen } from './profielen.js';
 import { beschrijf, bestandsnaam, bomRegel } from './onderdelen.js';
 import { maakZaaglijst, zaaglijstAlsCsv } from './zaaglijst.js';
@@ -2001,7 +2002,7 @@ function toonOnderdelen(lijst, boom) {
 // Een rekenhulp, geen keuring: zie sterkte.js. De invoer (belasting, factoren,
 // doorbuigingsgrens) is van de gebruiker en wordt per browser onthouden - het
 // is projectgegeven, geen ontwerp.
-const STERKTE_VELDEN = ['gebruik', 'qk', 'bronQk', 'Qk', 'gammaQ', 'gammaM0', 'gammaM2', 'dMax', 'aLas', 'fy'];
+const STERKTE_VELDEN = ['gebruik', 'qk', 'bronQk', 'Qk', 'QkVul', 'gammaQ', 'gammaM0', 'gammaM2', 'dMax', 'aLas', 'fy'];
 
 // DE PLEK KIEZEN IN PLAATS VAN EEN GETAL. De officiële tabel (NEN-EN 1991-1-1
 // NB, bijlage NB.A) is niet openbaar; deze waarden zijn die van een
@@ -2033,19 +2034,47 @@ const sterkteInvoer = () => {
     for (const n of ['gammaQ', 'gammaM0', 'gammaM2']) if (!(Number(ruw[n]) > 0)) ruw[n] = A[n].waarde;
     return ruw;
 };
+const toonGebruikUitleg = () => {
+    const g = GEBRUIK_LAST[sterkteEl('gebruik')?.value];
+    const uitleg = document.getElementById('s_gebruikUitleg');
+    if (!uitleg) return;
+    uitleg.textContent = g ? `${String(g.qk).replace('.', ',')} kN per meter - ${GEBRUIK_BRON}.`
+        : 'Vul het getal van je constructeur in bij "duwkracht", met de bron erbij.';
+};
 sterkteEl('gebruik')?.addEventListener('change', () => {
     const g = GEBRUIK_LAST[sterkteEl('gebruik').value];
-    const uitleg = document.getElementById('s_gebruikUitleg');
     if (g) {
         sterkteEl('qk').value = g.qk;
         sterkteEl('bronQk').value = `${g.tekst}: ${GEBRUIK_BRON}`;
-        if (uitleg) uitleg.textContent = `${String(g.qk).replace('.', ',')} kN per meter - ${GEBRUIK_BRON}.`;
-    } else if (uitleg) {
-        uitleg.textContent = 'Vul het getal van je constructeur in bij "duwkracht", met de bron erbij.';
     }
+    toonGebruikUitleg();
     sterkteEl('qk').dispatchEvent(new Event('input'));
 });
 const ankerInvoer = () => Object.fromEntries(ANKER_VELDEN.map(n => [n, ankerEl(n) ? ankerEl(n).value : '']));
+
+// DE STERKTE-INVOER GAAT MEE in het ontwerpbestand en de link: de constructeur
+// die de link opent moet dezelfde uitkomst zien. Alleen wat ingevuld is, zoals
+// het er staat (een lege factor blijft leeg = aanbevolen waarde).
+/** De ingevulde sterkte- en ankervelden, met a_ voor de ankers. */
+export function sterkteInstellingen() {
+    const uit = {};
+    for (const n of STERKTE_VELDEN) { const v = sterkteEl(n)?.value; if (v) uit[n] = v; }
+    for (const n of ANKER_VELDEN) { const v = ankerEl(n)?.value; if (v) uit['a_' + n] = v; }
+    return uit;
+}
+/** Het omgekeerde: alle velden zetten, wat er niet in staat wordt leeg. */
+export function zetSterkteInstellingen(s) {
+    for (const n of STERKTE_VELDEN) if (sterkteEl(n)) sterkteEl(n).value = s[n] ?? '';
+    for (const n of ANKER_VELDEN) {
+        const el = ankerEl(n);
+        if (!el) continue;
+        // Een keuzelijst heeft geen lege waarde: dan de eerste optie.
+        el.value = s['a_' + n] ?? '';
+        if (el.tagName === 'SELECT' && el.selectedIndex < 0) el.selectedIndex = 0;
+    }
+    toonGebruikUitleg();
+    bewaarSterkte();
+}
 const bewaarSterkte = () => {
     const alles = { ...sterkteInvoer(),
                     ...Object.fromEntries(Object.entries(ankerInvoer()).map(([k, v]) => ['a_' + k, v])) };
@@ -2074,6 +2103,7 @@ export function sterkteNu() {
     const rijen = sterkte.controleerBalustrade({
         hoogte: b.hoogte, overstek: b.handregelOverstek, metaal: b.metaal,
         staanderProfiel: b.staanderProfiel, handregelProfiel: b.handregelProfiel, staanders,
+        vulling: vullingVoorSterkte(b),
     }, sterkteInvoer(), catalogus ? alleProfielen(catalogus.boom) : []);
     // De ankers onder de zwaarst belaste staander, met de rekenkrachten uit
     // de staandercontrole. Zonder die krachten valt er niets te toetsen.
@@ -2083,6 +2113,34 @@ export function sterkteNu() {
         : [{ naam: 'Ankers', status: sterkte.STATUS.ONVOLDOENDE_GEGEVENS,
              toelichting: 'Eerst moet de staandercontrole kunnen rekenen (lijnlast, factoren, profiel).' }];
     return [...rijen, ...ankerRijen];
+}
+
+/**
+ * De vulling voor de sterktecontrole: het langste onderdeel zoals het GEBOUWD
+ * is (overspanning en diepte uit het model). null als er niets te toetsen is.
+ */
+function vullingVoorSterkte(b) {
+    const langste = (soort, maat) => laatsteDelen.filter(d => d.soort === soort)
+        .reduce((a, d) => (!a || maat(d) > maat(a) ? d : a), null);
+    if (b.vulling === 'glas') return { soort: 'glas' };
+    if (b.vulling === 'spijlen') {
+        const d = langste('spijl', (x) => x.dz);
+        return d && { soort: b.vulling, onderdeel: 'spijl', profiel: b.spijlProfiel || null,
+                      baluster: Boolean(d.baluster), overspanning: d.dz, diepte: d.dy };
+    }
+    if (b.vulling === 'horizontaal') {
+        const d = langste('vulregel', (x) => x.zaaglengte || x.dx);
+        return d && { soort: b.vulling, onderdeel: 'regel', profiel: d.profiel || null,
+                      overspanning: d.zaaglengte || d.dx, diepte: d.dy,
+                      maat: `${Math.round(d.dy)} × ${Math.round(d.dz)} mm` };
+    }
+    if (b.vulling === 'knieregel') {
+        const d = langste('knieregel', (x) => x.dx);
+        // Overspanning 0: het grootste veld tussen de staanders.
+        return d && { soort: b.vulling, onderdeel: 'knieregel', profiel: b.handregelProfiel || null,
+                      overspanning: 0, diepte: d.dy };
+    }
+    return null;
 }
 
 /** Een voorstel uit de sterktecontrole toepassen, alsof je het zelf koos. */
@@ -2106,6 +2164,8 @@ function pasSterkteVoorstelToe(a) {
 
 // De controles als een vraag in gewone woorden.
 const VRAAG_VAN = (naam) => [
+    [/^Vulling: glas/, 'het glas en de klemmen'],
+    [/^Vulling/, 'houdt de vulling een duw op één spijl of regel?'],
     [/^Staander/, 'is de staander sterk genoeg?'],
     [/^Las/, 'houdt de las tussen staander en voetplaat?'],
     [/^Handregel/, 'is de handregel sterk genoeg?'],
@@ -2126,6 +2186,26 @@ function toonSterkte() {
     const leeg = document.getElementById('sterkteLeeg');
     if (!inhoud) return;
     inhoud.textContent = '';
+    // GLAS ZONDER STAANDERS: dan is er geen staander om te rekenen, en "bouw
+    // eerst een balustrade" klopt niet - die staat er.
+    if (laatsteDelen && laatsteNaam !== 'trap' && huidigeMaten().vulling === 'glasvrij') {
+        if (leeg) leeg.style.display = 'none';
+        const k = document.createElement('div');
+        k.className = 'sterkteRij';
+        k.style.cssText = 'border-left:4px solid #45607a;padding:6px 10px;margin:8px 0;'
+            + 'background:rgba(127,127,127,0.06);border-radius:4px';
+        const kopje = document.createElement('div');
+        kopje.style.fontWeight = '600';
+        kopje.textContent = 'Glas zonder staanders: hier rekent de app niet';
+        const uitleg = document.createElement('div');
+        uitleg.textContent = 'Bij deze balustrade vangt het glas zelf de duw op, ingeklemd in een '
+            + 'profiel op de vloer. De glasdikte en -opbouw horen volgens NEN 2608 bepaald te worden, '
+            + 'het klemprofiel en de bevestiging in de vloer volgens de opgave van de fabrikant. '
+            + 'Vraag het de glasleverancier of een constructeur.';
+        k.append(kopje, uitleg);
+        inhoud.append(k);
+        return;
+    }
     let rijen = null;
     try { rijen = sterkteNu(); } catch (err) { console.error(err); }
     if (leeg) {
@@ -2288,6 +2368,8 @@ export function sterkterapportNu() {
             ['Duwkracht qk', `${komma(inv.qk)} kN/m`],
             ['Bron duwkracht', inv.bronQk || '(geen bron opgegeven)'],
             ['Puntlast Qk', Number(inv.Qk) > 0 ? `${komma(inv.Qk)} kN` : 'niet meegerekend'],
+            ['Puntlast vulling', Number(inv.QkVul) > 0 ? `${komma(inv.QkVul)} kN` : 'niet opgegeven'],
+            ['Vulling', b.vulling || '-'],
             ['Factoren', `γQ ${komma(inv.gammaQ)}, γM0 ${komma(inv.gammaM0)}, γM2 ${komma(inv.gammaM2)}`
                 + (ruw('gammaQ') || ruw('gammaM0') || ruw('gammaM2') ? '' : ' (aanbevolen Eurocode-waarden)')],
             ['Max. doorbuiging', Number(inv.dMax) > 0 ? `${komma(inv.dMax)} mm` : 'niet opgegeven'],
@@ -3236,6 +3318,7 @@ function huidigeInstellingen() {
         balustrade: huidigeMaten(),
         trap: huidigeTrapMaten(),
         leuning: document.getElementById('t_leuning').value,
+        sterkte: sterkteInstellingen(),
     };
 }
 
@@ -3283,6 +3366,9 @@ async function pasInstellingenToe(inhoud) {
     const gezet = vulVelden(velden, inhoud.balustrade)
                 + vulVelden(trapVelden, inhoud.trap);
     if (inhoud.leuning) document.getElementById('t_leuning').value = inhoud.leuning;
+    // De sterkte-invoer. Een ouder bestand of een voorbeeld heeft hem niet: dan
+    // blijft staan wat deze browser al had - het is projectgegeven.
+    if (inhoud.sterkte && typeof inhoud.sterkte === 'object') zetSterkteInstellingen(inhoud.sterkte);
     if (inhoud.trap && inhoud.trap.tredeMateriaal) {
         tredeMateriaalEl.value = inhoud.trap.tredeMateriaal;
     }
@@ -3427,6 +3513,7 @@ async function ontwerpAlsCode() {
         [k, /Profiel$/.test(k) && v && typeof v === 'object' ? v.bestand : v]));
     const inhoud = { v: INSTEL_VERSIE, wat: watStaatErIn(),
                      b: kaal(inst.balustrade), t: kaal(inst.trap), l: inst.leuning };
+    if (Object.keys(inst.sterkte).length) inhoud.s = inst.sterkte;
     const stroom = new Blob([JSON.stringify(inhoud)]).stream()
         .pipeThrough(new CompressionStream('deflate-raw'));
     const bytes = new Uint8Array(await new Response(stroom).arrayBuffer());
@@ -3598,7 +3685,7 @@ async function openOntwerpUitLink() {
         if (startDialoog.open) startDialoog.close();
         const isTrap = o.wat === 'trap';
         openGroep(isTrap ? 'Trap' : 'Balustrade');
-        await pasInstellingenToe({ versie: o.v, balustrade: o.b, trap: o.t, leuning: o.l });
+        await pasInstellingenToe({ versie: o.v, balustrade: o.b, trap: o.t, leuning: o.l, sterkte: o.s });
         statusEl.textContent = 'Ontwerp geopend uit een link; het model wordt opgebouwd…';
         (isTrap ? trapKnop : genereerKnop).click();
     } catch (err) {
@@ -4652,7 +4739,9 @@ const terugKnopEl = document.getElementById('terugKnop');
 function onthoudOntwerp(wat) {
     // Zonder het tijdstip van opslaan: anders is elke stand nieuw, ook
     // dezelfde trap die net teruggezet is.
-    const { opgeslagen, ...inst } = huidigeInstellingen();
+    // Ook zonder de sterkte-invoer: Terug gaat over het model, en mag de plek
+    // of de duwkracht die je daarna koos niet terugdraaien.
+    const { opgeslagen, sterkte: _s, ...inst } = huidigeInstellingen();
     const stand = JSON.stringify({ wat, inst });
     // Dezelfde bouw twee keer (of het terugzetten zelf) is geen nieuwe stap.
     if (ontwerpen[ontwerpen.length - 1] !== stand) ontwerpen.push(stand);
@@ -5260,3 +5349,31 @@ function buildHighlight(points, radius) {
 // Zie openOntwerpUitLink.
 if (document.readyState === 'complete') openOntwerpUitLink();
 else window.addEventListener('load', openOntwerpUitLink);
+
+// --- een nieuwe versie online -------------------------------------------------
+// Zie nieuweversie.js. Even na het laden (niet tegelijk met OpenCascade), en
+// daarna elk half uur zolang het tabblad open is.
+function toonNieuweVersie() {
+    if (document.getElementById('nieuweVersie')) return;
+    const balk = document.createElement('div');
+    balk.id = 'nieuweVersie';
+    balk.setAttribute('role', 'status');
+    balk.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:1000;'
+        + 'background:#1f3a5f;color:#fff;padding:8px 12px;border-radius:6px;'
+        + 'box-shadow:0 2px 8px rgba(0,0,0,0.3);max-width:calc(100vw - 32px)';
+    balk.textContent = 'Er is een nieuwe versie van de app. ';
+    const knop = document.createElement('button');
+    knop.type = 'button';
+    knop.textContent = 'Nu herladen';
+    knop.style.marginLeft = '8px';
+    // Het ontwerp gaat mee in de link, zodat herladen niets kost.
+    knop.addEventListener('click', async () => {
+        try { if (laatsteDelen) history.replaceState(null, '', await linkNaarOntwerp()); } catch { /* dan zonder */ }
+        location.reload();
+    });
+    balk.append(knop);
+    document.body.append(balk);
+}
+const kijkNaarVersie = () => kijkOfErEenNieuweVersieIs({ toon: toonNieuweVersie }).catch(() => {});
+setTimeout(kijkNaarVersie, 15_000);
+setInterval(() => { if (document.visibilityState === 'visible') kijkNaarVersie(); }, 30 * 60_000);

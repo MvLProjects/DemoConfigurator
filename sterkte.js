@@ -332,6 +332,8 @@ export function controleerBalustrade(m, invoer, catalogus = []) {
         });
     }
 
+    if (m.vulling) uit.push(controleerVulling(m.vulling, m.metaal, invoer, Lmax));
+
     // --- wat de app (nog) niet betrouwbaar kan -------------------------------
     uit.push({
         naam: 'Voetplaat (buiging) en lokale indeuking van dunne buizen',
@@ -342,6 +344,70 @@ export function controleerBalustrade(m, invoer, catalogus = []) {
     });
     uit.push(slingerIndicatie({ st, hr, matSt, matHr, H, Lmax }));
     return uit;
+}
+
+/**
+ * DE VULLING: één spijl, regel of knieregel onder een puntlast in het midden,
+ * als ligger op twee steunpunten (veilige kant: de lassen klemmen hem in
+ * werkelijkheid wat in). De puntlast komt van de gebruiker - de NB geeft voor
+ * de vulling een eigen waarde, en die verzinnen we niet.
+ *
+ * @param v { soort: de vulling, onderdeel: 'spijl'|'regel'|'knieregel',
+ *            profiel, overspanning [mm] (bij de knieregel 0: dan het veld),
+ *            diepte [mm] (de maat dwars op de balustrade), baluster }
+ */
+export function controleerVulling(v, metaal, invoer, Lmax) {
+    const naam = 'Vulling: puntlast op een spijl of regel';
+    if (v.soort === 'glas') {
+        return { naam: 'Vulling: glas in klemmen', status: STATUS.CONSTRUCTEUR,
+            toelichting: 'Het glas en de klemmen rekent de app niet. De glasdikte en -opbouw '
+                + '(gelaagd veiligheidsglas) horen volgens NEN 2608 bepaald te worden, de klemmen '
+                + 'volgens de opgave van de fabrikant. Vraag het de glasleverancier of een constructeur.' };
+    }
+    if (v.baluster) {
+        return { naam, status: STATUS.CONSTRUCTEUR,
+            toelichting: 'Gedraaide balusters zijn geen catalogusprofiel; hun sterkte hoort bij de '
+                + 'leverancier of een constructeur.' };
+    }
+    const wat = { spijl: 'spijlen', regel: 'regels', knieregel: 'knieregel' }[v.onderdeel] || 'vulling';
+    // De liggende regels zijn strippen uit het raam, zonder catalogusprofiel:
+    // dan is de staalsoort (en dus fy) onbekend.
+    if (!v.profiel && v.onderdeel !== 'spijl') {
+        return { naam, status: STATUS.CONSTRUCTEUR,
+            toelichting: `De ${wat} ${v.maat ? `(${v.maat}) ` : ''}zijn geen catalogusprofiel: de staalsoort `
+                + 'is onbekend, dus de app rekent ze niet. Laat een constructeur ze toetsen.' };
+    }
+    const s = doorsnede(v.profiel);
+    if (s.fout) {
+        return { naam, status: STATUS.ONVOLDOENDE_GEGEVENS,
+            toelichting: `Ontbreekt: een profiel voor de ${wat} - ${s.fout}.` };
+    }
+    const mat = materiaalVoor(metaal, v.profiel, invoer);
+    const Q = Number(invoer.QkVul), gQ = Number(invoer.gammaQ), gM0 = Number(invoer.gammaM0);
+    const L = Number(v.overspanning) > 0 ? Number(v.overspanning) : Lmax;
+    const tekort = [mat.ontbreekt, !(Q > 0) && 'puntlast op de vulling (uit de NB, via je constructeur)',
+        !(gQ > 0) && 'belastingfactor γQ', !(gM0 > 0) && 'materiaalfactor γM0',
+        !(L > 0) && 'overspanning'].filter(Boolean);
+    if (tekort.length) {
+        return { naam, status: STATUS.ONVOLDOENDE_GEGEVENS, toelichting: `Ontbreekt: ${tekort.join(', ')}.` };
+    }
+    // Welke W: de duw staat dwars op de balustrade, dus de buiging met de
+    // diepte die dwars staat. Welke kant van het profiel dat is volgt uit het
+    // model, niet uit de catalogus (een platstaal kan plat of op zijn kant).
+    const dwarsIsY = !(Number(v.diepte) > 0) || Math.abs(s.by - v.diepte) <= Math.abs(s.bx - v.diepte);
+    const W = dwarsIsY ? s.Wx : s.Wy;
+    const MEd = gQ * Q * 1000 * L / 4;
+    const MRd = W * mat.fy / gM0;
+    const ok = MEd <= MRd;
+    return {
+        naam, status: ok ? STATUS.VOLDOET : STATUS.VOLDOET_NIET,
+        waarde: r2(MEd / 1e6), grens: r2(MRd / 1e6), eenheid: 'kNm', exact: { MEd, MRd },
+        toelichting: `De ${wat}: ${Math.round(L)} mm vrij, als ligger op twee steunpunten met de puntlast `
+            + `in het midden (veilige kant). M_Ed = γQ·Q·L/4 met Q = ${Q} kN, M_Rd = Wel·fy/γM0. `
+            + `Wel = ${r1(W / 1000)} cm³ (uit de maten), fy = ${mat.fy} N/mm² (${mat.bronFy}).`,
+        voorstel: ok ? null : `Een zwaarder profiel voor de ${wat}, of een kortere overspanning.`,
+        acties: [],
+    };
 }
 
 /** De stootenergie van de slingerproef: 50 kg, 0,5 kNm (≈ 1 m val). */
