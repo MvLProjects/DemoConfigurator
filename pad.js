@@ -64,7 +64,7 @@
 // paar millimeter aan de bovenkant. Voor de maat die ertoe doet - de doorgang -
 // maakt het niets uit.
 
-import { berekenSpijlen, spijlPosities, VOETPLAAT, VULRAAMWERK, PAALKAP,
+import { berekenSpijlen, spijlPosities, VOETPLAAT, voetplaatVan, VULRAAMWERK, PAALKAP,
          uitklinkDiepte, stripBreedte, profielDoos,
          VULLING, vullingSoort, GLAS, SIERPUNT, AFRONDING, SCHOPRAND, KNIEREGEL, LASBOCHT, EINDKAP, MUURPLAAT,
          DEKBAND } from './balustrade-rules.js';
@@ -678,7 +678,7 @@ export function padDelen(punten, gesloten, p) {
     // Daarom gaat de plaatdikte van de STAANDERLENGTE af en komt hij niet bij
     // de hoogte op. 1000 mm boven de vloer blijft zo 1000 mm boven de vloer -
     // precies zoals in dat voorbeeld, waar de handregel op z = 1457 eindigt.
-    const vp = { ...VOETPLAAT, ...(p.voetplaat || {}) };
+    const vp = voetplaatVan(p);
     const plaatDikte = Math.max(0, Number(p.voetplaatDikte) || 0);
 
     // --- de handregel loopt over ELKE staander heen ------------------------
@@ -1447,11 +1447,14 @@ export function padDelen(punten, gesloten, p) {
                 // De gaten, in de maten van de plaat zelf: x langs de lengte,
                 // y over de breedte, allebei gerekend vanaf de hoek. De as van
                 // elk gat staat loodrecht op de plaat.
-                gaten: vp.gat > 0 ? [-1, 1].map(kant => ({
-                    x: vp.lengte / 2 + kant * vp.gatAfstand / 2,
-                    y: vp.breedte / 2,
-                    diameter: vp.gat,
-                })) : [],
+                // Eén rij op de hartlijn, of bij gatAfstandDwars twee rijen:
+                // een gat in elke hoek, voor en achter de staander.
+                gaten: vp.gat > 0 ? [-1, 1].flatMap(kant => (vp.gatAfstandDwars > 0 ? [-1, 1] : [0])
+                    .map(rij => ({
+                        x: vp.lengte / 2 + kant * vp.gatAfstand / 2,
+                        y: vp.breedte / 2 + rij * (vp.gatAfstandDwars || 0) / 2,
+                        diameter: vp.gat,
+                    }))) : [],
                 groep: staanderGroep,
             });
         }

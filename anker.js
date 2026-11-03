@@ -82,6 +82,12 @@ export function ankerKrachten(MEd, VEd, plaat) {
  * plaat een kwartslag gedraaid.
  */
 export function plaatVoor(stand, vp) {
+    // TWEE RIJEN (de grote plaat): een rij voor en een achter de staander,
+    // elk met twee ankers op gatAfstand. Dan is er niets te draaien.
+    if (vp.gatAfstandDwars > 0) {
+        const h = vp.gatAfstandDwars / 2;
+        return { breedte: vp.breedte, ankers: [-h, -h, h, h], sTrek: vp.gatAfstand };
+    }
     return stand === 'dwars'
         ? { breedte: vp.lengte, ankers: [-vp.gatAfstand / 2, vp.gatAfstand / 2], sTrek: 0 }
         : { breedte: vp.breedte, ankers: [0, 0], sTrek: vp.gatAfstand };

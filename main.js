@@ -14,7 +14,7 @@ import { initOcct, laadStep, laadVorm, countMeshEdges, schrijfStep,
 import { maakNavigatie } from './navigation.js';
 import { bouwBalustrade, bouwBlok, bouwBalustradeOpRanden, beoordeelRanden,
     voorspelBalustrade } from './build-balustrade.js';
-import { STANDAARD, valideer, VULLING, GLAS, GLASVRIJ, KNIEREGEL, VOETPLAAT, vullingSoort } from './balustrade-rules.js';
+import { STANDAARD, valideer, VULLING, GLAS, GLASVRIJ, KNIEREGEL, VOETPLAAT, voetplaatVan, vullingSoort } from './balustrade-rules.js';
 import { parseer, noemtProfiel } from './command-parser.js';
 import { bouwTrap, trapDelen, wandleuningFout, controleerWentel,
          controleerHoutBoom } from './build-trap.js';
@@ -91,6 +91,12 @@ const MAT_GAP = 0;       // driehoeken die bij geen enkele b-rep face horen
 const MAT_FACE = 1;      // normale face, zonder eigen materiaal
 const MAT_SELECTED = 2;  // geselecteerde face
 const MAT_EERSTE_VRIJ = 3;
+// Het gekozen onderdeel en Show Only; zie "een onderdeel kiezen" verderop.
+// Hier bovenaan omdat clearSelection en rendersAanzicht ze lezen.
+let deelVerschuiving = null;
+let gekozenDeel = null;     // { mesh, solid, index }
+let isolatie = null;        // { mesh, solid, was: Map(groep -> materiaal), plek, randen, maten }
+let isolatiePauze = false;
 
 const statusEl = document.getElementById('status');
 
@@ -2110,7 +2116,8 @@ export function sterkteNu() {
     // De ankers onder de zwaarst belaste staander, met de rekenkrachten uit
     // de staandercontrole. Zonder die krachten valt er niets te toetsen.
     const voet = (rijen.find(r => r.voet) || {}).voet;
-    const plaat = anker.plaatVoor(ankerInvoer().plaat, VOETPLAAT);
+    // De plaat zoals hij GETEKEND is (smal of vierkant), niet de standaard.
+    const plaat = anker.plaatVoor(ankerInvoer().plaat, voetplaatVan(b));
     const ankerRijen = voet ? anker.controleerAnkers(voet, plaat, ankerInvoer())
         : [{ naam: 'Ankers', status: sterkte.STATUS.ONVOLDOENDE_GEGEVENS,
              toelichting: 'Eerst moet de staandercontrole kunnen rekenen (lijnlast, factoren, profiel).' }];
@@ -2399,6 +2406,11 @@ export function sterkterapportNu() {
  * ingevuld". Hem weglaten zou het totaal te laag maken zonder dat iemand het
  * ziet - dat is het soort stille fout waar deze app niet van houdt.
  */
+/** "2026-10-21" -> "21 oktober 2026"; iets anders blijft zoals het is. */
+const datumNl = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || '')
+    ? new Date(iso + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+    : iso);
+
 async function toonKosten(onderdelen) {
     const vak = document.getElementById('kostenVak');
     const inhoud = document.getElementById('kostenInhoud');
@@ -2420,10 +2432,32 @@ async function toonKosten(onderdelen) {
     }
 
     kop.textContent = 'Richtprijzen, geen offerte. De hoeveelheden komen uit '
-        + 'het model; de tarieven zijn opgezocht op ' + raming.gezien
-        + ' en staan in tarieven.json.';
+        + 'het model, de prijzen van internet (opgezocht op ' + datumNl(raming.gezien) + ').';
 
     inhoud.textContent = '';
+    // EERST HET GETAL WAAR HET OM GAAT: wat het gemaakt ongeveer kost, met
+    // arbeid - hetzelfde als op de offerte. Stond in de kleine letters onder
+    // de materiaalposten, als "ter vergelijking".
+    let indicatie = null;
+    try { indicatie = kosten.prijsIndicatie(onderdelen); } catch (err) { console.error(err); }
+    if (indicatie && indicatie.regels.length) {
+        const kaart = document.createElement('div');
+        kaart.className = 'ksKaart';
+        const titel = document.createElement('div');
+        titel.textContent = 'Gemaakt en afgewerkt, met arbeid';
+        const bedrag = document.createElement('b');
+        bedrag.textContent = kosten.bereikTekst(indicatie.laag, indicatie.hoog);
+        const uitleg = document.createElement('div');
+        uitleg.className = 'hint';
+        uitleg.textContent = 'Zoals op de offerte. Zonder transport en montage'
+            + (indicatie.ontbreekt.length ? `; nog zonder ${indicatie.ontbreekt.join(', ')}` : '') + '.';
+        kaart.append(titel, bedrag, uitleg);
+        inhoud.append(kaart);
+    }
+    const sub = document.createElement('div');
+    sub.className = 'ksSub';
+    sub.textContent = 'Waarvan materiaal';
+    inhoud.append(sub);
     const regel = (naam, aantal, bedrag, klasse, bron) => {
         const r = document.createElement('div');
         r.className = 'ksRegel' + (klasse ? ' ' + klasse : '');
@@ -2433,7 +2467,7 @@ async function toonKosten(onderdelen) {
         if (bron) {
             const b = document.createElement('span');
             b.className = 'ksBron';
-            b.textContent = ' · ' + bron;
+            b.textContent = bron;
             n.append(b);
         }
         const a = document.createElement('span');
@@ -2447,7 +2481,7 @@ async function toonKosten(onderdelen) {
     };
 
     for (const r of raming.regels) {
-        regel(r.naam, `${r.hoeveelheid} ${r.eenheid}`,
+        regel(r.naam, `${String(r.hoeveelheid).replace('.', ',')} ${r.eenheid}`,
               kosten.bereikTekst(r.laag, r.hoog),
               r.laag === null ? 'ksLeeg' : '',
               r.tarief && r.tarief.eigen ? 'eigen prijs' : (r.bron || ''));
@@ -2457,20 +2491,12 @@ async function toonKosten(onderdelen) {
 
     const stukken = [];
     if (!raming.volledig) {
-        stukken.push('Dit is een MATERIAALBEGROTING en geen kostprijs: '
-            + 'arbeid, transport en montage zitten er niet in.');
+        stukken.push('Het materiaal is alleen de grondstof: arbeid, transport en '
+            + 'montage zitten er niet in.');
     }
     if (raming.ontbreekt.length) {
         stukken.push('Zonder tarief: ' + raming.ontbreekt.join(', ')
             + '. Vul ze in tarieven.json in.');
-    }
-    if (raming.controle) {
-        stukken.push(`Ter vergelijking, dezelfde `
-            + `${raming.hoeveelheden.staalKg} kg tegen de prijs van een `
-            + `afgewerkte constructie: `
-            + `${kosten.bereikTekst(raming.controle.laag, raming.controle.hoog)}. `
-            + 'Dat getal heeft arbeid er wél in zitten, dus het hoort hoger '
-            + 'uit te komen.');
     }
     if (raming.hoeveelheden.onbekend.length) {
         stukken.push('Buiten de telling gebleven (geen gemeten vorm): '
@@ -2951,6 +2977,11 @@ function offerteKeuzes() {
             ['Materiaal', metaal],
             ...(Number(b.regelVoor) > 0 ? [['Plaats handregel', 'vóór de staanders']] : []),
             ...(b.schoprand ? [['Schoprand', '100 mm, langs de vloer']] : []),
+            ...(Number(b.voetplaatDikte) > 0 ? [['Voetplaten', (() => {
+                const vp = voetplaatVan(b);
+                const n = vp.gat > 0 ? (vp.gatAfstandDwars > 0 ? 4 : 2) : 0;
+                return `${vp.lengte} × ${vp.breedte} × ${b.voetplaatDikte}` + (n ? `, ${n} gaten Ø${vp.gat}` : '');
+            })()]] : []),
             ...leuningExtra,
             ['Afwerking', afwerking],
             ...offerteSterkte(),
@@ -4175,6 +4206,11 @@ export const AANZICHTEN = [
  * ergens anders en lijkt het alsof de knop het model heeft verzet.
  */
 export function rendersAanzicht(richting, breedtePx, hoogtePx, opties = {}) {
+    // Show Only geldt voor het scherm, niet voor een blad: een offerte of
+    // tekening toont altijd het hele model.
+    if (isolatie && !isolatiePauze) {
+        return zonderIsolatie(() => rendersAanzicht(richting, breedtePx, hoogtePx, opties));
+    }
     // VOOR DE KLANT: zonder maatlijnen en zonder de oranje markering van de
     // keuring. Die zijn er voor wie de leuning maakt, niet voor wie hem koopt.
     const klant = Boolean(opties.voorKlant);
@@ -4609,6 +4645,7 @@ async function laadStepBytes(bytes, naam) {
     // delen zijn, alleen de vorm. De maatvoering valt dan terug op de
     // buitenmaten, en dat is precies wat er over zo'n model te zeggen valt.
     laatsteDelen = null;
+    deelVerschuiving = null;
     toonGeladen(await laadStep(bytes), naam);
 }
 
@@ -4629,6 +4666,10 @@ async function toonVorm(shape, naam, materialen = null, delen = null) {
     await initOcct();
     laatsteDelen = delen;
     laatsteNaam = naam;
+    // Solid n is onderdeel n - verschuiving; zie metAandacht. Zonder lijst
+    // van uiterlijken weten we het niet, en blijft klikken een vlak kiezen.
+    deelVerschuiving = Array.isArray(materialen) && Array.isArray(delen)
+        ? materialen.length - delen.length : null;
     toonGeladen(await laadVorm(shape), naam, materialen);
     toonVloer(naam);
     if (naam === 'trap' || naam === 'balustrade') onthoudOntwerp(naam);
@@ -4819,6 +4860,7 @@ function toonVoorbeeld(delen, naam) {
     toonStuklijst(null);
     toonOnderdelen(null);
 
+    vergeetDeelKeuze();
     const wasVoorbeeld = Boolean(modelRoot.userData.voorbeeld);
     ruimVoorbeeldOp(modelRoot);
     scene.remove(modelRoot);
@@ -4886,6 +4928,7 @@ function toonGeladen({ meshes, edges, counts }, naam, materialen = null) {
 }
 
 function showResult(result, fileName, materialen = null) {
+    vergeetDeelKeuze();
     clearSelection();
     ruimVoorbeeldOp(modelRoot);
     scene.remove(modelRoot);
@@ -5167,7 +5210,9 @@ function pick(event) {
     raycaster.params.Line.threshold = PIXELMARGE * mmPerPixel;
 
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObject(modelRoot, true);
+    // Een verborgen onderdeel (Show Only) is wel geometrie maar niet te zien,
+    // en dan ook niet aan te klikken.
+    const hits = raycaster.intersectObject(modelRoot, true).filter(zichtbaarGeraakt);
     const edgeHits = edgeRoot.visible
         ? raycaster.intersectObjects(edgeRoot.children, false)
         : [];
@@ -5204,6 +5249,15 @@ function pick(event) {
         clearSelection();
         statusEl.textContent =
             'Daar zit geen vlak. Klik iets verder op het model.';
+        return;
+    }
+
+    // Bij een GEBOUWD model is een klik een onderdeel: de hele staander, niet
+    // één vlak ervan. Bij een ingelezen STEP-bestand weten we niet wat de
+    // onderdelen zijn, en blijft het een vlak.
+    const deelIndex = deelVanVlak(hit.object, faceIndex);
+    if (deelIndex !== null) {
+        selecteerDeel(hit.object, hit.object.userData.brepFaces[faceIndex].solid, deelIndex);
         return;
     }
 
@@ -5252,12 +5306,203 @@ function clearSelection() {
     if (!selection) return;
     // Terug naar het EIGEN materiaal van die groep, niet naar MAT_FACE. Een
     // houten trede die je een keer hebt aangeklikt hoort niet grijs te worden.
+    // Een onderdeel heeft er meer dan één: al zijn vlakken.
     const eigen = selection.mesh.userData.eigenMateriaal;
-    selection.mesh.geometry.groups[selection.groupIndex].materialIndex =
-        (eigen && eigen[selection.groupIndex] !== undefined)
-            ? eigen[selection.groupIndex] : MAT_FACE;
+    for (const g of selection.groepen || [selection.groupIndex]) {
+        selection.mesh.geometry.groups[g].materialIndex =
+            (eigen && eigen[g] !== undefined) ? eigen[g] : MAT_FACE;
+    }
     selection = null;
+    werkDeelBalkBij();
 }
+
+// --- een onderdeel kiezen, en Show Only -------------------------------------
+//
+// Het gebouwde model is ÉÉN mesh; elk vlak weet van welke solid het is
+// (tessellate.js), en solid n is onderdeel n - deelVerschuiving van
+// laatsteDelen. Een onderdeel kiezen is dus: al zijn vlakken oranje.
+//
+// SHOW ONLY VERANDERT ALLEEN WAT JE ZIET. De andere onderdelen krijgen
+// tijdelijk een onzichtbaar materiaal; de geometrie, de onderdelenlijst en
+// alles wat daaruit komt (stuklijst, tekeningen, STEP, NC) blijven precies
+// zoals ze waren. Show All zet de materialen terug. Een nieuw model (een
+// maat veranderd) begint altijd weer heel.
+
+/** Het onderdeel (index in laatsteDelen) van een vlak, of null. */
+function deelVanVlak(mesh, faceIndex) {
+    if (deelVerschuiving === null || !laatsteDelen) return null;
+    const vlak = (mesh.userData.brepFaces || [])[faceIndex];
+    if (!vlak || !(vlak.solid >= 0)) return null;
+    const i = vlak.solid - deelVerschuiving;
+    return i >= 0 && i < laatsteDelen.length ? i : null;
+}
+
+/** De groepen (in geometry.groups) van alle vlakken van één solid. */
+function groepenVanSolid(mesh, solid) {
+    const uit = [];
+    (mesh.userData.brepFaces || []).forEach((v, f) => {
+        if (v.solid === solid && mesh.userData.groupOfFace.has(f)) uit.push(mesh.userData.groupOfFace.get(f));
+    });
+    return uit;
+}
+
+/** Hoort een raycast-treffer bij iets wat je ziet? */
+function zichtbaarGeraakt(hit) {
+    if (!isolatie || hit.object !== isolatie.mesh) return true;
+    const f = findBrepFace(hit.object.userData.brepFaces, hit.faceIndex);
+    return f >= 0 && hit.object.userData.brepFaces[f].solid === isolatie.solid;
+}
+
+/** Een naam voor het onderdeel zoals de werkplaats het kent. */
+function deelNaam(index) {
+    const d = laatsteDelen[index];
+    const soort = d.soort.charAt(0).toUpperCase() + d.soort.slice(1);
+    const u = (laatsteOnderdelen || []).find(o => (o.exemplaren || [o.deel]).includes(d));
+    const nr = u && u.nummer ? `nr ${String(u.nummer).padStart(3, '0')}` : '';
+    // Een profiel heet naar zijn profiel en zaaglengte; een plaat of iets
+    // zonder profiel naar zijn maten (160 × 200 × 10).
+    if (!d.profiel) {
+        const maten = [d.dx, d.dy, d.dz].map(v => Math.round(v)).sort((a, b) => b - a).join(' × ');
+        return [nr, soort, d.omschrijving || '', `${maten} mm`].filter(Boolean).join(' · ');
+    }
+    const lang = d.zaaglengte || { x: d.dx, y: d.dy, z: d.dz }[d.lengteAs];
+    return [nr, soort, d.profiel.englishLabel || d.profiel.label || '',
+            lang ? `${Math.round(lang)} mm` : ''].filter(Boolean).join(' · ');
+}
+
+function selecteerDeel(mesh, solid, index) {
+    clearSelection();
+    const groepen = groepenVanSolid(mesh, solid);
+    for (const g of groepen) mesh.geometry.groups[g].materialIndex = MAT_SELECTED;
+    selection = { mesh, groupIndex: groepen[0], groepen, faceIndex: -1 };
+    gekozenDeel = { mesh, solid, index };
+    statusEl.textContent = `${deelNaam(index)} geselecteerd.`;
+    werkDeelBalkBij();
+}
+
+/** De mesh van het gebouwde model (zelftest). */
+export const modelMeshVoorTest = () => modelRoot.children.find(m => m.userData && m.userData.brepFaces) || null;
+
+/** Onderdeel `index` van laatsteDelen kiezen, zoals een klik dat doet (zelftest). */
+export function kiesDeel(index) {
+    const mesh = modelMeshVoorTest();
+    if (!mesh || deelVerschuiving === null || !laatsteDelen || !laatsteDelen[index]) return false;
+    selecteerDeel(mesh, index + deelVerschuiving, index);
+    return true;
+}
+
+/** Alleen het gekozen onderdeel tonen. */
+export function toonAlleenDeel() {
+    if (!gekozenDeel) return;
+    const { mesh, solid, index } = gekozenDeel;
+    toonAllesWeer(false);
+    clearSelection();
+    gekozenDeel = { mesh, solid, index };
+    const onzichtbaar = new THREE.MeshBasicMaterial({ visible: false });
+    const plek = mesh.material.length;
+    mesh.material.push(onzichtbaar);
+    const eigen = new Set(groepenVanSolid(mesh, solid));
+    const was = new Map();
+    mesh.geometry.groups.forEach((g, i) => {
+        if (eigen.has(i)) return;
+        was.set(i, g.materialIndex);
+        g.materialIndex = plek;
+    });
+    // De randen en maatlijnen horen bij het hele model; zonder de rest
+    // zouden ze in de lucht hangen.
+    isolatie = { mesh, solid, was, plek, randen: edgeRoot.visible,
+                 maten: matenGroep ? matenGroep.visible : null };
+    edgeRoot.visible = false;
+    if (matenGroep) matenGroep.visible = false;
+    // In beeld: het onderdeel, niet de lege plek waar de balustrade stond.
+    const doos = new THREE.Box3();
+    const pos = mesh.geometry.getAttribute('position');
+    const idx = mesh.geometry.getIndex();
+    const p = new THREE.Vector3();
+    for (const g of eigen) {
+        const groep = mesh.geometry.groups[g];
+        for (let k = groep.start; k < groep.start + groep.count; k++) {
+            doos.expandByPoint(p.fromBufferAttribute(pos, idx.getX(k)));
+        }
+    }
+    if (!doos.isEmpty()) {
+        doos.applyMatrix4(mesh.matrixWorld);
+        const hulp = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([doos.min, doos.max]));
+        navigatie.stopAnimatie();
+        richtCameraOp(hulp, new THREE.Vector3(1, -1, 0.8).normalize());
+        hulp.geometry.dispose();
+    }
+    statusEl.textContent = `Alleen ${deelNaam(index)} - Show All toont weer alles.`;
+    werkDeelBalkBij();
+}
+
+/** Alles weer tonen. `inBeeld`: de camera weer op het hele model. */
+export function toonAllesWeer(inBeeld = true) {
+    if (!isolatie) return;
+    const { mesh, was, plek, randen, maten } = isolatie;
+    for (const [i, m] of was) mesh.geometry.groups[i].materialIndex = m;
+    const onzichtbaar = mesh.material[plek];
+    mesh.material.splice(plek, 1);
+    if (onzichtbaar) onzichtbaar.dispose();
+    edgeRoot.visible = randen;
+    if (matenGroep && maten !== null) matenGroep.visible = maten;
+    isolatie = null;
+    if (inBeeld) {
+        fitCameraToObject(modelRoot);
+        // Het onderdeel blijft gekozen en oranje: zo zie je waar het zit.
+        if (gekozenDeel && gekozenDeel.mesh === mesh) {
+            selecteerDeel(mesh, gekozenDeel.solid, gekozenDeel.index);
+        }
+        statusEl.textContent = 'Weer het hele model in beeld.';
+    }
+    werkDeelBalkBij();
+}
+
+/** Een nieuw model: niets meer gekozen, niets meer verborgen. */
+function vergeetDeelKeuze() {
+    if (isolatie) toonAllesWeer(false);
+    gekozenDeel = null;
+    werkDeelBalkBij();
+}
+
+/** Tijdens een render voor een blad: even alles tonen, daarna terug. */
+function zonderIsolatie(doe) {
+    if (!isolatie || isolatiePauze) return doe();
+    const { mesh, was, randen, maten } = isolatie;
+    const nu = new Map();
+    for (const [i, m] of was) { nu.set(i, mesh.geometry.groups[i].materialIndex); mesh.geometry.groups[i].materialIndex = m; }
+    const r = [edgeRoot.visible, matenGroep ? matenGroep.visible : null];
+    edgeRoot.visible = randen;
+    if (matenGroep && maten !== null) matenGroep.visible = maten;
+    isolatiePauze = true;
+    try { return doe(); } finally {
+        isolatiePauze = false;
+        for (const [i, m] of nu) mesh.geometry.groups[i].materialIndex = m;
+        edgeRoot.visible = r[0];
+        if (matenGroep && r[1] !== null) matenGroep.visible = r[1];
+    }
+}
+
+/** De balk linksboven in het beeld: wat er gekozen is, en de twee knoppen. */
+function werkDeelBalkBij() {
+    const balk = document.getElementById('deelBalk');
+    if (!balk) return;
+    const deelZichtbaar = Boolean(gekozenDeel && laatsteDelen && laatsteDelen[gekozenDeel.index]);
+    balk.hidden = !deelZichtbaar && !isolatie;
+    if (balk.hidden) return;
+    document.getElementById('deelNaam').textContent = deelZichtbaar
+        ? (isolatie ? 'Alleen: ' : '') + deelNaam(gekozenDeel.index) : '';
+    document.getElementById('toonAlleen').disabled = !deelZichtbaar || Boolean(isolatie);
+    document.getElementById('toonAlles').disabled = !isolatie;
+}
+document.getElementById('toonAlleen')?.addEventListener('click', () => toonAlleenDeel());
+document.getElementById('toonAlles')?.addEventListener('click', () => toonAllesWeer());
+// Escape: eerst alles weer tonen, dan de keuze weg.
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.target instanceof HTMLInputElement) return;
+    if (isolatie) toonAllesWeer();
+    else if (gekozenDeel) { gekozenDeel = null; clearSelection(); }
+});
 
 // --- edge-selectie ---------------------------------------------------------
 // Elke edge is een eigen THREE.Line met zijn edgeId in userData, dus de raycaster

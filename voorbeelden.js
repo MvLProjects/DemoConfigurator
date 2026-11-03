@@ -119,7 +119,7 @@ export const VOORBEELDEN = [
         wat: 'balustrade',
         b: { lengte: 3000, hoogte: 1100, vulling: 'knieregel', staanderProfiel: FL80,
              handregelProfiel: CHS48, regelVoor: 1, schoprand: 1, geslotenEind: 1,
-             verzinken: true },
+             verzinken: true, voetplaatVorm: 'groot' },
     },
     {
         id: 'hekwerk',

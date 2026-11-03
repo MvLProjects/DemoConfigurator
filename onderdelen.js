@@ -372,8 +372,13 @@ const rond = (v) => Math.round(v * 100) / 100;
  * niet per se voor een kort stuk uit een dik profiel.
  */
 export function beschrijf(deel) {
-    const maten = [deel.dx, deel.dy, deel.dz].sort((a, b) => a - b);
     const langs = { x: 'dx', y: 'dy', z: 'dz' }[deel.lengteAs];
+    // De doorsnede is wat er NAAST de lengte ligt, niet "de twee kleinste".
+    // Bij een plaat van 160 lang en 200 breed stond er anders 10 × 160 met
+    // een lengte van 160, en ontbrak de 200.
+    const maten = langs
+        ? [...['dx', 'dy', 'dz'].filter(k => k !== langs).map(k => deel[k]).sort((a, b) => a - b), deel[langs]]
+        : [deel.dx, deel.dy, deel.dz].sort((a, b) => a - b);
     const pr = deel.profiel;
 
     // Het materiaal zoals de werkplaats het moet lezen. Bij een profiel uit de

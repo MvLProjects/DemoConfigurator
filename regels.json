@@ -220,7 +220,8 @@
     "geslotenEind": 0,
     "eindkappen": 0,
     "knieregelHoogte": 500,
-    "muurEind": 0
+    "muurEind": 0,
+    "voetplaatVorm": "smal"
   },
 
   "voetplaat": {
@@ -228,6 +229,29 @@
     "breedte": 50,
     "gat": 20,
     "gatAfstand": 90
+  },
+
+  "_voetplaatVormen": [
+    "DE GROTE VOETPLAAT, op aanwijzing van Marthijn voor de industriele leuning:",
+    "de smalle plaat van 150 x 50 is smaller dan een platte staander van 80 diep,",
+    "en met beide gaten op de hartlijn heeft het anker tegen kantelen maar 25 mm",
+    "arm (zie anker.js).",
+    "",
+    "160 langs x 200 dwars, vier gaten Ø18 (M16-anker), hart op hart 100 langs",
+    "en 140 dwars: een rij VOOR en een rij ACHTER de staander. Waarom 140 dwars:",
+    "de schoprand loopt achter de staanders, 10 mm boven de plaat, op 40..46 mm",
+    "achter het hart. Een sluitring van Ø30 met moer (samen ~16 hoog) past daar",
+    "niet onder; op 70 mm blijft er 9 mm vrij tot de schoprand en 15 mm tot een",
+    "staander van 80 diep. Randafstand 30 = 1,67 x het gat, boven de 1,2 x d0",
+    "van NEN-EN 1993-1-8 tabel 3.3 en boven de aanbevolen 1,5. Arm tegen",
+    "kantelen 100 + 70 = 170 mm.",
+    "",
+    "`smal` is de plaat hierboven, ongewijzigd: bestaande ontwerpen veranderen",
+    "niet. `gatAfstandDwars` > 0 betekent twee rijen gaten in plaats van een."
+  ],
+  "voetplaatVormen": {
+    "smal": {},
+    "groot": { "lengte": 160, "breedte": 200, "gat": 18, "gatAfstand": 100, "gatAfstandDwars": 140 }
   },
 
   "_vulraamwerk": [

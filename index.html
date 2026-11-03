@@ -118,6 +118,17 @@
         top: 50%; transform: translateY(-50%); font-size: 11px; color: #8a939b;
         pointer-events: none; }
     #panel .metEenheid input[type=number] { width: 50px; padding-right: 27px; }
+    #deelBalk { position: absolute; top: 12px; left: 12px; z-index: 3; display: flex;
+        align-items: center; gap: 8px; flex-wrap: wrap; max-width: calc(100% - 140px);
+        background: rgba(255,255,255,0.96); border: 1px solid #dde3ea; border-left: 4px solid #ff8a2b;
+        border-radius: 6px; padding: 6px 8px 6px 10px; font-size: 12.5px; color: #333;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    #deelBalk[hidden] { display: none; }
+    #deelNaam { font-weight: 600; }
+    #deelBalk button { padding: 4px 10px; font: inherit; cursor: pointer; border-radius: 4px;
+        border: 1px solid #c6ccd2; background: #fff; color: #333; }
+    #deelBalk button#toonAlleen { background: #2d6cdf; border-color: #2d6cdf; color: #fff; }
+    #deelBalk button:disabled { opacity: .45; cursor: default; }
     #leegBeeld { position: absolute; inset: 0; display: flex; align-items: center;
         justify-content: center; pointer-events: none; z-index: 1; }
     #leegBeeld[hidden] { display: none; }
@@ -331,7 +342,7 @@
     #panel textarea.breed { width: 100%; box-sizing: border-box; margin-bottom: 6px;
                             padding: 4px 5px; font: inherit; resize: vertical;
                             border: 1px solid #c6ccd2; border-radius: 3px; }
-    #panel input[type=text] { width: 110px; padding: 3px 5px; font: inherit;
+    #panel input[type=text], #panel input[type=password] { width: 110px; padding: 3px 5px; font: inherit;
                               border: 1px solid #c6ccd2; border-radius: 3px; }
     #panel input[type=file] { width: 110px; font-size: 11px; }
     .cfg_rij { display: flex; gap: 5px; margin-bottom: 8px; }
@@ -486,7 +497,14 @@
     .ksRegel.ksLeeg .ksBedrag { color: #8c2b2b; }
     .ksRegel.ksTotaal { border-bottom: 0; border-top: 2px solid #cfd6dc;
                         font-weight: 600; margin-top: 3px; padding-top: 4px; }
-    .ksBron { font-size: 10px; color: #98a1a9; }
+    /* De bron op een eigen regel onder de naam, niet in een smal kolommetje. */
+    .ksBron { display: block; font-size: 10px; color: #98a1a9; }
+    .ksKaart { border: 1px solid #cfe0f5; background: #f2f7fd; border-radius: 6px;
+        padding: 8px 10px; margin: 4px 0 10px; font-size: 12px; }
+    .ksKaart > b { display: block; font-size: 16px; margin: 2px 0; }
+    .ksKaart .hint { margin: 2px 0 0; }
+    .ksSub { font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+        letter-spacing: .04em; color: #6b747c; margin: 6px 0 2px; }
     #levVak { display: none; margin-top: 10px; }
     .levSoort { font-size: 11px; font-weight: 600; color: #55606a;
                 margin: 7px 0 3px; }
@@ -537,7 +555,8 @@
     #stuklijstTabel tfoot td { font-weight: 600; border-top: 1px solid #dde3ea;
                                border-bottom: none; padding-top: 4px; }
     /* --- instellingen bewaren --- */
-    #instellingen { margin-top: 18px; border-top: 1px solid #e2e6ea; padding-top: 12px; }
+    /* Geen streep bovenaan: dit is het enige in het tabblad, er valt niets te scheiden. */
+    #instellingen { margin-top: 0; }
     #instelRij { display: flex; gap: 6px; }
     #instelRij button { margin-top: 0; }
     /* --- opdrachtvenster onderaan het paneel --- */
@@ -1058,9 +1077,18 @@
                uiteinden, niet in een hoek. 0 laat hem op de staander eindigen.</p>
             <div class="veld"><label for="p_voetplaatDikte">voetplaatdikte</label>
                 <input type="number" id="p_voetplaatDikte" step="1"></div>
-            <p class="hint">Onder elke staander komt een plaat van 150 × 50 met
-               twee boutgaten van ⌀20. De staander staat erop en wordt dus even
-               veel korter, zodat de hoogte klopt. 0 betekent geen voetplaat.</p>
+            <div class="veld"><label for="p_voetplaatVorm">voetplaat</label>
+                <select id="p_voetplaatVorm">
+                    <option value="smal">smal, 150 × 50, 2 gaten</option>
+                    <option value="groot">groot, 160 × 200, 4 gaten</option>
+                </select></div>
+            <p class="hint">Onder elke staander komt een plaat. <b>Smal</b>: 150 × 50 met
+               twee boutgaten van ⌀20 op de hartlijn. <b>Groot</b>: 160 langs × 200 dwars
+               met vier gaten van ⌀18 (M16), een rij vóór en een rij achter de staander
+               (hart op hart 100 × 140), vrij van de schoprand - veel sterker tegen
+               kantelen en breder dan een platte staander.
+               De staander staat erop en wordt dus even veel korter, zodat de hoogte
+               klopt. Dikte 0 betekent geen voetplaat.</p>
             <div class="veld"><label for="p_vulraamwerk">vulraamwerk</label>
                 <input type="checkbox" id="p_vulraamwerk"></div>
             <p class="hint">Zet de spijlen in een eigen raam van twee regels in
@@ -1647,7 +1675,9 @@
                 </select></div>
             <p class="hint">Getekend liggen beide ankers op de hartlijn van een plaat van 50 breed:
                tegen kantelen hebben ze maar 25 mm arm. Dwars gedraaid wordt dat 120 mm.
-               Deze keuze verandert alleen de berekening, nog niet het model.</p>
+               Deze keuze verandert alleen de berekening, nog niet het model. Met de
+               <b>grote voetplaat</b> (tabblad Balustrade) rekent de app met de vier
+               gaten zoals getekend, 70 mm voor en achter het hart, en doet deze keuze niets.</p>
             <div class="veld"><label for="a_fck">betonklasse</label>
                 <select id="a_fck">
                     <option value="">kies</option>
@@ -1771,6 +1801,14 @@
     <div id="viewport">
         <!-- HET LEGE BEELD zegt wat je moet doen, in plaats van een grijs vlak.
              Weg zodra er een model staat; zie werkLeegBeeldBij in main.js. -->
+        <!-- HET GEKOZEN ONDERDEEL: klik een onderdeel aan, en hier staat wat het
+             is, met Show Only (alleen dit tonen) en Show All (alles weer).
+             Alleen bij een gebouwd model; zie "een onderdeel kiezen" in main.js. -->
+        <div id="deelBalk" role="toolbar" aria-label="gekozen onderdeel" hidden>
+            <span id="deelNaam"></span>
+            <button type="button" id="toonAlleen" title="Alleen dit onderdeel tonen; de rest wordt tijdelijk verborgen">Show Only</button>
+            <button type="button" id="toonAlles" title="Weer het hele model tonen (Esc)" disabled>Show All</button>
+        </div>
         <div id="leegBeeld">
             <div class="leegKaart">
                 <b>Nog geen model</b>

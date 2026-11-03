@@ -24,6 +24,10 @@ export const IJKPUNTEN = regels.ijkpunten;
 // de knop die ertoe doet: 0 betekent geen voetplaat. De rest zijn maten die
 // zelden veranderen, en vijf extra invoervelden maken het paneel onleesbaar.
 export const VOETPLAAT = regels.voetplaat;
+export const VOETPLAAT_VORMEN = regels.voetplaatVormen || {};
+/** De voetplaat van een ontwerp: de standaard, de gekozen vorm, een eigen opgave. */
+export const voetplaatVan = (p = {}) =>
+    ({ ...VOETPLAAT, ...(VOETPLAAT_VORMEN[p.voetplaatVorm] || {}), ...(p.voetplaat || {}) });
 
 // De maten van het vulraamwerk. Zelfde reden als bij de voetplaat: alleen de
 // aan/uit-schakelaar staat in het paneel, de maten staan hier.
@@ -300,10 +304,11 @@ export function valideer(p) {
     // De gaten moeten op de plaat passen. Vallen ze over de rand, dan levert de
     // uitsnede geen gesloten vorm meer op en is er niets aan te zien - het
     // onderdeel ziet er gewoon raar uit. Beter er hier op stuiten.
-    const vp = { ...VOETPLAAT, ...(p.voetplaat || {}) };
+    const vp = voetplaatVan(p);
     if (fouten.length === 0 && p.voetplaatDikte > 0 && vp.gat > 0) {
         const rand = vp.lengte / 2 - vp.gatAfstand / 2 - vp.gat / 2;
-        if (rand < 0) {
+        const randDwars = vp.breedte / 2 - (vp.gatAfstandDwars || 0) / 2 - vp.gat / 2;
+        if (rand < 0 || randDwars < 0) {
             fouten.push('de gaten vallen over de rand van de voetplaat');
         }
         if (vp.gat >= vp.breedte) {

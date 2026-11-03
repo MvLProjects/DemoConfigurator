@@ -9906,6 +9906,12 @@ try {
     check('de kop zegt dat het richtprijzen zijn en geen offerte',
         /richtprijzen/i.test(auKop) && /geen offerte/i.test(auKop),
         auKop.slice(0, 70));
+    // EERST DE PRIJS MET ARBEID, zoals op de offerte; dan het materiaal.
+    const auKaart = doc.querySelector('#kostenInhoud .ksKaart');
+    check('Kosten begint met de prijsindicatie met arbeid, met een Nederlandse datum in de kop',
+        !!auKaart && /€/.test(auKaart.textContent) && /arbeid/.test(auKaart.textContent)
+        && !/\d{4}-\d{2}-\d{2}/.test(auKop),
+        (auKaart ? auKaart.textContent : 'geen kaart') + ' | ' + auKop.slice(-40));
     check('en het slot zegt dat arbeid er niet in zit',
         /arbeid/i.test(doc.getElementById('kostenSlot').textContent),
         doc.getElementById('kostenSlot').textContent.slice(0, 70));
@@ -11767,6 +11773,142 @@ try {
         bpStatus.textContent = 'een lange statusregel om af te kappen';
         await new Promise(r => setTimeout(r, 0));
         check('de hele statusregel staat in de tooltip', bpStatus.title === 'een lange statusregel om af te kappen');
+    }
+
+    // ============ DEEL BQ: grote voetplaat en Show Only =====================
+    log('\n\n======== DEEL BQ: de grote voetplaat en Show Only (feedback Marthijn) ========\n');
+    {
+        const bqVoor = errors.length;
+        // 1. DE GROTE VOETPLAAT: 160 langs x 200 dwars, vier gaten, en dat bij
+        //    elke lengte - dus ook als er staanders bij komen.
+        const bqPr = (re) => cat.alleProfielen(catBoom).find(x => re.test(x.englishLabel || x.label || ''));
+        const bqFl = bqPr(/^FL 80x12$/), bqChs = bqPr(/^CHS 48\.3x2\.6$/);
+        const bqVp = regelsNu.voetplaatVan({ voetplaatVorm: 'groot' });
+        check('de grote voetplaat: 160 × 200, gat 18, hart op hart 100 × 140',
+            bqVp.lengte === 160 && bqVp.breedte === 200 && bqVp.gat === 18
+            && bqVp.gatAfstand === 100 && bqVp.gatAfstandDwars === 140, JSON.stringify(bqVp));
+        check('zonder keuze blijft het de smalle plaat van 150 × 50 met twee gaten',
+            regelsNu.voetplaatVan({}).breedte === 50 && !(regelsNu.voetplaatVan({}).gatAfstandDwars > 0));
+        const SCH = regelsNu.SCHOPRAND;
+        for (const lengte of [3000, 4700]) {
+            const p = { ...regelsNu.STANDAARD, lengte, hoogte: 1100, vulling: 'knieregel',
+                        staanderProfiel: bqFl, handregelProfiel: bqChs, regelVoor: 1, schoprand: 1,
+                        geslotenEind: 1, voetplaatVorm: 'groot' };
+            const delen = bouwMod.balustradeDelen(p);
+            const platen = delen.filter(d => d.soort === 'voetplaat');
+            const staanders = delen.filter(d => d.soort === 'staander');
+            const halfDiep = 40, halfDik = 6;          // FL 80x12, 80 dwars
+            const ring = 15;                            // sluitring M16, Ø30
+            const fout = [];
+            for (const pl of platen) {
+                if (Math.abs(pl.dx - 160) > 1e-6 || Math.abs(pl.dy - 200) > 1e-6) fout.push(`maat ${pl.dx}×${pl.dy}`);
+                if (pl.gaten.length !== 4) fout.push(`${pl.gaten.length} gaten`);
+                for (const g of pl.gaten) {
+                    const u = g.x - pl.dx / 2, v = g.y - pl.dy / 2;     // vanaf het hart
+                    const rand = Math.min(g.x, pl.dx - g.x, g.y, pl.dy - g.y);
+                    if (rand < 1.5 * g.diameter) fout.push(`rand ${rand}`);
+                    // Niet onder de staander, met ruimte voor de ring.
+                    if (Math.abs(u) < halfDik + ring && Math.abs(v) < halfDiep + ring) fout.push(`onder de staander ${u},${v}`);
+                    // Niet onder de schoprand: die ligt achter de staander,
+                    // van halfDiep tot halfDiep + dikte.
+                    if (Math.abs(v) + ring > halfDiep && Math.abs(v) - ring < halfDiep + SCH.dikte) fout.push(`onder de schoprand ${v}`);
+                }
+            }
+            check(`lengte ${lengte}: elke staander op een plaat van 160 × 200 met 4 gaten, `
+                + 'vrij van staander en schoprand, randafstand ≥ 1,5 × het gat',
+                platen.length === staanders.length && platen.length >= 2 && fout.length === 0,
+                `${platen.length} platen, ${staanders.length} staanders; ${fout.slice(0, 4).join(', ')}`);
+        }
+        check('de validatie houdt gaten buiten de rand, ook dwars',
+            regelsNu.valideer({ ...regelsNu.STANDAARD, voetplaat: { breedte: 120, gatAfstandDwars: 140 } })
+                .some(f => /rand van de voetplaat/.test(f)));
+        // 2. DE ANKERS rekenen met de plaat zoals getekend: arm 100 + 70.
+        const bqAk = await win.eval("import('/anker.js')");
+        const bqKr = bqAk.ankerKrachten(1e6, 3000, bqAk.plaatVoor('langs', bqVp));
+        check('ankers onder de grote plaat: arm 170 mm, twee in trek',
+            Math.abs(bqKr.arm - 170) < 1e-9 && bqKr.aantalTrek === 2, JSON.stringify(bqKr));
+        // 3. DE STUKLIJST noemt de plaat zoals hij is: 10 × 200, lang 160.
+        const bqOnd = await win.eval("import('/onderdelen.js')");
+        const bqB = bqOnd.beschrijf({ soort: 'voetplaat', dx: 160, dy: 200, dz: 10, lengteAs: 'x', profiel: null });
+        check('stuklijst: voetplaat 10 × 200, lengte 160 (niet 10 × 160)',
+            bqB.profiel === '10 × 200' && bqB.lengte === 160, `${bqB.profiel} / ${bqB.lengte}`);
+
+        // 4. SHOW ONLY in de echte app, op het voorbeeld Industriële leuning.
+        const bqStatus = doc.getElementById('status');
+        bqStatus.textContent = '';
+        await mainMod.openVoorbeeld('industrieel-balk');
+        for (let i = 0; i < 40000 && !/Balustrade \d|mislukt/.test(bqStatus.textContent); i++) await sleep(25);
+        check('het voorbeeld Industriële leuning bouwt, met de grote voetplaat',
+            /Balustrade \d/.test(bqStatus.textContent) && doc.getElementById('p_voetplaatVorm').value === 'groot',
+            bqStatus.textContent.slice(0, 60));
+        const offT = new TextDecoder('latin1').decode(await mainMod.maakOfferteBlad());
+        check('de offerte noemt de voetplaten: 160 × 200 × 10, 4 gaten Ø18',
+            /\(160 × 200 × 10, 4 gaten Ø18\)/.test(offT));
+        const model = await win.eval("import('/main.js')");
+        const balk = doc.getElementById('deelBalk');
+        check('zonder keuze geen balk', balk.hidden === true);
+        // Een staander kiezen, zoals een klik dat doet.
+        let stIndex = -1;
+        for (let i = 0; i < 60; i++) {
+            if (!model.kiesDeel(i)) break;
+            if (/Staander/.test(doc.getElementById('deelNaam').textContent)) { stIndex = i; break; }
+        }
+        check('een staander kiezen: de balk noemt hem, met nummer en profiel',
+            stIndex >= 0 && !balk.hidden && /nr \d{3} · Staander · FL 80x12/.test(doc.getElementById('deelNaam').textContent)
+            && !doc.getElementById('toonAlleen').disabled && doc.getElementById('toonAlles').disabled,
+            doc.getElementById('deelNaam').textContent);
+        const mesh = model.modelMeshVoorTest();
+        const groepenVoor = mesh.geometry.groups.map(g => g.materialIndex).join(',');
+        const posVoor = mesh.geometry.getAttribute('position').count;
+        const stuklijstVoor = doc.getElementById('stuklijstTabel').textContent;
+        doc.getElementById('toonAlleen').click();
+        const zichtbaar = mesh.geometry.groups.filter(g => mesh.material[g.materialIndex].visible !== false).length;
+        const verborgen = mesh.geometry.groups.length - zichtbaar;
+        check('Show Only: alleen de staander zichtbaar, de rest verborgen',
+            zichtbaar > 0 && verborgen > zichtbaar && /^Alleen: /.test(doc.getElementById('deelNaam').textContent)
+            && !doc.getElementById('toonAlles').disabled, `${zichtbaar} zichtbaar, ${verborgen} verborgen`);
+        check('Show Only verandert geen geometrie, stuklijst of onderdelen',
+            mesh.geometry.getAttribute('position').count === posVoor
+            && doc.getElementById('stuklijstTabel').textContent === stuklijstVoor);
+        // Een blad (offerte, tekening) toont altijd het hele model.
+        let tijdensRender = -1;
+        const echteRender = mesh.onBeforeRender;
+        mesh.onBeforeRender = () => {
+            tijdensRender = mesh.geometry.groups.filter(g => mesh.material[g.materialIndex].visible !== false).length;
+        };
+        const beeld = model.rendersAanzicht([1, -1, 0.8], 300, 200, { voorKlant: true });
+        mesh.onBeforeRender = echteRender;
+        const naRender = mesh.geometry.groups.filter(g => mesh.material[g.materialIndex].visible !== false).length;
+        check('een render voor een blad toont alles, en daarna blijft Show Only staan',
+            !!beeld && tijdensRender === mesh.geometry.groups.length && naRender === zichtbaar,
+            `tijdens ${tijdensRender} van ${mesh.geometry.groups.length}, daarna ${naRender}`);
+        doc.getElementById('toonAlles').click();
+        const naShowAll = mesh.geometry.groups.map(g => g.materialIndex);
+        check('Show All: alles weer zichtbaar, de staander nog gekozen (oranje)',
+            mesh.geometry.groups.every(g => mesh.material[g.materialIndex] && mesh.material[g.materialIndex].visible !== false)
+            && naShowAll.some(m => m === 2) && doc.getElementById('toonAlles').disabled,
+            `${naShowAll.filter(m => m === 2).length} oranje groepen`);
+        // Escape wist de keuze; dan zijn de materialen precies als voorheen.
+        doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        // (groepenVoor is NA het kiezen vastgelegd, met de staander oranje;
+        // daarom hier: niets oranje, alles zichtbaar, geen extra materiaal.)
+        check('Escape: niets meer gekozen, niets oranje, alles zichtbaar, geen verborgen materiaal over',
+            balk.hidden === true && !mesh.geometry.groups.some(g => g.materialIndex === 2)
+            && mesh.geometry.groups.every(g => mesh.material[g.materialIndex] && mesh.material[g.materialIndex].visible !== false)
+            && !mesh.material.some(m => m.visible === false),
+            balk.hidden ? 'balk weg' : 'balk staat er nog');
+        // Een nieuwe bouw (een maat veranderd) begint weer heel.
+        model.kiesDeel(stIndex);
+        doc.getElementById('toonAlleen').click();
+        bqStatus.textContent = '';
+        doc.getElementById('genereer').click();
+        for (let i = 0; i < 40000 && !/Balustrade \d|mislukt/.test(bqStatus.textContent); i++) await sleep(25);
+        const nieuw = model.modelMeshVoorTest();
+        check('na opnieuw bouwen is alles zichtbaar en niets gekozen',
+            nieuw && nieuw.geometry.groups.every(g => nieuw.material[g.materialIndex].visible !== false)
+            && balk.hidden === true, bqStatus.textContent.slice(0, 50));
+        check('grote voetplaat en Show Only geven geen fout in de console',
+            errors.length === bqVoor, errors.slice(bqVoor).join(' | '));
     }
 
     // ============ DEEL BN1: DSTV-NC1 voor de zaagstraat =======================
